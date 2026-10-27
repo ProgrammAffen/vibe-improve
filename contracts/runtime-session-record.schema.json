@@ -1,0 +1,409 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vibe-improve.local/contracts/runtime-session-record.schema.json",
+  "title": "Decrypted runtime session record",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "envId",
+        "accessToken",
+        "refreshToken"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "envId": {
+          "const": "one-person-company-7dao3979fd72e"
+        },
+        "accessToken": {
+          "$ref": "#/$defs/token"
+        },
+        "refreshToken": {
+          "$ref": "#/$defs/token"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "envId",
+        "accessToken",
+        "refreshToken",
+        "accessExpiresAt",
+        "sessionExpiresAt",
+        "validatedAt",
+        "user",
+        "scope",
+        "licenseCache"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 2
+        },
+        "envId": {
+          "const": "one-person-company-7dao3979fd72e"
+        },
+        "accessToken": {
+          "$ref": "#/$defs/token"
+        },
+        "refreshToken": {
+          "$ref": "#/$defs/token"
+        },
+        "accessExpiresAt": {
+          "$ref": "#/$defs/time"
+        },
+        "sessionExpiresAt": {
+          "$ref": "#/$defs/time",
+          "description": "End of the rolling local identity window; renewed only after successful provider authentication, at most seven days after validatedAt. Expiry requires online silent refresh, not unconditional deletion of refresh credentials."
+        },
+        "validatedAt": {
+          "$ref": "#/$defs/time",
+          "description": "Trusted time of the latest successful provider authentication; opening the app or a local action cannot advance it."
+        },
+        "user": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "email",
+            "nickname"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+            },
+            "email": {
+              "type": "string",
+              "maxLength": 320,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+            },
+            "nickname": {
+              "type": "string",
+              "maxLength": 256,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+            }
+          }
+        },
+        "scope": {
+          "type": "string",
+          "maxLength": 1024,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+        },
+        "licenseCache": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/licenseCache"
+            }
+          ]
+        },
+        "licenseClock": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/licenseClock"
+            }
+          ]
+        },
+        "networkRetry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "attempts",
+            "nextRetryAt",
+            "refreshDevices"
+          ],
+          "properties": {
+            "attempts": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            },
+            "nextRetryAt": {
+              "$ref": "#/$defs/time"
+            },
+            "refreshDevices": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "token": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 16384,
+      "pattern": "^[!-~]+$"
+    },
+    "time": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "licenseCache": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkedAt",
+        "status",
+        "certificate",
+        "bindingId",
+        "licenseId",
+        "maxDevices"
+      ],
+      "properties": {
+        "checkedAt": {
+          "$ref": "#/$defs/time"
+        },
+        "status": {
+          "enum": [
+            "valid",
+            "unlicensed",
+            "expired",
+            "revoked",
+            "device_unbound",
+            "device_revoked",
+            "invalid",
+            "device_limit"
+          ]
+        },
+        "certificate": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "algorithm",
+                "keyId",
+                "payload",
+                "signature"
+              ],
+              "properties": {
+                "algorithm": {
+                  "const": "Ed25519"
+                },
+                "keyId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "payload": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 16384
+                },
+                "signature": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          ]
+        },
+        "bindingId": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "licenseId": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "maxDevices": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "leaseToken": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{64})?$"
+        },
+        "renewal": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/leaseRenewal"
+            }
+          ]
+        },
+        "deviceList": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/deviceListCache"
+            }
+          ]
+        }
+      },
+      "dependentRequired": {
+        "leaseToken": [
+          "renewal"
+        ],
+        "renewal": [
+          "leaseToken"
+        ],
+        "deviceList": [
+          "leaseToken",
+          "renewal"
+        ]
+      }
+    },
+    "leaseRenewal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requestId",
+        "renewalId",
+        "nextLeaseToken",
+        "startedAt",
+        "retryCount",
+        "nextRetryAt"
+      ],
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "renewalId": {
+          "type": "string",
+          "pattern": "^renew_[a-f0-9]{32}$"
+        },
+        "nextLeaseToken": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "startedAt": {
+          "$ref": "#/$defs/time"
+        },
+        "retryCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "nextRetryAt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "deviceListCache": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkedAt",
+        "userId",
+        "licenseId",
+        "maxDevices",
+        "devices"
+      ],
+      "properties": {
+        "checkedAt": {
+          "$ref": "#/$defs/time"
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+        },
+        "licenseId": {
+          "type": "string",
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+        },
+        "maxDevices": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "devices": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "deviceId",
+              "bindingId",
+              "deviceName",
+              "lastSeenAt"
+            ],
+            "properties": {
+              "deviceId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+              },
+              "bindingId": {
+                "type": "string",
+                "maxLength": 80,
+                "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+              },
+              "deviceName": {
+                "type": "string",
+                "maxLength": 80,
+                "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+              },
+              "lastSeenAt": {
+                "type": "string",
+                "maxLength": 64,
+                "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "licenseClock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "bootId",
+        "continuousMs",
+        "serverTimeMs"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "bootId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{16,128}$"
+        },
+        "continuousMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "serverTimeMs": {
+          "$ref": "#/$defs/time"
+        }
+      }
+    }
+  }
+}

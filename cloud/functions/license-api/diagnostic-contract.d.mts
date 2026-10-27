@@ -1,0 +1,10 @@
+export const RESULT_CODES: readonly string[];
+export const PROVIDER_CODES: readonly string[];
+export const STAGES: readonly string[];
+export const REASONS: readonly string[];
+export const PROVIDER_CATEGORIES: readonly string[];
+export const ERROR_TYPES: readonly string[];
+export const SITES: readonly string[];
+export type DiagnosticDetails = {causeCode?:string;parentTraceId?:string;serverTraceId?:string;providerRequestId?:string;stage?:string;reason?:string;providerCode?:string;providerCategory?:string;errorType?:string;site?:string;httpStatus?:number;providerErrorNumber?:number;retryAfterSeconds?:number;line?:number;column?:number;retryable?:boolean};
+export function sanitizeDetails(value:unknown):DiagnosticDetails;
+export function diagnoseError(value:unknown,options?:{stage?:string;verification?:boolean;offline?:boolean}):DiagnosticDetails&{resultCode:string};

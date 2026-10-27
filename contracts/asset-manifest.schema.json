@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vibe-improve.local/contracts/asset-manifest.schema.json",
+  "title": "Approved development assets",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "assets"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "path", "sha256", "source", "license", "licenseEvidence", "approvedBy", "approvalRef", "approvedAt"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,79}(?![\\s\\S])" },
+          "kind": { "enum": ["images", "video", "audio", "fonts", "models", "other"] },
+          "path": { "type": "string", "pattern": "^assets/(images|video|audio|fonts|models|other)/[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}(?![\\s\\S])" },
+          "source": { "$ref": "#/$defs/text" },
+          "license": { "$ref": "#/$defs/text" },
+          "licenseEvidence": { "$ref": "#/$defs/text" },
+          "approvedBy": { "const": "user" },
+          "approvalRef": { "$ref": "#/$defs/text" },
+          "approvedAt": {
+            "type": "string",
+            "anyOf": [{ "format": "date" }, { "format": "date-time" }]
+          },
+          "licenseFile": { "type": "string", "pattern": "^assets/(licenses|fonts)/[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])" },
+          "metadata": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": false,
+            "properties": {
+              "dimensions": { "$ref": "#/$defs/text" },
+              "transparency": { "$ref": "#/$defs/text" },
+              "anchor": { "$ref": "#/$defs/text" },
+              "coordinateSystem": { "$ref": "#/$defs/text" },
+              "animation": { "$ref": "#/$defs/text" },
+              "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
+              "loudness": { "$ref": "#/$defs/text" },
+              "loop": { "type": "boolean" },
+              "fallbackAssetId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,79}(?![\\s\\S])" }
+            }
+          }
+        },
+        "allOf": [{
+          "if": {
+            "properties": {
+              "kind": { "const": "fonts" },
+              "license": { "pattern": "[Oo][Ff][Ll]|[Oo][Pp][Ee][Nn][ -][Ff][Oo][Nn][Tt][ -][Ll][Ii][Cc][Ee][Nn][Ss][Ee]" }
+            },
+            "required": ["kind", "license"]
+          },
+          "then": { "required": ["licenseFile"] }
+        }]
+      }
+    }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1, "maxLength": 4096, "pattern": "\\S" }
+  }
+}

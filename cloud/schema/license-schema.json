@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "provider": "cloudbase-nosql",
+  "functionName": "license-api",
+  "collections": [
+    {
+      "name": "vi_license_activation_codes",
+      "clientPermissions": {
+        "read": false,
+        "write": false
+      },
+      "id": "SHA256(canonical activation code)",
+      "indexes": []
+    },
+    {
+      "name": "vi_license_accounts",
+      "clientPermissions": {
+        "read": false,
+        "write": false
+      },
+      "id": "SHA256(productId + NUL + trusted uid)",
+      "indexes": []
+    },
+    {
+      "name": "vi_license_devices",
+      "clientPermissions": {
+        "read": false,
+        "write": false
+      },
+      "id": "Device: SHA256(productId + NUL + uid + NUL + deviceId); slot: slot_<hash(product,uid,license)>_<index>",
+      "indexes": []
+    },
+    {
+      "name": "vi_license_receipts",
+      "clientPermissions": {
+        "read": false,
+        "write": false
+      },
+      "id": "SHA256(productId + NUL + trusted uid + NUL + requestId)",
+      "indexes": []
+    },
+    {
+      "name": "vi_license_rate_limits",
+      "clientPermissions": {
+        "read": false,
+        "write": false
+      },
+      "id": "SHA256(productId + NUL + trusted uid + NUL + minute bucket)",
+      "indexes": [
+        {
+          "name": "expiresAt_ascending",
+          "fields": [
+            {
+              "field": "expiresAt",
+              "order": "ASC"
+            }
+          ],
+          "unique": false
+        }
+      ]
+    }
+  ],
+  "functionPermissions": {
+    "invoke": "authenticated non-anonymous CloudBase end users only; validate again inside function"
+  },
+  "notes": "Existing vi_ collections are retained. Device and deterministic fixed-slot records coexist in vi_license_devices. All mutations are transactional; old device rows upgrade in place. No resource deletion or client database access."
+}

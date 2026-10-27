@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vibe-improve:agent-capabilities:1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "providers"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1,
+      "type": "integer"
+    },
+    "providers": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "$ref": "#/$defs/provider"
+      }
+    }
+  },
+  "$defs": {
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "status",
+        "transport",
+        "verifiedVersion",
+        "verifiedPlatforms",
+        "verifiedCapabilities",
+        "verifiedAt",
+        "evidence"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "codex",
+            "claude-code",
+            "qoder",
+            "codebuddy",
+            "openclaw",
+            "hermes"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "planned",
+            "probed",
+            "verified"
+          ]
+        },
+        "transport": {
+          "enum": [
+            null,
+            "cli",
+            "acp"
+          ]
+        },
+        "verifiedVersion": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "verifiedPlatforms": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "macos",
+              "windows",
+              "linux"
+            ]
+          }
+        },
+        "verifiedCapabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "text",
+              "structured-output",
+              "streaming",
+              "file-read",
+              "web-research",
+              "file-generation",
+              "image-input",
+              "video-input",
+              "resume",
+              "cancel",
+              "permission-events"
+            ]
+          }
+        },
+        "verifiedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "evidence": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "verified"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "transport": {
+                "type": "string"
+              },
+              "verifiedVersion": {
+                "type": "string"
+              },
+              "verifiedPlatforms": {
+                "minItems": 1
+              },
+              "verifiedCapabilities": {
+                "minItems": 1
+              },
+              "verifiedAt": {
+                "type": "string"
+              },
+              "evidence": {
+                "type": "string"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "verifiedVersion": {
+                "type": "null"
+              },
+              "verifiedPlatforms": {
+                "maxItems": 0
+              },
+              "verifiedCapabilities": {
+                "maxItems": 0
+              },
+              "verifiedAt": {
+                "type": "null"
+              },
+              "evidence": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "providers": [
+    {
+      "id": "codex",
+      "name": "OpenAI Codex",
+      "status": "probed",
+      "transport": "cli",
+      "verifiedVersion": null,
+      "verifiedPlatforms": [],
+      "verifiedCapabilities": [],
+      "verifiedAt": null,
+      "evidence": null
+    },
+    {
+      "id": "claude-code",
+      "name": "Claude Code",
+      "status": "probed",
+      "transport": "cli",
+      "verifiedVersion": null,
+      "verifiedPlatforms": [],
+      "verifiedCapabilities": [],
+      "verifiedAt": null,
+      "evidence": null
+    },
+    {
+      "id": "qoder",
+      "name": "Qoder",
+      "status": "planned",
+      "transport": null,
+      "verifiedVersion": null,
+      "verifiedPlatforms": [],
+      "verifiedCapabilities": [],
+      "verifiedAt": null,
+      "evidence": null
+    },
+    {
+      "id": "codebuddy",
+      "name": "CodeBuddy",
+      "status": "probed",
+      "transport": "cli",
+      "verifiedVersion": null,
+      "verifiedPlatforms": [],
+      "verifiedCapabilities": [],
+      "verifiedAt": null,
+      "evidence": null
+    },
+    {
+      "id": "openclaw",
+      "name": "OpenClaw",
+      "status": "planned",
+      "transport": null,
+      "verifiedVersion": null,
+      "verifiedPlatforms": [],
+      "verifiedCapabilities": [],
+      "verifiedAt": null,
+      "evidence": null
+    },
+    {
+      "id": "hermes",
+      "name": "Hermes",
+      "status": "planned",
+      "transport": null,
+      "verifiedVersion": null,
+      "verifiedPlatforms": [],
+      "verifiedCapabilities": [],
+      "verifiedAt": null,
+      "evidence": null
+    }
+  ]
+}

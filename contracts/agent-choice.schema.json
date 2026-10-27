@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vibe-improve:agent-choice:1",
+  "title": "Local default and project agent choices",
+  "type": "object",
+  "maxProperties": 513,
+  "properties": {
+    "default": {
+      "$ref": "#/$defs/choice"
+    }
+  },
+  "patternProperties": {
+    "^proj_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$": {
+      "$ref": "#/$defs/choice"
+    }
+  },
+  "additionalProperties": {
+    "anyOf": [
+      {
+        "$ref": "#/$defs/choice"
+      },
+      {
+        "enum": [
+          "workbuddy",
+          "trae"
+        ],
+        "deprecated": true,
+        "description": "Read-only legacy choices; never accepted for new selections."
+      }
+    ]
+  },
+  "$defs": {
+    "choice": {
+      "enum": [
+        "manual",
+        "codex",
+        "claude-code",
+        "codebuddy",
+        "qoder",
+        "openclaw",
+        "hermes"
+      ]
+    }
+  }
+}

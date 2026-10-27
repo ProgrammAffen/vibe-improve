@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vibe-improve.local/contracts/project-draft.schema.json",
+  "title": "Vibe Improve project draft",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schemaVersion", "id", "name", "revision", "createdAt", "updatedAt", "lastOpenedAt", "state"],
+  "properties": {
+    "format": {"const": "vibe-improve.project"},
+    "schemaVersion": {"const": 1},
+    "id": {"type": "string", "pattern": "^proj_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 80},
+    "revision": {"type": "integer", "minimum": 1, "maximum": 999999},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "updatedAt": {"type": "string", "format": "date-time"},
+    "lastOpenedAt": {"type": "string", "format": "date-time"},
+    "state": {"const": "draft"}
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vibe-improve:route:1",
+  "title": "Vibe Improve learning route v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schemaVersion", "id", "revision", "title", "locale", "sourceLanguage", "chapters"],
+  "properties": {
+    "format": {"const": "vibe-improve.route"},
+    "schemaVersion": {"const": 1, "type": "integer"},
+    "id": {"$ref": "#/$defs/id"},
+    "revision": {"type": "integer", "minimum": 1, "maximum": 1000000},
+    "title": {"$ref": "#/$defs/title"},
+    "locale": {"enum": ["zh-CN", "en"]},
+    "sourceLanguage": {"enum": ["zh-CN", "en"]},
+    "chapters": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 24,
+      "items": {"$ref": "#/$defs/chapter"}
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]*$", "not": {"pattern": "[^A-Za-z0-9._-]"}, "minLength": 1, "maxLength": 64},
+    "title": {"type": "string", "minLength": 1, "maxLength": 160, "pattern": "\\S"},
+    "description": {"type": "string", "minLength": 1, "maxLength": 2000, "pattern": "\\S"},
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "description": {"$ref": "#/$defs/description"}
+      }
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task", "passCriteria", "objectiveIds"],
+      "properties": {
+        "task": {"type": "string", "minLength": 1, "maxLength": 4000, "pattern": "\\S"},
+        "passCriteria": {
+          "type": "array", "minItems": 1, "maxItems": 24,
+          "uniqueItems": true, "items": {"$ref": "#/$defs/description"}
+        },
+        "objectiveIds": {
+          "type": "array", "minItems": 1, "maxItems": 12,
+          "uniqueItems": true, "items": {"$ref": "#/$defs/id"}
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "objectives", "prerequisites", "estimatedMinutes", "assessment"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "title": {"$ref": "#/$defs/title"},
+        "objectives": {
+          "type": "array", "minItems": 1, "maxItems": 12,
+          "items": {"$ref": "#/$defs/objective"}
+        },
+        "prerequisites": {
+          "type": "array", "minItems": 0, "maxItems": 64,
+          "uniqueItems": true, "items": {"$ref": "#/$defs/id"}
+        },
+        "estimatedMinutes": {"type": "integer", "minimum": 1, "maximum": 1440},
+        "assessment": {"$ref": "#/$defs/assessment"}
+      }
+    },
+    "chapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "nodes"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "title": {"$ref": "#/$defs/title"},
+        "nodes": {
+          "type": "array", "minItems": 1, "maxItems": 64,
+          "items": {"$ref": "#/$defs/node"}
+        }
+      }
+    }
+  }
+}

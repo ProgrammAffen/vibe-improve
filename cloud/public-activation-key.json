@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 2,
+  "algorithm": "Ed25519",
+  "keyId": "vi-activation-v2-20261020",
+  "productId": "vibe-improve",
+  "profileId": 1,
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAdhePPloqgLiSMMnsc1KOJudxlTDudmB3BuZ0Iu7vp/g=\n-----END PUBLIC KEY-----\n"
+}

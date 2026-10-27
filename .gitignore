@@ -1,0 +1,13 @@
+/tmp/
+__pycache__/
+*.py[cod]
+.DS_Store
+node_modules/
+node_modules
+.env
+.env.*
+!.env.example
+Vibe Improve Runtime/
+output/
+.codex/config.toml
+.agents/

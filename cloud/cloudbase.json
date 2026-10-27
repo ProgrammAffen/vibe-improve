@@ -1,0 +1,20 @@
+{
+  "envId": "one-person-company-7dao3979fd72e",
+  "region": "ap-shanghai",
+  "functionName": "license-api",
+  "runtime": "Nodejs20.19",
+  "handler": "index.main",
+  "role": "backend-only",
+  "license": {
+    "productId": "vibe-improve",
+    "issuer": "vibe-improve.cloudbase",
+    "audience": "vibe-improve.clients",
+    "keyId": "vi-ed25519-20261018",
+    "leaseSeconds": 604800,
+    "offlineGraceSeconds": 0,
+    "maxDevices": 2
+  },
+  "authentication": {
+    "maxSessions": 50
+  }
+}

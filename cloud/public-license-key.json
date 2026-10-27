@@ -1,0 +1,7 @@
+{
+  "keyId": "vi-ed25519-20261018",
+  "productId": "vibe-improve",
+  "issuer": "vibe-improve.cloudbase",
+  "audience": "vibe-improve.clients",
+  "publicKeySpki": "MCowBQYDK2VwAyEA5fEjtRoJp0_QuKoG2-Dir1PqJBOj7uOMOaW3fLTj0tg"
+}

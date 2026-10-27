@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "dependencies": {
+    "@tencent-ai/codebuddy-code": "2.177.0"
+  }
+}

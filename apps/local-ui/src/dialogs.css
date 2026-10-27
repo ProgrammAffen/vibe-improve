@@ -1,0 +1,84 @@
+.field-icon,.field-art{display:none}
+
+.stone-dialog{--dialog-top:61px;--dialog-bottom:56px;width:min(540px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:visible;border:0;border-radius:0;padding:var(--dialog-top) 0 var(--dialog-bottom);background:transparent;color:#382b1e;filter:drop-shadow(0 16px 18px #140b0970)}
+.stone-dialog::backdrop{background:#1a100b80;backdrop-filter:blur(3px)}
+.stone-dialog-frame{position:absolute;inset:0;pointer-events:none;border:60px solid transparent;border-image:url('/assets/images/dialog-frame-blank-v2.png') 180 175 175 175 fill / 60px / 0 stretch}
+.stone-dialog-inner{position:relative;max-height:calc(100dvh - 24px - var(--dialog-top) - var(--dialog-bottom));min-width:0;margin:0 45px;padding:0 22px;border:0;border-radius:0;border-image:none;background:transparent;overflow:auto;scrollbar-gutter:auto;scrollbar-width:none;overscroll-behavior:contain;scroll-padding-block:12px}
+.stone-dialog-inner::-webkit-scrollbar{display:none;width:0;height:0}
+.stone-dialog button:focus,.stone-dialog button:focus-visible,.stone-dialog button:active{outline:none;box-shadow:none}
+.stone-dialog h2{margin:0 0 26px;padding-inline:0;font-size:30px;line-height:1.35;text-align:center;color:#382719}
+.stone-dialog .close-button{position:absolute;right:4px;top:18px;display:grid;place-items:center;width:48px;height:48px;max-width:48px;padding:10px;border:0;border-radius:0;background:transparent;color:#533817;transform:none;transition:color .15s}
+.stone-dialog .close-button svg{width:24px;height:24px;pointer-events:none}
+.stone-dialog .close-button:not(:disabled):is(:hover,:focus-visible,:active,[data-visual-state="hover"],[data-visual-state="pressed"]){color:#fff}
+.stone-dialog .close-button:disabled{opacity:.5}
+.stone-dialog .auth-form{gap:14px}
+.stone-dialog .field label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.stone-dialog .field-control{display:flex;align-items:center;min-height:54px;border:1.5px solid transparent;border-radius:4px;background:transparent;color:#4c3d2b;isolation:isolate}
+.stone-dialog .field-art{display:block;position:absolute;inset:-1.5px;z-index:-1;overflow:hidden;pointer-events:none}
+.stone-dialog .field-art img{position:absolute;max-width:none;pointer-events:none}
+.stone-dialog .field-control:focus-within{outline:none;box-shadow:none;background:#e8dbc2}
+.stone-dialog .field-art{transition:filter .15s ease}
+.stone-dialog .field-control:focus-within .field-art{filter:brightness(.94)}
+.stone-dialog .field-control.has-error{border-color:#a94931}
+.stone-dialog .field-control input{min-height:51px;padding:10px 13px;border:0;border-radius:3px;background:transparent;color:#382b1e;font-size:18px;line-height:1.4}
+.stone-dialog .field-control input::placeholder{color:#71654f;opacity:1}
+.stone-dialog .field-control .field-icon{display:block;flex:0 0 23px;width:23px;height:23px;margin-inline:14px 0;color:#65533d;stroke-width:2.3;pointer-events:none}
+.stone-dialog .has-field-icon input{padding-inline-start:12px}
+.stone-dialog .password-toggle{align-self:stretch;flex:0 0 44px;width:44px;min-height:46px;min-width:44px;padding:10px;background:transparent;color:#56462e}
+.stone-dialog .password-toggle svg{width:21px;height:21px}
+.stone-dialog .password-toggle:not(:disabled):hover{background:#b9a782;color:#fff8e8}
+.stone-dialog .password-toggle:focus-visible{background:#b9a782;color:#fff8e8}
+.stone-dialog .password-fields{display:flex;flex-direction:column;gap:14px}
+.stone-dialog .field-error{font-size:14px;line-height:1.5;color:#a03c25;margin-block:8px 0}
+.stone-dialog .password-rule{font-size:12px;line-height:1.6;color:#766448}
+.stone-dialog .game-button{min-width:0;min-height:52px;height:auto;padding:12px 28px 14px;font-size:18px;line-height:1.4;isolation:isolate}
+.stone-dialog .game-button-label{display:block;position:relative;min-width:0;max-width:100%;line-height:1.4;overflow-wrap:anywhere;white-space:normal;text-align:center}
+.stone-dialog .game-button-art{position:absolute;inset:0;pointer-events:none}
+.stone-dialog .game-button:not(:disabled):focus-visible .game-button-art{filter:brightness(.78) saturate(1.2) hue-rotate(-5deg)}
+.stone-dialog .game-button--secondary:not(:disabled):focus-visible{color:#fff8e8}
+.stone-dialog .game-button--primary:not(:disabled):focus-visible,.stone-dialog .game-button--danger:not(:disabled):focus-visible{color:#151310}
+.stone-dialog .game-button:disabled{opacity:.66;filter:grayscale(.3)}
+.stone-dialog .auth-submit{margin-top:4px;display:flex;justify-content:center}
+.stone-dialog .auth-submit .game-button{width:84%;min-width:0;min-height:58px;font-size:22px}
+.stone-dialog .auth-links{display:flex;align-items:center;justify-content:space-around;gap:8px 24px;margin-top:0}
+.stone-dialog .auth-links button{font-size:17px;line-height:1.5;padding:6px 2px;min-height:44px;max-width:100%;text-align:center;color:#51432c;text-decoration:none}
+.stone-dialog .auth-links button:hover{background:#8a7655;color:#fff8e8;text-decoration:underline;text-underline-offset:4px}
+.stone-dialog .auth-links button:focus-visible{background:#8a7655;color:#fff8e8;text-decoration:underline;text-underline-offset:4px}
+.stone-dialog .verification-email{display:flex;align-items:center;gap:12px;min-height:46px;margin:0;padding:10px 14px;color:#66563e;background:#e5d8bf;border:1.5px solid #b8aa90;border-radius:4px;font-size:14px}
+.stone-dialog .verification-email svg{flex:0 0 21px;width:21px;height:21px}
+.stone-dialog .verification-email span{min-width:0;overflow-wrap:anywhere}
+.stone-dialog .verification-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(100px,.65fr);gap:10px;align-items:start}
+.stone-dialog .resend-code{min-height:50px;min-width:0;width:100%;padding:12px 17px;font-size:13px}
+.stone-dialog .resend-code .game-button-label{line-height:1.5}
+.stone-dialog .form-message{padding:10px 12px;font-size:14px;line-height:1.6;border-radius:4px}
+.stone-dialog .confirmation-message{display:flex;align-items:center;justify-content:center;gap:15px;min-width:0}
+.stone-dialog .confirmation-copy{min-width:0;font-size:16px;line-height:1.6;text-align:start}
+.stone-dialog .notice-icon{width:32px;height:32px;flex:0 0 32px;stroke-width:2.2}
+.stone-dialog .warning-icon{color:#9c5c15;fill:#efc75d}
+.stone-dialog .info-icon{color:#286488;fill:#c4d9e4}
+.stone-dialog .confirmation-actions{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:26px}
+.stone-dialog .confirmation-actions .game-button{flex:1 1 150px;max-width:100%;min-width:0;font-size:17px}
+.stone-dialog .confirmation-actions>.game-button:only-child{flex:0 1 270px}
+
+@media(max-width:480px){
+  .stone-dialog{--dialog-top:53px;--dialog-bottom:36px}
+  .stone-dialog-frame{border-width:48px;border-image-width:48px}
+  .stone-dialog-inner{margin-inline:24px;padding-inline:10px}
+  .stone-dialog h2{font-size:25px;margin-bottom:22px}
+  .stone-dialog .close-button{top:11px;right:0;width:44px;height:44px;padding:12px}
+  .stone-dialog .close-button svg{width:21px;height:21px}
+  .stone-dialog .verification-row{grid-template-columns:minmax(0,1fr)}
+  .stone-dialog .resend-code{justify-self:end;width:fit-content;max-width:100%;min-width:min(150px,100%)}
+  .stone-dialog .confirmation-actions .game-button{flex-basis:100%}
+  .stone-dialog .game-button{padding-inline:24px}
+  .stone-dialog .field label{position:static;display:block;width:auto;height:auto;margin:0 0 5px;padding:0;overflow:visible;clip-path:none;white-space:normal;font-size:14px;line-height:1.5}
+  .stone-dialog .field input::placeholder{opacity:0}
+}
+@media(prefers-reduced-motion:reduce){.stone-dialog .close-button:hover{transform:none}}
+
+.stone-dialog .binding-capacity{margin:0 0 20px;text-align:center;color:#66513a;font-size:17px;line-height:1.5}
+
+.stone-dialog .license-redeem-form{display:flex;flex-direction:column;gap:18px;min-width:0}
+.stone-dialog .license-redeem-form .confirmation-actions{margin-top:8px}
+.stone-dialog .redeem-current-expiry{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px 18px;margin:0;color:#66513a;font-size:16px;line-height:1.6}
+.stone-dialog .redeem-current-expiry dd{margin:0;overflow-wrap:anywhere}

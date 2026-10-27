@@ -1,0 +1,52 @@
+{
+  "format": "vibe-improve.route",
+  "schemaVersion": 1,
+  "id": "workplace-data-basics",
+  "revision": 1,
+  "title": "用数据回答工作中的问题",
+  "locale": "zh-CN",
+  "sourceLanguage": "zh-CN",
+  "chapters": [
+    {
+      "id": "questions",
+      "title": "提出可验证的问题",
+      "nodes": [
+        {
+          "id": "define-a-question",
+          "title": "定义问题和衡量指标",
+          "objectives": [
+            {"id": "define-metric", "description": "将一个工作问题转化为含统计范围、时间区间和计算方法的指标。"}
+          ],
+          "prerequisites": [],
+          "estimatedMinutes": 30,
+          "assessment": {
+            "task": "针对虚构团队的响应效率，写出问题、指标定义及一个可手算的示例。",
+            "passCriteria": ["明确统计对象和时间区间。", "指标公式与手算结果一致。"],
+            "objectiveIds": ["define-metric"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "evidence",
+      "title": "用证据解释结果",
+      "nodes": [
+        {
+          "id": "interpret-results",
+          "title": "解释变化与局限",
+          "objectives": [
+            {"id": "explain-change", "description": "根据两组虚构数据计算指标变化，并提出一种需要额外证据检验的解释。"},
+            {"id": "state-limits", "description": "指出样本量或统计口径导致的至少一个结论局限。"}
+          ],
+          "prerequisites": ["define-a-question"],
+          "estimatedMinutes": 45,
+          "assessment": {
+            "task": "使用上一节定义的指标比较两组虚构数据，写一段包含计算过程、解释和局限的汇报。",
+            "passCriteria": ["两组数据采用相同统计口径，计算结果正确。", "解释与观察区分清楚，并说明需要补充的证据。", "明确说明至少一个结论局限。"],
+            "objectiveIds": ["explain-change", "state-limits"]
+          }
+        }
+      ]
+    }
+  ]
+}

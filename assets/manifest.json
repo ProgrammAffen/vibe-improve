@@ -1,0 +1,1271 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "id": "zcoolkuaile-regular",
+      "kind": "fonts",
+      "source": "Google Fonts official repository: https://github.com/google/fonts/raw/refs/heads/main/ofl/zcoolkuaile/ZCOOLKuaiLe-Regular.ttf",
+      "license": "SIL Open Font License 1.1 (OFL-1.1)",
+      "licenseEvidence": "tmp/research/zcool-kuaile/provenance.json and verification.json; Version 2.001, Regular 400, SHA-256 812a6fc1fe54b6d73a419245c32dfeba8aa33104d5be90d1cf6af082007cb71d.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。",
+      "approvedAt": "2026-10-16",
+      "licenseFile": "assets/licenses/ZCOOLKuaiLe-OFL.txt",
+      "path": "assets/fonts/ZCOOLKuaiLe-Regular.ttf",
+      "sha256": "812a6fc1fe54b6d73a419245c32dfeba8aa33104d5be90d1cf6af082007cb71d"
+    },
+    {
+      "id": "home-title-vibe-improve-v1",
+      "kind": "images",
+      "source": "Built-in image_gen; user reference; original and exact prompt: tmp/review/2026-10-16-volcanic-home/generation-prompts.json; file home-title-vibe-improve-v1.png.",
+      "license": "AI-generated output: applicable OpenAI service terms and rights in the user-provided reference apply; no independent verification of reference ownership or exclusivity.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。\n2026-10-17 用户审阅无右上角最大化按钮的预览后确认：“可以，就用这个版本。”并要求提供无标题、按钮、账户框的纯背景、独立按钮与标题，按钮文字不固化。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "1536x1024",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Top-left of original canvas; placement in review layout.json",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-title-vibe-improve-v1.png",
+      "sha256": "331aceb205924cccb074b6345470f1330def4efc151984bf8da583cc692dcae1"
+    },
+    {
+      "id": "home-menu-primary-blank-v1",
+      "kind": "images",
+      "source": "Built-in image_gen; user reference; original and exact prompt: tmp/review/2026-10-16-volcanic-home/generation-prompts.json; file home-menu-primary-blank-v1.png.",
+      "license": "AI-generated output: applicable OpenAI service terms and rights in the user-provided reference apply; no independent verification of reference ownership or exclusivity.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。\n2026-10-17 用户审阅无右上角最大化按钮的预览后确认：“可以，就用这个版本。”并要求提供无标题、按钮、账户框的纯背景、独立按钮与标题，按钮文字不固化。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "2172x724",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Top-left of original canvas; placement in review layout.json",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-primary-blank-v1.png",
+      "sha256": "cf69f5b2d44048c3981006f39af692968000cae02385ac082de6fe909c97f25d"
+    },
+    {
+      "id": "home-menu-secondary-blank-v1",
+      "kind": "images",
+      "source": "Built-in image_gen; user reference; original and exact prompt: tmp/review/2026-10-16-volcanic-home/generation-prompts.json; file home-menu-secondary-blank-v1.png.",
+      "license": "AI-generated output: applicable OpenAI service terms and rights in the user-provided reference apply; no independent verification of reference ownership or exclusivity.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。\n2026-10-17 用户审阅无右上角最大化按钮的预览后确认：“可以，就用这个版本。”并要求提供无标题、按钮、账户框的纯背景、独立按钮与标题，按钮文字不固化。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "2073x758",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Top-left of original canvas; placement in review layout.json",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-secondary-blank-v1.png",
+      "sha256": "2572d55a3cc0f4ccefce03c46a82da3aa7296c6ad5e16693f1f265a7dfd0171a"
+    },
+    {
+      "id": "home-menu-exit-blank-v1",
+      "kind": "images",
+      "source": "Built-in image_gen; user reference; original and exact prompt: tmp/review/2026-10-16-volcanic-home/generation-prompts.json; file home-menu-exit-blank-v1.png.",
+      "license": "AI-generated output: applicable OpenAI service terms and rights in the user-provided reference apply; no independent verification of reference ownership or exclusivity.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。\n2026-10-17 用户审阅无右上角最大化按钮的预览后确认：“可以，就用这个版本。”并要求提供无标题、按钮、账户框的纯背景、独立按钮与标题，按钮文字不固化。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "2172x724",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Top-left of original canvas; placement in review layout.json",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-exit-blank-v1.png",
+      "sha256": "ee27777a8b4943792834c6a396c4670137d4e868210a35c92dfa54eb3052b83d"
+    },
+    {
+      "id": "home-account-blank-v1",
+      "kind": "images",
+      "source": "Built-in image_gen; user reference; original and exact prompt: tmp/review/2026-10-16-volcanic-home/generation-prompts.json; file home-account-blank-v1.png.",
+      "license": "AI-generated output: applicable OpenAI service terms and rights in the user-provided reference apply; no independent verification of reference ownership or exclusivity.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "2115x743",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Top-left of original canvas; placement in review layout.json",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-account-blank-v1.png",
+      "sha256": "2e60c8c74a9adc6473fbd840ab8f043ed0de8521f5ecb252cd73955a7da3d382"
+    },
+    {
+      "id": "home-menu-new-zh-cn-v1",
+      "kind": "images",
+      "source": "Native Canvas UI composition of generated backplate, project-authored SVG icon and real ZCOOL KuaiLe text; tmp/review/2026-10-16-volcanic-home/layout.json; tmp/work/volcanic-home/build-ui.cjs.",
+      "license": "AI-generated output: applicable OpenAI service terms and rights in the user-provided reference apply; no independent verification of reference ownership or exclusivity. Text font: SIL OFL 1.1; project-authored icon.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-new-zh-CN-v1.png",
+      "sha256": "766ca5a7c3f3c82940646f7d258f8a5c5c8c12b4ab7165abda5a8e27a532f9fc"
+    },
+    {
+      "id": "home-menu-new-en-v1",
+      "kind": "images",
+      "source": "Native Canvas UI composition of generated backplate, project-authored SVG icon and real ZCOOL KuaiLe text; tmp/review/2026-10-16-volcanic-home/layout.json; tmp/work/volcanic-home/build-ui.cjs.",
+      "license": "AI-generated output: applicable OpenAI service terms and rights in the user-provided reference apply; no independent verification of reference ownership or exclusivity. Text font: SIL OFL 1.1; project-authored icon.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-new-en-v1.png",
+      "sha256": "499e4f68afcf22a767a576b00311f25396f5889b5ab47b759eaa9ea24e771f54"
+    },
+    {
+      "id": "home-menu-load-zh-cn-v1",
+      "kind": "images",
+      "source": "Native Canvas UI composition of generated backplate, project-authored SVG icon and real ZCOOL KuaiLe text; tmp/review/2026-10-16-volcanic-home/layout.json; tmp/work/volcanic-home/build-ui.cjs.",
+      "license": "AI-generated output: applicable OpenAI service terms and rights in the user-provided reference apply; no independent verification of reference ownership or exclusivity. Text font: SIL OFL 1.1; project-authored icon.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-load-zh-CN-v1.png",
+      "sha256": "6523681160865f515932f3001979a0321eca5540964a02828a404fe31404f9f4"
+    },
+    {
+      "id": "home-menu-load-en-v1",
+      "kind": "images",
+      "source": "Native Canvas UI composition of generated backplate, project-authored SVG icon and real ZCOOL KuaiLe text; tmp/review/2026-10-16-volcanic-home/layout.json; tmp/work/volcanic-home/build-ui.cjs.",
+      "license": "AI-generated output: applicable OpenAI service terms and rights in the user-provided reference apply; no independent verification of reference ownership or exclusivity. Text font: SIL OFL 1.1; project-authored icon.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-load-en-v1.png",
+      "sha256": "142dbce1c6201f06256534cb5c2cadb4e3805a9350fabbc34b44805ea05c24e6"
+    },
+    {
+      "id": "home-menu-settings-zh-cn-v1",
+      "kind": "images",
+      "source": "Native Canvas UI composition of generated backplate, project-authored SVG icon and real ZCOOL KuaiLe text; tmp/review/2026-10-16-volcanic-home/layout.json; tmp/work/volcanic-home/build-ui.cjs.",
+      "license": "AI-generated output: applicable OpenAI service terms and rights in the user-provided reference apply; no independent verification of reference ownership or exclusivity. Text font: SIL OFL 1.1; project-authored icon.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-settings-zh-CN-v1.png",
+      "sha256": "160474512195e30f15a0261c96455beedc5097676e712a75eb96ff2e09a4e8b4"
+    },
+    {
+      "id": "home-menu-settings-en-v1",
+      "kind": "images",
+      "source": "Native Canvas UI composition of generated backplate, project-authored SVG icon and real ZCOOL KuaiLe text; tmp/review/2026-10-16-volcanic-home/layout.json; tmp/work/volcanic-home/build-ui.cjs.",
+      "license": "AI-generated output: applicable OpenAI service terms and rights in the user-provided reference apply; no independent verification of reference ownership or exclusivity. Text font: SIL OFL 1.1; project-authored icon.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-settings-en-v1.png",
+      "sha256": "c6a50d05aa3ef0ea8def298763c0655d342d37f709634056703234c9e8e7d6be"
+    },
+    {
+      "id": "home-menu-exit-zh-cn-v1",
+      "kind": "images",
+      "source": "Native Canvas UI composition of generated backplate, project-authored SVG icon and real ZCOOL KuaiLe text; tmp/review/2026-10-16-volcanic-home/layout.json; tmp/work/volcanic-home/build-ui.cjs.",
+      "license": "AI-generated output: applicable OpenAI service terms and rights in the user-provided reference apply; no independent verification of reference ownership or exclusivity. Text font: SIL OFL 1.1; project-authored icon.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-exit-zh-CN-v1.png",
+      "sha256": "79ed4a57e889cf5b447c73355cc52862d12c2b03f99477c8043592b8e6c65e66"
+    },
+    {
+      "id": "home-menu-exit-en-v1",
+      "kind": "images",
+      "source": "Native Canvas UI composition of generated backplate, project-authored SVG icon and real ZCOOL KuaiLe text; tmp/review/2026-10-16-volcanic-home/layout.json; tmp/work/volcanic-home/build-ui.cjs.",
+      "license": "AI-generated output: applicable OpenAI service terms and rights in the user-provided reference apply; no independent verification of reference ownership or exclusivity. Text font: SIL OFL 1.1; project-authored icon.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-exit-en-v1.png",
+      "sha256": "bd636385c59342189f4cd5ae26e7ef6bf09fa0a51abb24214faac2b91f9174da"
+    },
+    {
+      "id": "home-account-zh-cn-v1",
+      "kind": "images",
+      "source": "Native Canvas UI composition of generated backplate, project-authored SVG icon and real ZCOOL KuaiLe text; tmp/review/2026-10-16-volcanic-home/layout.json; tmp/work/volcanic-home/build-ui.cjs.",
+      "license": "AI-generated output: applicable OpenAI service terms and rights in the user-provided reference apply; no independent verification of reference ownership or exclusivity. Text font: SIL OFL 1.1; project-authored icon.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-account-zh-CN-v1.png",
+      "sha256": "d99eb43342b6aca450b2eb27a33aea86a1526b36c9028f1059f11f7ec04e7b66"
+    },
+    {
+      "id": "home-account-en-v1",
+      "kind": "images",
+      "source": "Native Canvas UI composition of generated backplate, project-authored SVG icon and real ZCOOL KuaiLe text; tmp/review/2026-10-16-volcanic-home/layout.json; tmp/work/volcanic-home/build-ui.cjs.",
+      "license": "AI-generated output: applicable OpenAI service terms and rights in the user-provided reference apply; no independent verification of reference ownership or exclusivity. Text font: SIL OFL 1.1; project-authored icon.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-account-en-v1.png",
+      "sha256": "be4067a9c5d29865647a6b431e1910e8f935cde2dbacc91ff4e127b226961ac6"
+    },
+    {
+      "id": "home-icon-exit-v1",
+      "kind": "images",
+      "source": "Project-authored SVG geometric UI icon; source: tmp/work/volcanic-home/build-ui.cjs.",
+      "license": "Project-authored code-native icon; use in Vibe Improve authorized by the current request.",
+      "licenseEvidence": "Native SVG paths created in this workspace; no external icon library or generated lettering.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。\n2026-10-17 用户审阅无右上角最大化按钮的预览后确认：“可以，就用这个版本。”并要求提供无标题、按钮、账户框的纯背景、独立按钮与标题，按钮文字不固化。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "64x64",
+        "transparency": "SVG transparent canvas",
+        "anchor": "Top-left",
+        "coordinateSystem": "SVG viewBox 0 0 64 64"
+      },
+      "path": "assets/images/home-icon-exit-v1.svg",
+      "sha256": "3300d9c9798dc82d507d1cf1d6bd8886014564c47b3354b438d037b0f2dd7cd1"
+    },
+    {
+      "id": "home-icon-folder-v1",
+      "kind": "images",
+      "source": "Project-authored SVG geometric UI icon; source: tmp/work/volcanic-home/build-ui.cjs.",
+      "license": "Project-authored code-native icon; use in Vibe Improve authorized by the current request.",
+      "licenseEvidence": "Native SVG paths created in this workspace; no external icon library or generated lettering.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。\n2026-10-17 用户审阅无右上角最大化按钮的预览后确认：“可以，就用这个版本。”并要求提供无标题、按钮、账户框的纯背景、独立按钮与标题，按钮文字不固化。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "64x64",
+        "transparency": "SVG transparent canvas",
+        "anchor": "Top-left",
+        "coordinateSystem": "SVG viewBox 0 0 64 64"
+      },
+      "path": "assets/images/home-icon-folder-v1.svg",
+      "sha256": "57b5208dc772701b998807375e997085878d51286cfc08e5855e07f7b0662eef"
+    },
+    {
+      "id": "home-icon-gear-v1",
+      "kind": "images",
+      "source": "Project-authored SVG geometric UI icon; source: tmp/work/volcanic-home/build-ui.cjs.",
+      "license": "Project-authored code-native icon; use in Vibe Improve authorized by the current request.",
+      "licenseEvidence": "Native SVG paths created in this workspace; no external icon library or generated lettering.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。\n2026-10-17 用户审阅无右上角最大化按钮的预览后确认：“可以，就用这个版本。”并要求提供无标题、按钮、账户框的纯背景、独立按钮与标题，按钮文字不固化。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "64x64",
+        "transparency": "SVG transparent canvas",
+        "anchor": "Top-left",
+        "coordinateSystem": "SVG viewBox 0 0 64 64"
+      },
+      "path": "assets/images/home-icon-gear-v1.svg",
+      "sha256": "ed30038a47c603ba3387f12c1f03290135de6af3fefe74480cafe604ac234f82"
+    },
+    {
+      "id": "home-icon-person-v1",
+      "kind": "images",
+      "source": "Project-authored SVG geometric UI icon; source: tmp/work/volcanic-home/build-ui.cjs.",
+      "license": "Project-authored code-native icon; use in Vibe Improve authorized by the current request.",
+      "licenseEvidence": "Native SVG paths created in this workspace; no external icon library or generated lettering.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "64x64",
+        "transparency": "SVG transparent canvas",
+        "anchor": "Top-left",
+        "coordinateSystem": "SVG viewBox 0 0 64 64"
+      },
+      "path": "assets/images/home-icon-person-v1.svg",
+      "sha256": "e2b8a6c065bc17bfcd0e43b66c0b4042bdbfc3405d7ed7528ab92eeb7b86f546"
+    },
+    {
+      "id": "home-icon-play-v1",
+      "kind": "images",
+      "source": "Project-authored SVG geometric UI icon; source: tmp/work/volcanic-home/build-ui.cjs.",
+      "license": "Project-authored code-native icon; use in Vibe Improve authorized by the current request.",
+      "licenseEvidence": "Native SVG paths created in this workspace; no external icon library or generated lettering.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“Vibe Improve和右边的按钮要单独做成素材放到代码库对应的素材目录中”，并要求生成火山主页图和对应元素；此前指定按钮使用ZCOOL KuaiLe。本记录表示本轮生成与入库授权，不表示用户已逐项审阅新外观。\n2026-10-17 用户审阅无右上角最大化按钮的预览后确认：“可以，就用这个版本。”并要求提供无标题、按钮、账户框的纯背景、独立按钮与标题，按钮文字不固化。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "64x64",
+        "transparency": "SVG transparent canvas",
+        "anchor": "Top-left",
+        "coordinateSystem": "SVG viewBox 0 0 64 64"
+      },
+      "path": "assets/images/home-icon-play-v1.svg",
+      "sha256": "78bfd781d0cedf90b6dd25e48cb01a1da6989bb795d535d07ecfd7091320c759"
+    },
+    {
+      "id": "source-han-sans-cn-bold",
+      "kind": "fonts",
+      "source": "Adobe official Source Han Sans release: https://raw.githubusercontent.com/adobe-fonts/source-han-sans/refs/heads/release/SubsetOTF/CN/SourceHanSansCN-Bold.otf",
+      "license": "SIL Open Font License 1.1 (OFL-1.1)",
+      "licenseEvidence": "tmp/research/source-han-sans/verification.json and native-rendering.json; Version 2.005, Bold 700, SHA-256 62383707c086a32f3afd5e293f34c7eff64c7fea31f579fdc6cbe34d920519a6.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“字体用黑体，并且需要位于按钮的中心，vibe improvement可以再大一点”；延续此前生成首页及独立素材入库的授权。此记录不表示用户已审阅本轮修订外观。\n2026-10-17 用户审阅无右上角最大化按钮的预览后确认：“可以，就用这个版本。”并要求提供无标题、按钮、账户框的纯背景、独立按钮与标题，按钮文字不固化。",
+      "approvedAt": "2026-10-17",
+      "licenseFile": "assets/licenses/SourceHanSans-LICENSE.txt",
+      "path": "assets/fonts/SourceHanSansCN-Bold.otf",
+      "sha256": "62383707c086a32f3afd5e293f34c7eff64c7fea31f579fdc6cbe34d920519a6"
+    },
+    {
+      "id": "home-menu-new-zh-cn-v2",
+      "kind": "images",
+      "source": "Native Canvas composition: tmp/work/volcanic-home/build-ui-v2.cjs; generated v1 backplate; real Source Han Sans CN Bold text centered on full button; tmp/review/2026-10-16-volcanic-home/layout-v2.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“字体用黑体，并且需要位于按钮的中心，vibe improvement可以再大一点”；延续此前生成首页及独立素材入库的授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left; text ink center 500,146",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-new-zh-CN-v2.png",
+      "sha256": "eafbb1c8fe7ff87c50f7a3ba436ba81e617b58a635cd654d72b4d990b176fda9"
+    },
+    {
+      "id": "home-menu-new-en-v2",
+      "kind": "images",
+      "source": "Native Canvas composition: tmp/work/volcanic-home/build-ui-v2.cjs; generated v1 backplate; real Source Han Sans CN Bold text centered on full button; tmp/review/2026-10-16-volcanic-home/layout-v2.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“字体用黑体，并且需要位于按钮的中心，vibe improvement可以再大一点”；延续此前生成首页及独立素材入库的授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left; text ink center 500,146",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-new-en-v2.png",
+      "sha256": "4a667477224321cb161011b85db4cc95e545ec3680ecffa2b0c72a742da40bb1"
+    },
+    {
+      "id": "home-menu-load-zh-cn-v2",
+      "kind": "images",
+      "source": "Native Canvas composition: tmp/work/volcanic-home/build-ui-v2.cjs; generated v1 backplate; real Source Han Sans CN Bold text centered on full button; tmp/review/2026-10-16-volcanic-home/layout-v2.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“字体用黑体，并且需要位于按钮的中心，vibe improvement可以再大一点”；延续此前生成首页及独立素材入库的授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left; text ink center 500,146",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-load-zh-CN-v2.png",
+      "sha256": "1d73bcc60ac94ae09bbc8bc96eb7b2a7a6633e28fecf81c24a83bf00b37d71d2"
+    },
+    {
+      "id": "home-menu-load-en-v2",
+      "kind": "images",
+      "source": "Native Canvas composition: tmp/work/volcanic-home/build-ui-v2.cjs; generated v1 backplate; real Source Han Sans CN Bold text centered on full button; tmp/review/2026-10-16-volcanic-home/layout-v2.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“字体用黑体，并且需要位于按钮的中心，vibe improvement可以再大一点”；延续此前生成首页及独立素材入库的授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left; text ink center 500,146",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-load-en-v2.png",
+      "sha256": "16b4bccb12d757dcabd69b94ac0ff3f52ebd4d4a412e1a784167b268a66540d0"
+    },
+    {
+      "id": "home-menu-settings-zh-cn-v2",
+      "kind": "images",
+      "source": "Native Canvas composition: tmp/work/volcanic-home/build-ui-v2.cjs; generated v1 backplate; real Source Han Sans CN Bold text centered on full button; tmp/review/2026-10-16-volcanic-home/layout-v2.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“字体用黑体，并且需要位于按钮的中心，vibe improvement可以再大一点”；延续此前生成首页及独立素材入库的授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left; text ink center 500,146",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-settings-zh-CN-v2.png",
+      "sha256": "1cbc0be1de884728bf8cd99ea7a25cb08d3f4de3af46e73f21735894dc6bcee9"
+    },
+    {
+      "id": "home-menu-settings-en-v2",
+      "kind": "images",
+      "source": "Native Canvas composition: tmp/work/volcanic-home/build-ui-v2.cjs; generated v1 backplate; real Source Han Sans CN Bold text centered on full button; tmp/review/2026-10-16-volcanic-home/layout-v2.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“字体用黑体，并且需要位于按钮的中心，vibe improvement可以再大一点”；延续此前生成首页及独立素材入库的授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left; text ink center 500,146",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-settings-en-v2.png",
+      "sha256": "d8f544610776f75a81ae1efca10e471700adb6564149160ca921cb6b563a3c4a"
+    },
+    {
+      "id": "home-menu-exit-zh-cn-v2",
+      "kind": "images",
+      "source": "Native Canvas composition: tmp/work/volcanic-home/build-ui-v2.cjs; generated v1 backplate; real Source Han Sans CN Bold text centered on full button; tmp/review/2026-10-16-volcanic-home/layout-v2.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“字体用黑体，并且需要位于按钮的中心，vibe improvement可以再大一点”；延续此前生成首页及独立素材入库的授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left; text ink center 500,146",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-exit-zh-CN-v2.png",
+      "sha256": "8cafc5802b409c99ce99bcce7851a088e26c78defe47a75017f075b81f450fb8"
+    },
+    {
+      "id": "home-menu-exit-en-v2",
+      "kind": "images",
+      "source": "Native Canvas composition: tmp/work/volcanic-home/build-ui-v2.cjs; generated v1 backplate; real Source Han Sans CN Bold text centered on full button; tmp/review/2026-10-16-volcanic-home/layout-v2.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“字体用黑体，并且需要位于按钮的中心，vibe improvement可以再大一点”；延续此前生成首页及独立素材入库的授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left; text ink center 500,146",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-exit-en-v2.png",
+      "sha256": "28301f37893b87e57182fc15284556861ada0e69baf419983dd6384632b65834"
+    },
+    {
+      "id": "home-account-zh-cn-v2",
+      "kind": "images",
+      "source": "Native Canvas composition: tmp/work/volcanic-home/build-ui-v2.cjs; generated v1 backplate; real Source Han Sans CN Bold text centered on full button; tmp/review/2026-10-16-volcanic-home/layout-v2.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“字体用黑体，并且需要位于按钮的中心，vibe improvement可以再大一点”；延续此前生成首页及独立素材入库的授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left; text ink center 500,146",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-account-zh-CN-v2.png",
+      "sha256": "43a17f1643e32893b446a95028149c94db84bd5fda4d8922254968165ce31149"
+    },
+    {
+      "id": "home-account-en-v2",
+      "kind": "images",
+      "source": "Native Canvas composition: tmp/work/volcanic-home/build-ui-v2.cjs; generated v1 backplate; real Source Han Sans CN Bold text centered on full button; tmp/review/2026-10-16-volcanic-home/layout-v2.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求“字体用黑体，并且需要位于按钮的中心，vibe improvement可以再大一点”；延续此前生成首页及独立素材入库的授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-16",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "RGBA; transparent outside plaque",
+        "anchor": "Top-left; text ink center 500,146",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-account-en-v2.png",
+      "sha256": "c019c29072b7b17185c2826d6c2e70a6f8e92f65111f0d187fda54e0cfc9d51e"
+    },
+    {
+      "id": "home-menu-new-zh-cn-v3",
+      "kind": "images",
+      "source": "Native Canvas rendering: tmp/work/volcanic-home/build-ui-v4.cjs; typography and fixed-canvas coordinates: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt. Updated labels and uniform typography: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求主页与按钮保持比例、全屏空余为黑边、我的账户使用白色胶囊框，并指定“开始新项目 / New Quest”“加载项目 / Load Quest”；延续此前独立素材入库授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "Transparent outside native UI shape",
+        "anchor": "Top-left; account capsule centered group; menu text centered independently",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-new-zh-CN-v3.png",
+      "sha256": "b273c9db0e27166f5c3ddd5bc1a1ebb488036f03c4ff54f3d4412bb0d553a4fa"
+    },
+    {
+      "id": "home-menu-new-en-v3",
+      "kind": "images",
+      "source": "Native Canvas rendering: tmp/work/volcanic-home/build-ui-v4.cjs; typography and fixed-canvas coordinates: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt. Updated labels and uniform typography: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求主页与按钮保持比例、全屏空余为黑边、我的账户使用白色胶囊框，并指定“开始新项目 / New Quest”“加载项目 / Load Quest”；延续此前独立素材入库授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "Transparent outside native UI shape",
+        "anchor": "Top-left; account capsule centered group; menu text centered independently",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-new-en-v3.png",
+      "sha256": "cc59602f096a8a1bcd49b4185a58f73cc6ee99964147450c28f364713afc2c97"
+    },
+    {
+      "id": "home-menu-load-zh-cn-v3",
+      "kind": "images",
+      "source": "Native Canvas rendering: tmp/work/volcanic-home/build-ui-v4.cjs; typography and fixed-canvas coordinates: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt. Updated labels and uniform typography: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求主页与按钮保持比例、全屏空余为黑边、我的账户使用白色胶囊框，并指定“开始新项目 / New Quest”“加载项目 / Load Quest”；延续此前独立素材入库授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "Transparent outside native UI shape",
+        "anchor": "Top-left; account capsule centered group; menu text centered independently",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-load-zh-CN-v3.png",
+      "sha256": "8bb4931d4c237a2a0d746339c80fe6e8f0b43275cdb06d8fab1f0b65f8b027ce"
+    },
+    {
+      "id": "home-menu-load-en-v3",
+      "kind": "images",
+      "source": "Native Canvas rendering: tmp/work/volcanic-home/build-ui-v4.cjs; typography and fixed-canvas coordinates: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt. Updated labels and uniform typography: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求主页与按钮保持比例、全屏空余为黑边、我的账户使用白色胶囊框，并指定“开始新项目 / New Quest”“加载项目 / Load Quest”；延续此前独立素材入库授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "Transparent outside native UI shape",
+        "anchor": "Top-left; account capsule centered group; menu text centered independently",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-load-en-v3.png",
+      "sha256": "ce9d38f11fd24164599094c0d89f5e2a64b031888e8f5795f268eaa81e176a82"
+    },
+    {
+      "id": "home-menu-settings-zh-cn-v3",
+      "kind": "images",
+      "source": "Native Canvas rendering: tmp/work/volcanic-home/build-ui-v4.cjs; typography and fixed-canvas coordinates: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt. Updated labels and uniform typography: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求主页与按钮保持比例、全屏空余为黑边、我的账户使用白色胶囊框，并指定“开始新项目 / New Quest”“加载项目 / Load Quest”；延续此前独立素材入库授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "Transparent outside native UI shape",
+        "anchor": "Top-left; account capsule centered group; menu text centered independently",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-settings-zh-CN-v3.png",
+      "sha256": "05692b0c81e822944e25a1e2304a240c57bded660dc608dfb25fa3c9aa9542d1"
+    },
+    {
+      "id": "home-menu-settings-en-v3",
+      "kind": "images",
+      "source": "Native Canvas rendering: tmp/work/volcanic-home/build-ui-v4.cjs; typography and fixed-canvas coordinates: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt. Updated labels and uniform typography: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求主页与按钮保持比例、全屏空余为黑边、我的账户使用白色胶囊框，并指定“开始新项目 / New Quest”“加载项目 / Load Quest”；延续此前独立素材入库授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "Transparent outside native UI shape",
+        "anchor": "Top-left; account capsule centered group; menu text centered independently",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-settings-en-v3.png",
+      "sha256": "18f37020f4b82d77391432d2cca0a028c54fbadff58e0aa35a706091ab56cb88"
+    },
+    {
+      "id": "home-menu-exit-zh-cn-v3",
+      "kind": "images",
+      "source": "Native Canvas rendering: tmp/work/volcanic-home/build-ui-v4.cjs; typography and fixed-canvas coordinates: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt. Updated labels and uniform typography: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求主页与按钮保持比例、全屏空余为黑边、我的账户使用白色胶囊框，并指定“开始新项目 / New Quest”“加载项目 / Load Quest”；延续此前独立素材入库授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "Transparent outside native UI shape",
+        "anchor": "Top-left; account capsule centered group; menu text centered independently",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-exit-zh-CN-v3.png",
+      "sha256": "e814fecbd8c59dfe2403265890ac4a0b1f7640c3500e8340f42bd4747e9f50e1"
+    },
+    {
+      "id": "home-menu-exit-en-v3",
+      "kind": "images",
+      "source": "Native Canvas rendering: tmp/work/volcanic-home/build-ui-v4.cjs; typography and fixed-canvas coordinates: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "license": "Generated backplate subject to applicable OpenAI service terms and user-reference rights; project-authored SVG icon; text font SIL OFL 1.1.",
+      "licenseEvidence": "tmp/review/2026-10-16-volcanic-home/generation-prompts.json: actual built-in image_gen prompts and output receipts; reference supplied by user in this conversation. Authorization scope is recorded in approvalRef. Font evidence: tmp/research/zcool-kuaile/verification.json; font license distributed in assets/licenses/ZCOOLKuaiLe-OFL.txt. New font: tmp/research/source-han-sans/verification.json; assets/licenses/SourceHanSans-LICENSE.txt. Updated labels and uniform typography: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求主页与按钮保持比例、全屏空余为黑边、我的账户使用白色胶囊框，并指定“开始新项目 / New Quest”“加载项目 / Load Quest”；延续此前独立素材入库授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "1000x292",
+        "transparency": "Transparent outside native UI shape",
+        "anchor": "Top-left; account capsule centered group; menu text centered independently",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-menu-exit-en-v3.png",
+      "sha256": "fa59dca3b0308056a6a9c111002c4dea06c0179bf472b6d9d746040ac4292077"
+    },
+    {
+      "id": "home-account-capsule-zh-cn-v1",
+      "kind": "images",
+      "source": "Native Canvas rendering: tmp/work/volcanic-home/build-ui-v4.cjs; typography and fixed-canvas coordinates: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "license": "Project-authored capsule and icon; font SIL Open Font License 1.1.",
+      "licenseEvidence": "Native capsule SVG and original project-authored person icon; Source Han Sans CN Bold, assets/licenses/SourceHanSans-LICENSE.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求主页与按钮保持比例、全屏空余为黑边、我的账户使用白色胶囊框，并指定“开始新项目 / New Quest”“加载项目 / Load Quest”；延续此前独立素材入库授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "960x256",
+        "transparency": "Transparent outside native UI shape",
+        "anchor": "Top-left; account capsule centered group; menu text centered independently",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-account-capsule-zh-CN-v1.png",
+      "sha256": "e1158792437af4b3e77ac60f18fba82edf9843cc7c664f56995da37e3f6b3c82"
+    },
+    {
+      "id": "home-account-capsule-en-v1",
+      "kind": "images",
+      "source": "Native Canvas rendering: tmp/work/volcanic-home/build-ui-v4.cjs; typography and fixed-canvas coordinates: tmp/review/2026-10-17-home-ui/layout-v4.json.",
+      "license": "Project-authored capsule and icon; font SIL Open Font License 1.1.",
+      "licenseEvidence": "Native capsule SVG and original project-authored person icon; Source Han Sans CN Bold, assets/licenses/SourceHanSans-LICENSE.txt.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求主页与按钮保持比例、全屏空余为黑边、我的账户使用白色胶囊框，并指定“开始新项目 / New Quest”“加载项目 / Load Quest”；延续此前独立素材入库授权。此记录不表示用户已审阅本轮修订外观。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "960x256",
+        "transparency": "Transparent outside native UI shape",
+        "anchor": "Top-left; account capsule centered group; menu text centered independently",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-account-capsule-en-v1.png",
+      "sha256": "3afb8c77f7c8e74692c8d9e1af8f8aca831838544eee450f35e516577b773f10"
+    },
+    {
+      "id": "home-account-capsule-blank-v1",
+      "kind": "images",
+      "source": "Project-authored SVG UI geometry/recolor; tmp/work/volcanic-home/build-ui-v4.cjs.",
+      "license": "Project-authored native UI graphic; use in Vibe Improve authorized by current request.",
+      "licenseEvidence": "White capsule rounded rectangle and project-authored person icon paths; no external artwork or icon library.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求主页与按钮保持比例、全屏空余为黑边、我的账户使用白色胶囊框，并指定“开始新项目 / New Quest”“加载项目 / Load Quest”；延续此前独立素材入库授权。此记录不表示用户已审阅本轮修订外观。\n2026-10-17 用户审阅无右上角最大化按钮的预览后确认：“可以，就用这个版本。”并要求提供无标题、按钮、账户框的纯背景、独立按钮与标题，按钮文字不固化。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "240x64",
+        "transparency": "Transparent outside native UI shape",
+        "anchor": "Top-left; account capsule centered group; menu text centered independently",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-account-capsule-blank-v1.svg",
+      "sha256": "f9c82c58fe821203fa8906966c5e3e81a45a4ff077fcfc103351f6e78b958ca9"
+    },
+    {
+      "id": "home-icon-person-dark-v1",
+      "kind": "images",
+      "source": "Project-authored SVG UI geometry/recolor; tmp/work/volcanic-home/build-ui-v4.cjs.",
+      "license": "Project-authored native UI graphic; use in Vibe Improve authorized by current request.",
+      "licenseEvidence": "White capsule rounded rectangle and project-authored person icon paths; no external artwork or icon library.",
+      "approvedBy": "user",
+      "approvalRef": "用户本轮要求主页与按钮保持比例、全屏空余为黑边、我的账户使用白色胶囊框，并指定“开始新项目 / New Quest”“加载项目 / Load Quest”；延续此前独立素材入库授权。此记录不表示用户已审阅本轮修订外观。\n2026-10-17 用户审阅无右上角最大化按钮的预览后确认：“可以，就用这个版本。”并要求提供无标题、按钮、账户框的纯背景、独立按钮与标题，按钮文字不固化。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "64x64",
+        "transparency": "Transparent outside native UI shape",
+        "anchor": "Top-left; account capsule centered group; menu text centered independently",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-icon-person-dark-v1.svg",
+      "sha256": "c4ba6207ac1df5d4e69ebf283d8e431c1872a3934e1ee1c25e2daa14c54b1866"
+    },
+    {
+      "license": "User-supplied AI-generated media; applicable source service terms and rights in the reference apply. License and exclusivity not independently verified.",
+      "licenseEvidence": "User supplied the generated source MP4, requested local watermark cleanup and environment motion, then selected the resulting fast-v2 video for the homepage. Processing records: tmp/review/2026-10-17-home-environment-motion/processing-fast-v2.json.",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-17 用户审阅 fast-v2 后要求：“好，请你把这段视频直接作为主页，结合标题和按钮给我演示”。海报为同一视频首帧，用于加载和减少动态效果时显示。\n2026-10-17 用户附上 home-volcano-background-1920x1080.png 并要求：“请你将视频，和这张图片保存到真正的素材目录下，将之前的图片删除掉，保留按钮素材和标题素材”。",
+      "approvedAt": "2026-10-17",
+      "id": "home-volcano-loop-1080p-v1",
+      "kind": "video",
+      "source": "User MP4 f1a287a2-4d52-4cc3-a907-1d312696766b.mp4, local delogo and masked lava/smoke animation at 2x effect speed; tmp/work/home-environment-motion/animate_environment.py.",
+      "metadata": {
+        "dimensions": "1920x1080",
+        "transparency": "Opaque",
+        "animation": "193 frames, 24 fps; original character/fire motion with 2x environment effect speed. Native player repeats the selected source; no new character seam reconstruction. Source AIGC metadata preserved.",
+        "durationSeconds": 8.041666666666666,
+        "loudness": "No audio stream",
+        "loop": true,
+        "fallbackAssetId": "home-volcano-background-1080p-v1"
+      },
+      "path": "assets/video/home-volcano-loop-1080p-v1.mp4",
+      "sha256": "9f49a04112c815da8ca06075ba6d50784f624f7a71b1f2059b5a47caf432f657"
+    },
+    {
+      "id": "home-volcano-background-1080p-v1",
+      "kind": "images",
+      "source": "User-attached /Users/maoqi01/Desktop/home-volcano-background-1920x1080.png; exact bytes copied without image processing. Original supplied image is not modified.",
+      "license": "User-supplied AI-generated image; applicable source service terms and rights in the reference apply. License and exclusivity not independently verified.",
+      "licenseEvidence": "Image supplied and explicitly selected by the user in the current message; visual reference and prior generation/resizing history are retained in tmp/.",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-17 用户附上 home-volcano-background-1920x1080.png 并要求：“请你将视频，和这张图片保存到真正的素材目录下，将之前的图片删除掉，保留按钮素材和标题素材”。",
+      "approvedAt": "2026-10-17",
+      "metadata": {
+        "dimensions": "1920x1080",
+        "transparency": "Opaque",
+        "anchor": "Top-left; contain inside the 1672x941 logical scene",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/home-volcano-background-1920x1080.png",
+      "sha256": "c225ad9b989353318824db173b57be227d3e4d3f4e7ccc5b55751f33c8fdbd75"
+    },
+    {
+      "id": "auth-stone-frame-v1",
+      "kind": "images",
+      "source": "imagegen:exec-530e8674-84ef-495e-bec4-de16d9c06d4d",
+      "license": "OpenAI image output; user-directed project asset",
+      "licenseEvidence": "tmp/review/2026-10-17-interface-designs/art/GENERATION.md",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-18 用户：登录、注册、忘记密码、找回密码都用图示的界面",
+      "approvedAt": "2026-10-18",
+      "path": "assets/images/auth-stone-frame-v1.png",
+      "sha256": "09b456cef34574d43bf4dbd3245a56d50d269b3ee22f07d47adcb95edea15a24"
+    },
+    {
+      "id": "settings-forest-background-v1",
+      "kind": "images",
+      "source": "imagegen:exec-eef3ce40-deff-47b3-8ac0-192ea2275615",
+      "license": "OpenAI image output; user-directed project asset",
+      "licenseEvidence": "tmp/review/2026-10-18-interface-worlds/art/scene-forest-prompt.md",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-18 用户：设置以森林营地为背景",
+      "approvedAt": "2026-10-18",
+      "path": "assets/images/settings-forest-background-v1.png",
+      "sha256": "81d2b922feb8736bca8597bc0897e91a8ad8dfb9fde64916f45cd3fe1fb3ff61"
+    },
+    {
+      "id": "account-guild-background-v1",
+      "kind": "images",
+      "source": "imagegen:scene-guild-2026-10-18",
+      "license": "OpenAI image output; user-directed project asset",
+      "licenseEvidence": "tmp/review/2026-10-18-interface-worlds/art/scene-guild-prompt.md",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-18 用户授权正式构建独立我的账户页面；采用当前公会场景，页面组合待审阅",
+      "approvedAt": "2026-10-18",
+      "path": "assets/images/account-guild-background-v1.png",
+      "sha256": "3fe15668161246e562034b75732bdff81f7292256e670b1db6db0b7195c0e9db"
+    },
+    {
+      "id": "account-hamster-knight-v1",
+      "kind": "images",
+      "source": "imagegen:hamster-knight-front-2026-10-15",
+      "license": "OpenAI image output; user-directed project asset",
+      "licenseEvidence": "tmp/review/2026-10-15-hamster-knight/prompts/front-final.txt",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-18 用户：我的账户这个界面我需要放置金丝熊这个角色；复用已有角色参考，页面组合待审阅",
+      "approvedAt": "2026-10-18",
+      "path": "assets/images/account-hamster-knight-v1.png",
+      "sha256": "7fc9a7369ea3a9b067746f5ef8114cd35f4fb2c0304098c79dd5c9d2065e264d"
+    },
+    {
+      "id": "dialog-frame-blank-v2",
+      "kind": "images",
+      "source": "imagegen:exec-3598af02-56be-417b-b3aa-026fb8b0df09",
+      "license": "OpenAI image output; user-directed project asset",
+      "licenseEvidence": "tmp/review/2026-10-20-dialog-assets/panel-generation.json",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-20 用户：我认可你设计的弹出框，请你把它应用到应用当中；按钮和文字是相互分离的并且文字不能超过按钮的范围。派生无字面板用于实现已认可的 D01–D09 设计。",
+      "approvedAt": "2026-10-20",
+      "path": "assets/images/dialog-frame-blank-v2.png",
+      "sha256": "b2699511f6a7bac3f7e236b2095c9b2bd5dc29d33d96c9c9ca38c5ff696a7310",
+      "metadata": {
+        "dimensions": "1374x1145",
+        "transparency": "Alpha PNG; no embedded text or icons",
+        "anchor": "Nine-slice frame / independent live controls"
+      }
+    },
+    {
+      "id": "dialog-button-primary-blank-v1",
+      "kind": "images",
+      "source": "imagegen:exec-df016fae-6dc6-4427-a9a9-20b3f0964787",
+      "license": "OpenAI image output; user-directed project asset",
+      "licenseEvidence": "tmp/review/2026-10-20-dialog-assets/button-generation-sources.json",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-20 用户：我认可你设计的弹出框，请你把它应用到应用当中；按钮和文字是相互分离的并且文字不能超过按钮的范围。派生无字底板用于实现已认可的 D01–D09 设计。",
+      "approvedAt": "2026-10-20",
+      "path": "assets/images/dialog-button-primary-blank-v1.png",
+      "sha256": "ad4a2f6400251cae31fa94105ba837220df00da342f9a57895bbc31a38abe26e",
+      "metadata": {
+        "dimensions": "2014x781",
+        "transparency": "Alpha PNG; transparent padding excluded by component layout; no text or icons",
+        "anchor": "Top-left visible backplate bounds; independent centered live text"
+      }
+    },
+    {
+      "id": "dialog-button-secondary-blank-v1",
+      "kind": "images",
+      "source": "imagegen:exec-fe8e01fa-3871-4f71-a397-0ca2a03a09fb",
+      "license": "OpenAI image output; user-directed project asset",
+      "licenseEvidence": "tmp/review/2026-10-20-dialog-assets/button-generation-sources.json",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-20 用户：我认可你设计的弹出框，请你把它应用到应用当中；按钮和文字是相互分离的并且文字不能超过按钮的范围。派生无字底板用于实现已认可的 D01–D09 设计。",
+      "approvedAt": "2026-10-20",
+      "path": "assets/images/dialog-button-secondary-blank-v1.png",
+      "sha256": "30d3142fc73ee25c9bf287aa5804ec5f2653b01ff63fbf6b7c76d4051ee68d01",
+      "metadata": {
+        "dimensions": "2014x781",
+        "transparency": "Alpha PNG; transparent padding excluded by component layout; no text or icons",
+        "anchor": "Top-left visible backplate bounds; independent centered live text"
+      }
+    },
+    {
+      "id": "dialog-button-danger-blank-v1",
+      "kind": "images",
+      "source": "imagegen:exec-0db83aed-2b4c-4277-b204-d9ab8c647a22",
+      "license": "OpenAI image output; user-directed project asset",
+      "licenseEvidence": "tmp/review/2026-10-20-dialog-assets/button-generation-sources.json",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-20 用户：我认可你设计的弹出框，请你把它应用到应用当中；按钮和文字是相互分离的并且文字不能超过按钮的范围。派生无字底板用于实现已认可的 D01–D09 设计。",
+      "approvedAt": "2026-10-20",
+      "path": "assets/images/dialog-button-danger-blank-v1.png",
+      "sha256": "01904e38db1561fb64e87cf8828a113115d4f9d3b9544d54be558d41f0bcec8e",
+      "metadata": {
+        "dimensions": "2014x781",
+        "transparency": "Alpha PNG; transparent padding excluded by component layout; no text or icons",
+        "anchor": "Top-left visible backplate bounds; independent centered live text"
+      }
+    },
+    {
+      "id": "dialog-field-blank-v1",
+      "kind": "images",
+      "source": "imagegen:exec-3ade0d08-320b-4866-861b-bbdc717b5a23",
+      "license": "OpenAI image output; user-directed project asset",
+      "licenseEvidence": "tmp/review/2026-10-20-dialog-assets/field-generation.json",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-20 用户认可 D01–D09 弹窗并要求应用；无字输入底板为已认可设计的派生素材。",
+      "approvedAt": "2026-10-20",
+      "path": "assets/images/dialog-field-blank-v1.png",
+      "sha256": "9782a861772b7c22a690e4ac45e77440bb6d0f6da6ad72d6409f077f4589007c",
+      "metadata": {
+        "dimensions": "2172x724",
+        "transparency": "Alpha PNG; no embedded text or icons",
+        "anchor": "Nine-slice frame / independent live controls"
+      }
+    },
+    {
+      "id": "settings-camp-blank-v1",
+      "kind": "images",
+      "source": "imagegen:tmp/work/2026-10-20-settings-implementation/generated/background-blank-v1.png",
+      "license": "OpenAI image output; user-directed project asset",
+      "licenseEvidence": "tmp/work/2026-10-20-settings-implementation/generated/background-prompt.txt",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-20 用户选择第一张营地设置设计，要求去掉按钮悬停预览、一级入口纵向滚动，并明确“实施到app中”；所选设计派生的无字素材。",
+      "approvedAt": "2026-10-20",
+      "metadata": {
+        "dimensions": "1672x941",
+        "transparency": "opaque",
+        "anchor": "Derived from settings-selected-nav-scroll-v3; live labels and icons are separate"
+      },
+      "path": "assets/images/settings-camp-blank-v1.png",
+      "sha256": "b76574e953138314c7a9d108c4cac6c03282abbd990ecbe22b2f053dce172fc3"
+    },
+    {
+      "id": "settings-nav-selected-blank-v1",
+      "kind": "images",
+      "source": "imagegen:tmp/work/2026-10-20-settings-implementation/generated/nav-selected-blank-v2.png",
+      "license": "OpenAI image output; user-directed project asset",
+      "licenseEvidence": "tmp/work/2026-10-20-settings-implementation/generated/nav-selected-refine-prompt.txt",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-20 用户选择第一张营地设置设计，要求去掉按钮悬停预览、一级入口纵向滚动，并明确“实施到app中”；所选设计派生的无字素材。",
+      "approvedAt": "2026-10-20",
+      "metadata": {
+        "dimensions": "1983x793",
+        "transparency": "RGBA",
+        "anchor": "Derived from settings-selected-nav-scroll-v3; live labels and icons are separate"
+      },
+      "path": "assets/images/settings-nav-selected-blank-v1.png",
+      "sha256": "b183a6ccc7a665aecc807c8dac02c633f2663d7514022083ba572e6974ee8677"
+    },
+    {
+      "id": "settings-nav-neutral-blank-v1",
+      "kind": "images",
+      "source": "imagegen:tmp/work/2026-10-20-settings-implementation/generated/nav-neutral-blank-v1.png",
+      "license": "OpenAI image output; user-directed project asset",
+      "licenseEvidence": "tmp/work/2026-10-20-settings-implementation/generated/nav-neutral-prompt.txt",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-20 用户选择第一张营地设置设计，要求去掉按钮悬停预览、一级入口纵向滚动，并明确“实施到app中”；所选设计派生的无字素材。",
+      "approvedAt": "2026-10-20",
+      "metadata": {
+        "dimensions": "1983x793",
+        "transparency": "RGBA",
+        "anchor": "Derived from settings-selected-nav-scroll-v3; live labels and icons are separate"
+      },
+      "path": "assets/images/settings-nav-neutral-blank-v1.png",
+      "sha256": "7a069ed94d7a5128f82a4e3a106add6d8d990263d0c702bd74fb01cee144bdb5"
+    },
+    {
+      "id": "settings-row-blank-v1",
+      "kind": "images",
+      "source": "imagegen:tmp/work/2026-10-20-settings-implementation/generated/row-blank-v1.png",
+      "license": "OpenAI image output; user-directed project asset",
+      "licenseEvidence": "tmp/work/2026-10-20-settings-implementation/generated/row-prompt.txt",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-20 用户选择第一张营地设置设计，要求去掉按钮悬停预览、一级入口纵向滚动，并明确“实施到app中”；所选设计派生的无字素材。",
+      "approvedAt": "2026-10-20",
+      "metadata": {
+        "dimensions": "2172x724",
+        "transparency": "RGBA",
+        "anchor": "Derived from settings-selected-nav-scroll-v3; live labels and icons are separate"
+      },
+      "path": "assets/images/settings-row-blank-v1.png",
+      "sha256": "22daa793e86ef7d1655a9d4a2dd8208b785a8c7802ad6efb7bd50c27373782a8"
+    },
+    {
+      "id": "settings-control-thumb-v1",
+      "kind": "images",
+      "source": "imagegen:tmp/work/2026-10-20-settings-implementation/generated/control-thumb-v1.png",
+      "license": "OpenAI image output; user-directed project asset",
+      "licenseEvidence": "tmp/work/2026-10-20-settings-implementation/generated/control-thumb-prompt.txt",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-20 用户选择第一张营地设置设计，要求去掉按钮悬停预览、一级入口纵向滚动，并明确“实施到app中”；所选设计派生的无字素材。",
+      "approvedAt": "2026-10-20",
+      "metadata": {
+        "dimensions": "1254x1254",
+        "transparency": "RGBA",
+        "anchor": "Derived from settings-selected-nav-scroll-v3; live labels and icons are separate"
+      },
+      "path": "assets/images/settings-control-thumb-v1.png",
+      "sha256": "5de702b6a82b9471d1c2aebb8e669c1b201da58c4d3447fb21b28875d5fe4445"
+    },
+    {
+      "id": "project-grassland-scene-v1",
+      "kind": "images",
+      "source": "built-in imagegen; derived from user-selected project-page mockup",
+      "license": "AI-generated project artwork",
+      "licenseEvidence": "tmp/review/2026-10-23-project-pages-assets/grassland-scene-v1-prompt.txt",
+      "approvedBy": "user",
+      "approvalRef": "tmp/review/2026-10-23-project-pages-assets/implementation-approval.json",
+      "approvedAt": "2026-10-23",
+      "path": "assets/images/project-grassland-scene-v1.png",
+      "sha256": "8e6e28c0bd7df496a0108f4ca1aadd40895290897ade432c4c19a9d5a9220ae8"
+    },
+    {
+      "id": "project-creation-camp-scene-v1",
+      "kind": "images",
+      "source": "built-in imagegen; derived from user-selected project-page mockup",
+      "license": "AI-generated project artwork",
+      "licenseEvidence": "tmp/review/2026-10-23-project-pages-assets/creation-camp-scene-v1-prompt.txt",
+      "approvedBy": "user",
+      "approvalRef": "tmp/review/2026-10-23-project-pages-assets/implementation-approval.json",
+      "approvedAt": "2026-10-23",
+      "path": "assets/images/project-creation-camp-scene-v1.png",
+      "sha256": "29bea7143fa048519dbf4e58edda7985047d7608f310564a94fd63e098e9cc99"
+    },
+    {
+      "id": "project-panel-blank-v1",
+      "kind": "images",
+      "source": "built-in imagegen; derived from user-selected project-page mockup",
+      "license": "AI-generated project artwork",
+      "licenseEvidence": "tmp/review/2026-10-23-project-pages-assets/project-panel-blank-v1-prompt.txt",
+      "approvedBy": "user",
+      "approvalRef": "tmp/review/2026-10-23-project-pages-assets/implementation-approval.json",
+      "approvedAt": "2026-10-23",
+      "path": "assets/images/project-panel-blank-v1.png",
+      "sha256": "2cf19725efd6bf8aa2f756d327f0c7d975da5edef6a0562dc9655ccb871d57f2"
+    },
+    {
+      "id": "hamster-traveler-v1",
+      "kind": "images",
+      "source": "built-in imagegen; approved simplified candidate 03",
+      "license": "AI-generated project artwork",
+      "licenseEvidence": "tmp/review/2026-10-22-hamster-03-refined/prompt-v1.txt",
+      "approvedBy": "user",
+      "approvalRef": "用户：可以的，就用它为基础重新设计流程；本次要求将创建项目页实施到app",
+      "approvedAt": "2026-10-23",
+      "path": "assets/images/hamster-traveler-v1.png",
+      "sha256": "cf7acedca51a0913c0c977da7c92efd223f88053b1ec9fe636994f0feb343d9e"
+    },
+    {
+      "id": "project-create-blackboard-scene-v1",
+      "kind": "images",
+      "source": "Built-in image_gen; tmp/review/2026-10-23-blackboard-selection/create-blackboard-blank-generation.json; original prompt create-blackboard-blank-prompt.txt",
+      "license": "OpenAI image output; user-directed project artwork; reference rights and applicable service terms apply",
+      "licenseEvidence": "tmp/review/2026-10-23-blackboard-selection/create-blackboard-blank-generation.json and create-blackboard-blank-prompt.txt",
+      "approvedBy": "user",
+      "approvalRef": "tmp/review/2026-10-23-blackboard-selection/implementation-approval.json",
+      "approvedAt": "2026-10-23",
+      "path": "assets/images/project-create-blackboard-scene-v1.png",
+      "sha256": "5f9f9fc43e56a498d516120a7841f3390a2c196dad123739d394a71a4d70bf1e",
+      "metadata": {
+        "dimensions": "1672x941",
+        "transparency": "Opaque; no embedded text, fields, buttons or icons",
+        "anchor": "Full-scene background; board at right and integrated backpack hamster at left; live controls remain separate",
+        "coordinateSystem": "Pixels; top-left origin; x right, y down"
+      }
+    },
+    {
+      "id": "project-grassland-scene-v2",
+      "kind": "images",
+      "source": "Built-in image_gen; tmp/review/2026-10-23-project-redesign-v2/grassland-faceted-v2-generation.json; original prompt grassland-faceted-v2-prompt.txt",
+      "license": "OpenAI image output; user-directed project artwork; reference rights and applicable service terms apply",
+      "licenseEvidence": "tmp/review/2026-10-23-project-redesign-v2/grassland-faceted-v2-generation.json and grassland-faceted-v2-prompt.txt",
+      "approvedBy": "user",
+      "approvalRef": "tmp/review/2026-10-23-blackboard-selection/implementation-approval.json",
+      "approvedAt": "2026-10-23",
+      "path": "assets/images/project-grassland-scene-v2.png",
+      "sha256": "cdec3607e74a3349b94004fe5438a6cd8989ddd8cf3282cdedc15e96f86bdde5",
+      "metadata": {
+        "dimensions": "1672x941",
+        "transparency": "Opaque; no embedded character, panel, text or controls",
+        "anchor": "Full-scene background; centered translucent list panel drawn independently at runtime",
+        "coordinateSystem": "Pixels; top-left origin; x right, y down"
+      }
+    },
+    {
+      "id": "agent-selection-camp-blank-v1",
+      "kind": "images",
+      "path": "assets/images/agent-selection-camp-blank-v1.png",
+      "sha256": "72bb6d9efcf6308980377132a4dcfcaf9b99330990cbda6a9fd949df4db81fd1",
+      "source": "Built-in imagegen derivative of approved login UI; tmp/review/2026-10-26-agent-implementation/assets/agent-selection-camp-blank-v1.json",
+      "license": "AI-generated; applicable OpenAI service terms and supplied reference rights apply.",
+      "licenseEvidence": "Approved design and derivative prompt retained in tmp/review/2026-10-26-agent-implementation/assets/.",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-26 用户认可当前智能体登录设计，要求加入“无智能体，手动创建”选项、主按钮改为“下一步”，其他不变并实施到App；沿用已要求下载的真实官方品牌图标。",
+      "approvedAt": "2026-10-26",
+      "metadata": {
+        "dimensions": "1672x941",
+        "transparency": "Original alpha preserved for icons; opaque scene"
+      }
+    },
+    {
+      "id": "agent-codex",
+      "kind": "images",
+      "path": "assets/images/agent-codex.png",
+      "sha256": "de7d43f3386105ab20952958c2c25beb0d903e2aeb6e1aef57c49a648c0d1c07",
+      "source": "/Applications/ChatGPT.app/Contents/Resources/icon-codex-light.png",
+      "license": "Official product identity artwork; trademark rights remain with the respective owner; no modification or general-use license asserted.",
+      "licenseEvidence": "Official source, signed bundle metadata and SHA-256 in tmp/review/2026-10-25-agent-access/icon-sources.json.",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-26 用户认可当前智能体登录设计，要求加入“无智能体，手动创建”选项、主按钮改为“下一步”，其他不变并实施到App；沿用已要求下载的真实官方品牌图标。",
+      "approvedAt": "2026-10-26",
+      "metadata": {
+        "dimensions": "[1024, 1024]",
+        "transparency": "Original alpha preserved for icons; opaque scene"
+      }
+    },
+    {
+      "id": "agent-claude-code",
+      "kind": "images",
+      "path": "assets/images/agent-claude-code.png",
+      "sha256": "790955716092771efcbef71de04e637c50916ab513225f4a8710b74f660dd6a0",
+      "source": "/Applications/Claude.app/Contents/Resources/ion-dist/images/install-hub/claude_code_terminal-icon.png",
+      "license": "Official product identity artwork; trademark rights remain with the respective owner; no modification or general-use license asserted.",
+      "licenseEvidence": "Official source, signed bundle metadata and SHA-256 in tmp/review/2026-10-25-agent-access/icon-sources.json.",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-26 用户认可当前智能体登录设计，要求加入“无智能体，手动创建”选项、主按钮改为“下一步”，其他不变并实施到App；沿用已要求下载的真实官方品牌图标。",
+      "approvedAt": "2026-10-26",
+      "metadata": {
+        "dimensions": "[128, 128]",
+        "transparency": "Original alpha preserved for icons; opaque scene"
+      }
+    },
+    {
+      "id": "agent-trae",
+      "kind": "images",
+      "path": "assets/images/agent-trae.png",
+      "sha256": "49d523938a22af5a70dd79923725df38674823026e2f917e76337319969f4af4",
+      "source": "https://lf-cdn.trae.com.cn/obj/trae-com-cn/trae_website_prod_cn/favicon.png",
+      "license": "Official product identity artwork; trademark rights remain with the respective owner; no modification or general-use license asserted.",
+      "licenseEvidence": "Official source, signed bundle metadata and SHA-256 in tmp/review/2026-10-25-agent-access/icon-sources.json.",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-26 用户认可当前智能体登录设计，要求加入“无智能体，手动创建”选项、主按钮改为“下一步”，其他不变并实施到App；沿用已要求下载的真实官方品牌图标。",
+      "approvedAt": "2026-10-26",
+      "metadata": {
+        "dimensions": "[48, 48]",
+        "transparency": "Original alpha preserved for icons; opaque scene"
+      }
+    },
+    {
+      "id": "agent-qoder",
+      "kind": "images",
+      "path": "assets/images/agent-qoder.png",
+      "sha256": "2276f0f8e6240959e70b83ebc48ec1dac1c0180e24528794f9a52b7386026f3d",
+      "source": "https://g-adoc.alcasset.com/sync/maas_docs/qoder/master/global/media/favicon_162a702f2508.png",
+      "license": "Official product identity artwork; trademark rights remain with the respective owner; no modification or general-use license asserted.",
+      "licenseEvidence": "Official source, signed bundle metadata and SHA-256 in tmp/review/2026-10-25-agent-access/icon-sources.json.",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-26 用户认可当前智能体登录设计，要求加入“无智能体，手动创建”选项、主按钮改为“下一步”，其他不变并实施到App；沿用已要求下载的真实官方品牌图标。",
+      "approvedAt": "2026-10-26",
+      "metadata": {
+        "dimensions": "[412, 412]",
+        "transparency": "Original alpha preserved for icons; opaque scene"
+      }
+    },
+    {
+      "id": "agent-workbuddy",
+      "kind": "images",
+      "path": "assets/images/agent-workbuddy.svg",
+      "sha256": "10ccbc099e7bc3d5ff12c315c4edd7b21386aa7166c1ec19997b3d55010d5c7d",
+      "source": "https://download.codebuddy.ai/web/workbuddy/2365138d79c29bb1cbce4644f5cbbffd2b561a5c/assets/logo.svg",
+      "license": "Official product identity artwork; trademark rights remain with the respective owner; no modification or general-use license asserted.",
+      "licenseEvidence": "Official source, signed bundle metadata and SHA-256 in tmp/review/2026-10-25-agent-access/icon-sources.json.",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-26 用户认可当前智能体登录设计，要求加入“无智能体，手动创建”选项、主按钮改为“下一步”，其他不变并实施到App；沿用已要求下载的真实官方品牌图标。",
+      "approvedAt": "2026-10-26",
+      "metadata": {
+        "dimensions": "0 0 40 40",
+        "transparency": "Original alpha preserved for icons; opaque scene"
+      }
+    },
+    {
+      "id": "agent-openclaw",
+      "kind": "images",
+      "path": "assets/images/agent-openclaw.svg",
+      "sha256": "fa7e2ec07ebfa696bcc8c27d7e36425cbb7b1772f6f7f04ce390cf5f1c35cf0e",
+      "source": "https://openclaw.ai/favicon.svg",
+      "license": "Official product identity artwork; trademark rights remain with the respective owner; no modification or general-use license asserted.",
+      "licenseEvidence": "Official source, signed bundle metadata and SHA-256 in tmp/review/2026-10-25-agent-access/icon-sources.json.",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-26 用户认可当前智能体登录设计，要求加入“无智能体，手动创建”选项、主按钮改为“下一步”，其他不变并实施到App；沿用已要求下载的真实官方品牌图标。",
+      "approvedAt": "2026-10-26",
+      "metadata": {
+        "dimensions": "0 0 120 120",
+        "transparency": "Original alpha preserved for icons; opaque scene"
+      }
+    },
+    {
+      "id": "agent-hermes",
+      "kind": "images",
+      "path": "assets/images/agent-hermes.png",
+      "sha256": "5fbced606189c9bfc2925a16f8903333041cabbf1f8699fe9fe9b3e24504048f",
+      "source": "https://web-assets.nousresearch.com/marketing/a9e224a61d168b4acf3fd3dbab9448c92fa914f9/assets/hermes-agent/icon.png",
+      "license": "Official product identity artwork; trademark rights remain with the respective owner; no modification or general-use license asserted.",
+      "licenseEvidence": "Official source, signed bundle metadata and SHA-256 in tmp/review/2026-10-25-agent-access/icon-sources.json.",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-26 用户认可当前智能体登录设计，要求加入“无智能体，手动创建”选项、主按钮改为“下一步”，其他不变并实施到App；沿用已要求下载的真实官方品牌图标。",
+      "approvedAt": "2026-10-26",
+      "metadata": {
+        "dimensions": "[48, 48]",
+        "transparency": "Original alpha preserved for icons; opaque scene"
+      }
+    },
+    {
+      "id": "agent-codebuddy",
+      "kind": "images",
+      "path": "assets/images/agent-codebuddy.svg",
+      "sha256": "149baa45b9f9370c15f20d599afe381aa138e4fc13acf503f435c571ac93ecf5",
+      "source": "https://download.codebuddy.cn/web/website/a5b2fb510f0e7b156f19d072fae0cd12ae1f2f19/assets/logo.svg",
+      "license": "Official product identity artwork; trademark rights remain with the respective owner; no modification or general-use license asserted.",
+      "licenseEvidence": "Official CodeBuddy website icon link, retrieved 2026-10-27; unmodified source and SHA-256 retained.",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-27 用户要求使用 CodeBuddy 替换 WorkBuddy，移除 TRAE，并提供 CodeBuddy CLI 一键安装。",
+      "approvedAt": "2026-10-27",
+      "metadata": {
+        "transparency": "Original alpha preserved"
+      }
+    }
+  ]
+}
