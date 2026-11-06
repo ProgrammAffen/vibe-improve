@@ -1266,6 +1266,130 @@
       "metadata": {
         "transparency": "Original alpha preserved"
       }
+    },
+    {
+      "id": "agent-selection-camp-blank-v2",
+      "kind": "images",
+      "path": "assets/images/agent-selection-camp-blank-v2.png",
+      "sha256": "a2fd60c6ba2f8dd1887bc273f47d7c4fbac8090c91de8fc31547a2f14e2614e7",
+      "source": "Built-in imagegen edit of agent-selection-camp-blank-v1.png; approved hamster-traveler-v1 identity reference.",
+      "license": "AI-generated; applicable OpenAI service terms and supplied reference rights apply.",
+      "licenseEvidence": "Source images registered in this manifest; derivative review in tmp/review/agent-companion-2026-10-27/.",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-27 用户要求选择智能体页面的金丝熊更换表达当前主题的动作；沿用已选金丝熊与场景，仅更换举爪介绍伙伴、手持通信水晶姿态。",
+      "approvedAt": "2026-10-27",
+      "metadata": {
+        "dimensions": "1672x941",
+        "transparency": "Opaque scene; empty blackboard, no text or controls"
+      }
+    },
+    {
+      "id": "agent-selection-camp-blank-v3",
+      "kind": "images",
+      "source": "Built-in imagegen identity correction using approved hamster-traveler-v1.png; prompts in tmp/review/hamster-face-correction-2026-10-27/prompts.json",
+      "license": "AI-generated project artwork; applicable OpenAI service terms and supplied reference rights apply.",
+      "licenseEvidence": "Original approved simplified candidate 03 registered as hamster-traveler-v1; derivative generation in tmp/review/hamster-face-correction-2026-10-27/prompts.json.",
+      "approvedBy": "user",
+      "approvalRef": "用户已确认简化03号形象；2026-10-27纠正：你把金丝熊的外貌改了，脸上没有那么多多边形。此修订按已确认角色减少面部碎切面并恢复闭嘴微笑，保留既定动作。",
+      "approvedAt": "2026-10-27",
+      "path": "assets/images/agent-selection-camp-blank-v3.png",
+      "sha256": "b98fcb85939cd0f5c1d0141655283585bb3f1c8f75d8c261a24a26828f3801c2"
+    },
+    {
+      "id": "route-grassland-base-v1",
+      "kind": "images",
+      "source": "Built-in imagegen derivative of approved grassland river route selection and import modal; tmp/review/route-implementation-2026-10-28/prompts.json",
+      "license": "AI-generated project artwork; applicable OpenAI service terms and supplied reference rights apply.",
+      "licenseEvidence": "Approved scene and modal references; generation prompts and transparency checks in tmp/review/route-implementation-2026-10-28/",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-28 用户：可以，将当前设计实现到app中并设计创建路线点击之后的UI，给我3个选项。分层沿用已确认草原、小河与金丝熊姿态；所有文字和控件保持独立。",
+      "approvedAt": "2026-10-28",
+      "path": "assets/images/route-grassland-base-v1.png",
+      "sha256": "39288534bcb6146a9a1a6104dd2a287ce6b6d1c40b2291ab220d270fe42c478b"
+    },
+    {
+      "id": "route-stone-create-v1",
+      "kind": "images",
+      "source": "Built-in imagegen derivative of approved grassland river route selection and import modal; tmp/review/route-implementation-2026-10-28/prompts.json",
+      "license": "AI-generated project artwork; applicable OpenAI service terms and supplied reference rights apply.",
+      "licenseEvidence": "Approved scene and modal references; generation prompts and transparency checks in tmp/review/route-implementation-2026-10-28/",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-28 用户：可以，将当前设计实现到app中并设计创建路线点击之后的UI，给我3个选项。分层沿用已确认草原、小河与金丝熊姿态；所有文字和控件保持独立。",
+      "approvedAt": "2026-10-28",
+      "path": "assets/images/route-stone-create-v1.png",
+      "sha256": "63ff6d97acf8b6a3a6b89550a33dd0edab28f58f26a973b173dbc5caa3cd03d9"
+    },
+    {
+      "id": "route-stone-import-v1",
+      "kind": "images",
+      "source": "Built-in imagegen derivative of approved grassland river route selection and import modal; tmp/review/route-implementation-2026-10-28/prompts.json",
+      "license": "AI-generated project artwork; applicable OpenAI service terms and supplied reference rights apply.",
+      "licenseEvidence": "Approved scene and modal references; generation prompts and transparency checks in tmp/review/route-implementation-2026-10-28/",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-28 用户：可以，将当前设计实现到app中并设计创建路线点击之后的UI，给我3个选项。分层沿用已确认草原、小河与金丝熊姿态；所有文字和控件保持独立。",
+      "approvedAt": "2026-10-28",
+      "path": "assets/images/route-stone-import-v1.png",
+      "sha256": "996451e4bfbaf1ab1bebd3d036eb408d611fae3855b1e03f1fbb22ba23d8c5f5"
+    },
+    {
+      "id": "route-local-folder-v1",
+      "kind": "images",
+      "source": "Built-in imagegen derivative of approved grassland river route selection and import modal; tmp/review/route-implementation-2026-10-28/prompts.json",
+      "license": "AI-generated project artwork; applicable OpenAI service terms and supplied reference rights apply.",
+      "licenseEvidence": "Approved scene and modal references; generation prompts and transparency checks in tmp/review/route-implementation-2026-10-28/",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-28 用户：可以，将当前设计实现到app中并设计创建路线点击之后的UI，给我3个选项。分层沿用已确认草原、小河与金丝熊姿态；所有文字和控件保持独立。",
+      "approvedAt": "2026-10-28",
+      "path": "assets/images/route-local-folder-v1.png",
+      "sha256": "2abef9e24fda0268c243ac386343b519eea5057cead8eb9eb1e6b2f1771b6f4c"
+    },
+    {
+      "id": "route-grassland-base-v2",
+      "kind": "images",
+      "source": "Built-in imagegen placement edit of route-grassland-base-v1.png; prompt tmp/review/hamster-backpack-2026-10-28/prompt.txt",
+      "license": "AI-generated project artwork; applicable OpenAI service terms and supplied reference rights apply.",
+      "licenseEvidence": "Approved route-grassland-base-v1 source registered in manifest; requested placement correction 2026-10-28.",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-28 用户：金丝熊的背包被挡住了，挪一下它的位置。仅修正既定场景中的角色位置。",
+      "approvedAt": "2026-10-28",
+      "path": "assets/images/route-grassland-base-v2.png",
+      "sha256": "bdad0ebb01048e5cbc5b81e2fffc29690bb6d84aec2b193dc7ad4312f7aab575"
+    },
+    {
+      "id": "planning-library-blank-v1",
+      "kind": "images",
+      "source": "Built-in ImageGen blank-layer extraction from approved 2026-10-29 planning design",
+      "license": "AI-generated project artwork; applicable OpenAI service terms and approved reference rights apply.",
+      "licenseEvidence": "tmp/review/planning-implementation-2026-10-29/prompts.json",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-29 用户：好，将以上设计应用到app中。按已确认对话清单与棕色无宝石卷轴拆分无字背景层。",
+      "approvedAt": "2026-10-29",
+      "path": "assets/images/planning-library-blank-v1.png",
+      "sha256": "6ba0d19f5c50cea60a493d12ae827da333c0ccddabe240048cd6d4d23bf3237a"
+    },
+    {
+      "id": "route-editor-brown-blank-v1",
+      "kind": "images",
+      "source": "Built-in ImageGen blank-layer extraction from approved 2026-10-29 planning design",
+      "license": "AI-generated project artwork; applicable OpenAI service terms and approved reference rights apply.",
+      "licenseEvidence": "tmp/review/planning-implementation-2026-10-29/prompts.json",
+      "approvedBy": "user",
+      "approvalRef": "2026-10-29 用户：好，将以上设计应用到app中。按已确认对话清单与棕色无宝石卷轴拆分无字背景层。",
+      "approvedAt": "2026-10-29",
+      "path": "assets/images/route-editor-brown-blank-v1.png",
+      "sha256": "24cf358970c4de6b8f0f0c74402f837d178933bd6af7bbfd87b7c0c1b2998e1a"
+    },
+    {
+      "id": "route-editor-scroll-cutout-v2",
+      "kind": "images",
+      "source": "Built-in ImageGen background removal from project route-editor-brown-blank-v1",
+      "license": "AI-generated project artwork; applicable OpenAI service terms and approved reference rights apply.",
+      "licenseEvidence": "Existing route-editor-brown-blank-v1 source; new transparent extraction at tmp/review/route-editor-repairs-2026-11-01/scroll-cutout.png",
+      "approvedBy": "user",
+      "approvalRef": "2026-11-01 用户要求更换与卷轴重合的背景；保留既定卷轴，分离图层后使用已有森林背景。",
+      "approvedAt": "2026-11-01",
+      "path": "assets/images/route-editor-scroll-cutout-v2.png",
+      "sha256": "78433c10c6cf3c3d6b060b4ad351cd0806b4e1d2f904c6ea4add64c98828999c"
     }
   ]
 }

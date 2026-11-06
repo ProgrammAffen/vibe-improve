@@ -1,0 +1,68 @@
+{
+  "name": "consistency-device-constraint",
+  "task": "consistency",
+  "input": {
+    "locale": "en",
+    "acceptedAnswers": {
+      "goal": {
+        "summary": "Train a character-level language model.",
+        "fields": {
+          "topic": "Character-level language models",
+          "outcome": "Train a large model from scratch on a GPU"
+        }
+      },
+      "purpose": {
+        "summary": "Explore text generation.",
+        "fields": {
+          "context": "Personal experiments",
+          "criteria": "Show generated samples and explain observed training behavior"
+        }
+      },
+      "baseline": {
+        "summary": "Previously trained a small image classifier.",
+        "fields": {
+          "experience": "Trained an image classifier with guidance"
+        }
+      },
+      "time": {
+        "summary": "Five hours each week, one hour per session.",
+        "fields": {
+          "weekly": "Five hours",
+          "session": "One hour"
+        }
+      },
+      "constraints": {
+        "summary": "A laptop and small text data; no hard deadline.",
+        "fields": {
+          "conditions": "CPU laptop only; no GPU",
+          "scope": "Small local examples"
+        }
+      }
+    },
+    "anchorQuestionId": "constraints"
+  },
+  "response": {
+    "status": "ok",
+    "reply": "Your CPU-only constraint remains. Please review the proposed smaller experiment.",
+    "result": {
+      "status": "requires_review",
+      "issues": [
+        {
+          "questionId": "goal",
+          "fields": [
+            "outcome"
+          ],
+          "kind": "incompatible",
+          "reason": "The adopted outcome requires a GPU, but the adopted equipment is CPU-only. A small CPU experiment is a proposal requiring user adoption.",
+          "suggestion": {
+            "summary": "Train a small character-level model on the available CPU laptop.",
+            "fields": {
+              "outcome": "Train a small character-level model on the available CPU laptop and explain observed limits."
+            }
+          }
+        }
+      ]
+    },
+    "missing": []
+  }
+}

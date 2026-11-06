@@ -4,6 +4,7 @@ import Darwin
 enum ProjectError: String, Error {
     case invalidName = "PROJECT_NAME_INVALID", directoryRequired = "PROJECT_DIRECTORY_REQUIRED"
     case exists = "PROJECT_EXISTS", unavailable = "PROJECT_UNAVAILABLE", invalid = "PROJECT_INVALID"
+    case directoryLocked = "PROJECT_DIRECTORY_LOCKED"
     case conflict = "PROJECT_CONFLICT", limit = "PROJECT_LIMIT", storage = "PROJECT_STORAGE_UNAVAILABLE"
 }
 
@@ -29,12 +30,17 @@ private struct ProjectEntry: Codable {
 
 final class ProjectStore {
     private let files: RuntimeDirectory
+    private let lock = NSRecursiveLock()
     private var grants: [String: URL] = [:]
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     init(runtime: RuntimeDirectory) throws {
         files = try runtime.child("projects")
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    }
+    private func transaction<T>(_ body: () throws -> T) throws -> T {
+        lock.lock(); defer { lock.unlock() }
+        return try files.locked(body)
     }
     static func validName(_ value: String) -> Bool {
         let name = value.precomposedStringWithCanonicalMapping
@@ -46,6 +52,7 @@ final class ProjectStore {
             && !reserved.contains(stem)
     }
     func grant(_ url: URL) throws -> [String: Any] {
+        lock.lock(); defer { lock.unlock() }
         let selected = url.standardizedFileURL.resolvingSymlinksInPath()
         let fd = open(selected.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard fd >= 0 else { throw ProjectError.unavailable }
@@ -78,7 +85,32 @@ final class ProjectStore {
     private func resolve(_ entry: ProjectEntry) throws -> URL {
         var stale = false
         guard let url = try? URL(resolvingBookmarkData: entry.bookmark, options: [.withoutUI, .withoutMounting], relativeTo: nil, bookmarkDataIsStale: &stale) else { throw ProjectError.unavailable }
-        return url.standardizedFileURL
+        let selected = url.standardizedFileURL
+        guard selected.isFileURL, selected.resolvingSymlinksInPath().path == selected.path else { throw ProjectError.unavailable }
+        let fd = open(selected.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard fd >= 0 else { throw ProjectError.unavailable }
+        close(fd)
+        return selected
+    }
+    func projectWorkspace(for id: String) throws -> URL {
+        try transaction {
+            guard let entry = try readIndex().first(where: { $0.id == id }) else { throw ProjectError.unavailable }
+            let url = try resolve(entry)
+            if entry.kind == "project", try readDocument(at: url).id != id { throw ProjectError.invalid }
+            return url
+        }
+    }
+    private func ensureAvailable(_ url: URL, entries: [ProjectEntry], except id: String? = nil) throws {
+        let fd = open(url.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard fd >= 0 else { throw ProjectError.unavailable }
+        close(fd)
+        for entry in entries where entry.id != id {
+            if let existing = try? resolve(entry), existing.path == url.path { throw ProjectError.exists }
+        }
+        var metadata = stat()
+        let marker = url.appendingPathComponent(".vibe-improve").path
+        if lstat(marker, &metadata) == 0 { throw ProjectError.exists }
+        guard errno == ENOENT else { throw ProjectError.unavailable }
     }
     private func readDocument(at url: URL) throws -> ProjectDocument {
         var metadata = stat()
@@ -101,14 +133,14 @@ final class ProjectStore {
         return result
     }
     func list() throws -> [[String: Any]] {
-        try files.locked {
+        try transaction {
             try readIndex().map { entry in
                 do {
                     let url = try resolve(entry)
                     if entry.kind == "draft" {
                         let fd = open(url.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
                         guard fd >= 0 else { throw ProjectError.unavailable }; close(fd)
-                        return try summary(entry.document, path: url.appendingPathComponent(entry.document.name).path)
+                        return try summary(entry.document, path: url.path)
                     }
                     let document = try readDocument(at: url)
                     guard document.id == entry.id else { throw ProjectError.invalid }
@@ -120,34 +152,32 @@ final class ProjectStore {
     func create(name: String, parentToken: String, commandID: String) throws -> [String: Any] {
         let normalized = name.precomposedStringWithCanonicalMapping
         guard Self.validName(normalized) else { throw ProjectError.invalidName }
-        guard let parent = grants[parentToken] else { throw ProjectError.directoryRequired }
         guard UUID(uuidString: commandID) != nil else { throw ProjectError.invalid }
-        return try files.locked {
+        return try transaction {
+            guard let parent = grants[parentToken] else { throw ProjectError.directoryRequired }
             var entries = try readIndex()
             let projectID = "proj_" + commandID.lowercased()
-            let target = parent.appendingPathComponent(normalized, isDirectory: true)
+            let target = parent
             if let entry = entries.first(where: { $0.id == projectID }) {
-                guard entry.document.name == normalized, entry.path == target.path else { throw ProjectError.conflict }
-                return try summary(entry.document, path: entry.path)
+                guard entry.document.name == normalized, try resolve(entry).path == target.path else { throw ProjectError.conflict }
+                var result = try summary(entry.document, path: target.path)
+                result["directory"] = try grant(parent)
+                return result
             }
             guard entries.count < 256 else { throw ProjectError.limit }
-            let parentFD = open(parent.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-            guard parentFD >= 0 else { throw ProjectError.unavailable }
-            defer { close(parentFD) }
-            var metadata = stat()
-            if fstatat(parentFD, normalized, &metadata, AT_SYMLINK_NOFOLLOW) == 0 { throw ProjectError.exists }
-            guard errno == ENOENT else { throw ProjectError.unavailable }
-            guard !entries.contains(where: { $0.path.precomposedStringWithCanonicalMapping.lowercased() == target.path.precomposedStringWithCanonicalMapping.lowercased() }) else { throw ProjectError.exists }
+            try ensureAvailable(parent, entries: entries)
             let now = ISO8601DateFormatter().string(from: Date())
             let document = ProjectDocument(format: "vibe-improve.project", schemaVersion: 1, id: projectID, name: normalized, revision: 1, createdAt: now, updatedAt: now, lastOpenedAt: now, state: "draft")
             let entry = ProjectEntry(id: projectID, kind: "draft", bookmark: try parent.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil), path: target.path, document: document)
             entries.append(entry); try saveIndex(entries)
             try files.remove("draft.json")
-            return try summary(document, path: target.path)
+            var result = try summary(document, path: target.path)
+            result["directory"] = try grant(parent)
+            return result
         }
     }
     func openProject(id: String) throws -> [String: Any] {
-        try files.locked {
+        try transaction {
             var entries = try readIndex()
             guard let index = entries.firstIndex(where: { $0.id == id }) else { throw ProjectError.unavailable }
             let entry = entries[index], url = try resolve(entry)
@@ -155,7 +185,7 @@ final class ProjectStore {
             guard document.id == id else { throw ProjectError.invalid }
             document.lastOpenedAt = ISO8601DateFormatter().string(from: Date())
             if entry.kind == "project" { try RuntimeDirectory(url: url.appendingPathComponent(".vibe-improve"), create: false).write("project.json", data: encoder.encode(document)) }
-            let path = entry.kind == "draft" ? url.appendingPathComponent(document.name).path : url.path
+            let path = url.path
             entries[index] = ProjectEntry(id: id, kind: entry.kind, bookmark: entry.bookmark, path: path, document: document)
             try saveIndex(entries)
             var result = try summary(document, path: path, kind: entry.kind)
@@ -164,7 +194,7 @@ final class ProjectStore {
         }
     }
     func register(_ url: URL, replacing id: String? = nil) throws -> [String: Any] {
-        try files.locked {
+        try transaction {
             var entries = try readIndex()
             let document = try readDocument(at: url)
             if let id, document.id != id { throw ProjectError.invalid }
@@ -178,33 +208,35 @@ final class ProjectStore {
     func rename(id: String, name: String, expectedRevision: Int, parentToken: String?) throws -> [String: Any] {
         let name = name.precomposedStringWithCanonicalMapping
         guard Self.validName(name) else { throw ProjectError.invalidName }
-        return try files.locked {
+        return try transaction {
             var entries = try readIndex()
             guard let index = entries.firstIndex(where: { $0.id == id }) else { throw ProjectError.unavailable }
             let entry = entries[index]
-            let url = entry.kind == "draft" && parentToken != nil ? grants[parentToken!] : try resolve(entry)
+            let url:URL? = try resolve(entry)
+            if let token=parentToken{
+                guard let selected=grants[token] else{throw ProjectError.directoryRequired}
+                guard selected.standardizedFileURL.path==url?.standardizedFileURL.path else{throw ProjectError.directoryLocked}
+            }
             guard let url else { throw ProjectError.directoryRequired }
             var document = entry.kind == "draft" ? entry.document : try readDocument(at: url)
             guard document.id == id, document.revision == expectedRevision else { throw ProjectError.conflict }
-            let path = entry.kind == "draft" ? url.appendingPathComponent(name).path : url.path
+            let path = url.path
             if entry.kind == "draft" {
-                let fd = open(url.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-                guard fd >= 0 else { throw ProjectError.unavailable }; close(fd)
-                var metadata = stat()
-                guard lstat(path, &metadata) != 0, errno == ENOENT else { throw ProjectError.exists }
-                guard !entries.contains(where: { $0.id != id && $0.path.lowercased() == path.lowercased() }) else { throw ProjectError.exists }
+                try ensureAvailable(url, entries: entries, except: id)
             }
             document.name = name; document.revision += 1; document.updatedAt = ISO8601DateFormatter().string(from: Date())
             if entry.kind == "project" { try RuntimeDirectory(url: url.appendingPathComponent(".vibe-improve"), create: false).write("project.json", data: encoder.encode(document)) }
             entries[index] = ProjectEntry(id: id, kind: entry.kind, bookmark: try url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil), path: path, document: document)
             try saveIndex(entries)
-            return try summary(document, path: path, kind: entry.kind)
+            var result = try summary(document, path: path, kind: entry.kind)
+            if entry.kind == "draft" { result["directory"] = try grant(url) }
+            return result
         }
     }
     func remove(id: String, expectedRevision: Int) throws {
         guard id.range(of: "^proj_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$", options: .regularExpression) != nil,
               expectedRevision > 0, expectedRevision < 1_000_000 else { throw ProjectError.invalid }
-        try files.locked {
+        try transaction {
             var entries = try readIndex()
             guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
             let entry = entries[index]
@@ -220,12 +252,14 @@ final class ProjectStore {
     }
     func saveDraft(name: String, parentToken: String?) throws {
         guard name.count <= 80 else { throw ProjectError.invalidName }
-        var record: [String: Any] = ["name": name]
-        if let token = parentToken, let url = grants[token] { record["parent"] = try url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil).base64EncodedString() }
-        try files.locked { try files.write("draft.json", data: JSONSerialization.data(withJSONObject: record)) }
+        try transaction {
+            var record: [String: Any] = ["name": name]
+            if let token = parentToken, let url = grants[token] { record["parent"] = try url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil).base64EncodedString() }
+            try files.write("draft.json", data: JSONSerialization.data(withJSONObject: record))
+        }
     }
     func loadDraft() throws -> [String: Any] {
-        try files.locked {
+        try transaction {
             guard let data = try files.read("draft.json", maximumBytes: 65_536), let record = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let name = record["name"] as? String, name.count <= 80 else { return ["name": ""] }
             var response: [String: Any] = ["name": name]
             if let encoded = record["parent"] as? String, let bookmark = Data(base64Encoded: encoded) {

@@ -1,0 +1,44 @@
+{
+  "version": "planning.2",
+  "base": [
+    "00-core.md"
+  ],
+  "learningStandard": "10-learning-standard.md",
+  "repair": "60-repair.md",
+  "responseSchema": "tasks.schema.json",
+  "schemaImports": {
+    "route.schema.json": "../../contracts/route.schema.json"
+  },
+  "tasks": {
+    "interview": "20-interview.md",
+    "outline": "30-outline.md",
+    "lessons": "40-lessons.md",
+    "review": "50-review.md",
+    "edit": "70-edit.md",
+    "consistency": "80-consistency.md"
+  },
+  "learningTasks": [
+    "outline",
+    "lessons",
+    "review",
+    "edit"
+  ],
+  "legacyResponseTasks": [
+    "edit"
+  ],
+  "inputDelivery": "Fixed instructions and separately serialized context JSON data; CLI adapters choose supported message channels.",
+  "sharedRules": {
+    "interview": [
+      "15-consistency-standard.md"
+    ],
+    "outline": [
+      "15-consistency-standard.md"
+    ],
+    "lessons": [
+      "15-consistency-standard.md"
+    ],
+    "consistency": [
+      "15-consistency-standard.md"
+    ]
+  }
+}

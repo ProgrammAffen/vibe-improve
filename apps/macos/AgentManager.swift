@@ -2,8 +2,35 @@ import Foundation
 import Darwin
 import CoreFoundation
 
-enum AgentError: String, Error { case invalid="AGENT_INVALID", unavailable="AGENT_UNAVAILABLE", auth="AGENT_AUTH_REQUIRED", busy="AGENT_BUSY", login="AGENT_LOGIN_FAILED", timeout="AGENT_TIMEOUT", runtime="AGENT_RUNTIME_REQUIRED", install="AGENT_INSTALL_FAILED" }
+enum AgentError: String, Error { case invalid="AGENT_INVALID", unavailable="AGENT_UNAVAILABLE", auth="AGENT_AUTH_REQUIRED", busy="AGENT_BUSY", login="AGENT_LOGIN_FAILED", timeout="AGENT_TIMEOUT", runtime="AGENT_RUNTIME_REQUIRED", install="AGENT_INSTALL_FAILED", project="AGENT_PROJECT_UNAVAILABLE" }
 struct AgentCommandResult { let status: Int32; let text: String; let diagnostic: String; let timedOut: Bool }
+struct AgentSessionPreparation {
+    let projectID:String,provider:String,launch:AgentSessionLaunch?
+    var summary:[String:Any]{["projectId":projectID,"provider":provider]}
+}
+struct AgentSessionLaunch {
+    let provider:String,projectID:String,executable:URL,arguments:[String],workspace:URL,environment:[String:String]
+    private let device:dev_t,inode:ino_t
+    var threadStartParameters:[String:Any]{provider=="codex" ? ["cwd":workspace.path]:[:]}
+    var turnStartParameters:[String:Any]{threadStartParameters}
+    static func validateWorkspace(_ url:URL)throws->stat {
+        guard url.isFileURL,url.path.hasPrefix("/"),url.standardizedFileURL.path==url.path,
+              url.resolvingSymlinksInPath().path==url.path else{throw AgentError.project}
+        let fd=open(url.path,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC)
+        guard fd>=0 else{throw AgentError.project};defer{close(fd)}
+        var value=stat();guard fstat(fd,&value)==0,value.st_mode&S_IFMT==S_IFDIR else{throw AgentError.project};return value
+    }
+    init(provider:String,projectID:String,executable:URL,arguments:[String],workspace:URL,environment:[String:String])throws{
+        let metadata=try Self.validateWorkspace(workspace)
+        self.provider=provider;self.projectID=projectID;self.executable=executable;self.arguments=arguments;self.workspace=workspace;self.environment=environment
+        device=metadata.st_dev;inode=metadata.st_ino
+    }
+    func configure(_ process:Process)throws{
+        let metadata=try Self.validateWorkspace(workspace)
+        guard metadata.st_dev==device,metadata.st_ino==inode else{throw AgentError.project}
+        process.executableURL=executable;process.arguments=arguments;process.currentDirectoryURL=workspace;process.environment=environment
+    }
+}
 final class AgentOutput {
     private let lock=NSLock()
     private var data=Data()
@@ -45,9 +72,10 @@ final class AgentManager {
     private let home:URL
     private let command: (URL,[String],TimeInterval)->AgentCommandResult
     private let resolverOverride: ((String)->URL?)?
+    private let projectWorkspace:((String)throws->URL)?
     private let codebuddy:CodeBuddyAdapter
-    init(runtime:RuntimeDirectory,home:URL=FileManager.default.homeDirectoryForCurrentUser,resolver:((String)->URL?)?=nil,runner:((URL,[String],TimeInterval)->AgentCommandResult)?=nil) throws {
-        self.runtime=try runtime.child("agents");self.home=home;self.resolverOverride=resolver
+    init(runtime:RuntimeDirectory,home:URL=FileManager.default.homeDirectoryForCurrentUser,resolver:((String)->URL?)?=nil,runner:((URL,[String],TimeInterval)->AgentCommandResult)?=nil,projectWorkspace:((String)throws->URL)?=nil) throws {
+        self.runtime=try runtime.child("agents");self.home=home;self.resolverOverride=resolver;self.projectWorkspace=projectWorkspace
         self.codebuddy=try CodeBuddyAdapter(runtime:self.runtime,home:home)
         let working=self.runtime.url
         self.command=runner ?? {url,args,timeout in AgentManager.run(url,args:args,timeout:timeout,working:working)}
@@ -103,20 +131,47 @@ final class AgentManager {
         guard let team=["codex":"2DC432GLL2","claude-code":"Q6L2SF6YDW"][id] else{return nil}
         for path in candidates(id){
             let real=path.resolvingSymlinksInPath()
-            let check=command(URL(fileURLWithPath:"/usr/bin/codesign"),["--verify","--strict",real.path],6)
+            let check=command(URL(fileURLWithPath:"/usr/bin/codesign"),["--verify","--strict",real.path],20)
             if check.status != 0{continue}
-            let info=command(URL(fileURLWithPath:"/usr/bin/codesign"),["-dv","--verbose=2",real.path],6)
+            let info=command(URL(fileURLWithPath:"/usr/bin/codesign"),["-dv","--verbose=2",real.path],8)
             if info.status==0&&(info.text+info.diagnostic).split(separator:"\n").contains(Substring("TeamIdentifier="+team)){return real}
         }
         return nil
     }
+    func detection()throws->[[String:Any]] {
+        preferenceLock.lock();defer{preferenceLock.unlock()}
+        return try runtime.locked{try cachedDetection()}
+    }
+    private func cachedDetection()throws->[[String:Any]]{
+        guard let data=try runtime.read("detection.json",maximumBytes:16_384),let record=try? JSONSerialization.jsonObject(with:data) as? [String:Any],record["schemaVersion"] as? Int==1,let values=record["probes"] as? [[String:Any]] else{return []}
+        let states=["ready","login-required","not-installed","unverified","unknown","runtime-required"]
+        var seen=Set<String>()
+        return values.compactMap{value in
+            guard let id=value["id"] as? String,Self.ids.contains(id),seen.insert(id).inserted,let state=value["state"] as? String,states.contains(state) else{return nil}
+            var result:[String:Any]=["id":id,"state":state]
+            if let version=value["version"] as? String,version.range(of:"^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+.][A-Za-z0-9.]+)?$",options:.regularExpression) != nil,version.count<100{result["version"]=version}
+            return result
+        }
+    }
     func probe(_ id:String)throws->[String:Any] {
+        let result=try performProbe(id)
+        preferenceLock.lock();defer{preferenceLock.unlock()}
+        try runtime.locked{
+            var values=try cachedDetection().filter{$0["id"] as? String != id};values.append(result)
+            try runtime.write("detection.json",data:JSONSerialization.data(withJSONObject:["schemaVersion":1,"checkedAt":ISO8601DateFormatter().string(from:Date()),"probes":values],options:.sortedKeys))
+        }
+        return result
+    }
+    private func performProbe(_ id:String)throws->[String:Any] {
         guard Self.ids.contains(id) else{throw AgentError.invalid}
         if id=="codebuddy",resolverOverride==nil{return codebuddy.probe()}
         guard let binary=resolve(id) else{
             let commands=candidates(id),application=installedApplication(id)
             return ["id":id,"state":commands.isEmpty && application == nil ? "not-installed":"unverified"]
         }
+        return probe(id,binary:binary)
+    }
+    private func probe(_ id:String,binary:URL)->[String:Any] {
         let version=command(binary,["--version"],8)
         guard version.status==0,!version.timedOut else{return["id":id,"state":"unknown"]}
         let auth=command(binary,id=="claude-code" ? ["auth","status","--json"]:["login","status"],12)
@@ -148,7 +203,11 @@ final class AgentManager {
     }
     func save(_ scope:String,choice:String)throws {
         guard validScope(scope),Self.ids.contains(choice)||choice=="manual" else{throw AgentError.invalid}
-        if choice != "manual"{guard try probe(choice)["state"] as? String=="ready" else{throw AgentError.auth}}
+        if choice != "manual"{
+            let state=try probe(choice)["state"] as? String
+            if state=="login-required"{throw AgentError.auth}
+            guard state=="ready" else{throw AgentError.unavailable}
+        }
         preferenceLock.lock();defer{preferenceLock.unlock()}
         try runtime.locked{
             var values:[String:String]=[:]
@@ -156,6 +215,26 @@ final class AgentManager {
             guard values.count<513 || values[scope] != nil else{throw AgentError.unavailable}
             values[scope]=choice;try runtime.write("choices.json",data:JSONSerialization.data(withJSONObject:values,options:.sortedKeys))
         }
+    }
+    func prepareSession(projectID:String)throws->AgentSessionPreparation {
+        guard projectID != "default",validScope(projectID) else{throw AgentError.invalid}
+        guard let projectWorkspace else{throw AgentError.project}
+        let workspace:URL
+        do{workspace=try projectWorkspace(projectID);_ = try AgentSessionLaunch.validateWorkspace(workspace)}catch{throw AgentError.project}
+        guard let provider=try choice(projectID) as? String else{throw AgentError.invalid}
+        if provider=="manual"{return AgentSessionPreparation(projectID:projectID,provider:provider,launch:nil)}
+        if provider=="codebuddy"{return AgentSessionPreparation(projectID:projectID,provider:provider,launch:try codebuddy.prepareSession(projectID:projectID,workspace:workspace))}
+        guard ["codex","claude-code"].contains(provider),let binary=resolve(provider) else{throw AgentError.unavailable}
+        let state=probe(provider,binary:binary)["state"] as? String
+        if state=="login-required"{throw AgentError.auth}
+        guard state=="ready" else{throw AgentError.unavailable}
+        var environment=ProcessInfo.processInfo.environment
+        environment["TMPDIR"]=runtime.url.path;environment["CLAUDE_CODE_TMPDIR"]=runtime.url.path
+        environment["DISABLE_AUTOUPDATER"]="1";environment["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"]="1";environment["NO_COLOR"]="1"
+        let arguments=provider=="codex" ? ["--cd",workspace.path,"app-server"]:
+            ["-p","--input-format","stream-json","--output-format","stream-json","--verbose","--tools","","--strict-mcp-config","--mcp-config","{\"mcpServers\":{}}","--setting-sources","","--no-session-persistence"]
+        let launch=try AgentSessionLaunch(provider:provider,projectID:projectID,executable:binary,arguments:arguments,workspace:workspace,environment:environment)
+        return AgentSessionPreparation(projectID:projectID,provider:provider,launch:launch)
     }
     func beginLogin(_ id:String)throws->[String:Any] {
         if id=="codebuddy" {

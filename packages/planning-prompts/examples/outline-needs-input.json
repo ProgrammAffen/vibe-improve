@@ -1,0 +1,16 @@
+{
+  "name": "outline-needs-input",
+  "task": "outline",
+  "input": {
+    "locale": "zh-CN",
+    "confirmedBackground": {}
+  },
+  "response": {
+    "status": "needs_input",
+    "reply": "你希望用这些知识完成什么具体任务？",
+    "result": null,
+    "missing": [
+      "尚未确定最终能力或成果"
+    ]
+  }
+}

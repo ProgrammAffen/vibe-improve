@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vibe-improve:route-preparation:1",
+  "title": "Local route preparation draft",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "projectId", "revision", "agentConfirmed", "source", "aiAssisted"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "projectId": {"type": "string", "pattern": "^proj_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"},
+    "revision": {"type": "integer", "minimum": 0, "maximum": 999999},
+    "agentConfirmed": {"type": "boolean"},
+    "source": {"enum": [null, "create", "import"]},
+    "aiAssisted": {"type": "boolean"},
+    "routeDraft": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fileName", "route"],
+      "properties": {
+        "fileName": {"type": "string", "maxLength": 255},
+        "route": {"$ref": "route.schema.json"}
+      }
+    }
+  }
+}

@@ -31,14 +31,14 @@ function storage(initial){
           finally{pending--;queueMicrotask(()=>{if(!closed&&pending===0){closed=true;if(mode==='readwrite')state[name]=snapshot;tx.oncomplete?.();}});}
         });return result;
       }
-      return {get:id=>request(()=>snapshot.get(id)),getAll:()=>request(()=>[...snapshot.values()]),delete:id=>request(()=>{if(controls.failDelete)throw new Error('SYNTHETIC_STORAGE_FAILURE');snapshot.delete(id);}),put:value=>request(()=>snapshot.set(value.id,value))};
+      return {get:id=>request(()=>snapshot.get(id)),getAll:()=>request(()=>[...snapshot.values()]),delete:id=>request(()=>{if(controls.failDelete)throw new Error('SYNTHETIC_STORAGE_FAILURE');snapshot.delete(id);}),put:(value,key)=>request(()=>snapshot.set(key??value.id,value))};
     }};return tx;
   }};
   return {state,controls,indexedDB:{open(){const result={result:database};queueMicrotask(()=>result.onsuccess?.());return result;}}};
 }
-function service(storage){
+function service(storage,picker){
   const module={exports:{}},logs=[];
-  vm.runInNewContext(serviceSource,{module,exports:module.exports,window:{},navigator:{},indexedDB:storage.indexedDB,performance,TextEncoder,require:name=>name==='./domain'?domain.exports:{logEvent:(...args)=>logs.push(args)}});
+  vm.runInNewContext(serviceSource,{module,exports:module.exports,window:{showDirectoryPicker:picker},navigator:{},crypto:{randomUUID},DOMException,indexedDB:storage.indexedDB,performance,TextEncoder,require:name=>name==='./domain'?domain.exports:{logEvent:(...args)=>logs.push(args)}});
   return {...module.exports.projectService,logs};
 }
 
@@ -79,4 +79,18 @@ test('a browser open that finishes after index removal cannot recreate the remov
   db.controls.beforeWrite=()=>db.state.projects.delete(value.id);
   await assert.rejects(api.open(value.id),/^Error: PROJECT_UNAVAILABLE$/);
   assert.equal((await api.list()).length,0);
+});
+
+test('browser creation and legacy restore use the selected folder itself without appending the project name',async()=>{
+  const folder={name:'Chosen folder',queryPermission:async()=> 'granted',isSameEntry:async other=>other===folder,getDirectoryHandle:async()=>{throw new DOMException('missing','NotFoundError')}};
+  const db=storage([]),api=service(db,async()=>folder),choice=await api.chooseParent();
+  const record=await api.create('A title, not a subdirectory',choice,randomUUID());
+  assert.equal(record.path,folder.name);assert.equal(record.directory.path,folder.name);
+  const old=db.state.projects.get(record.id);old.record.path='Chosen folder/Legacy title';
+  const restarted=service(db);
+  assert.equal((await restarted.list())[0].path,folder.name);
+  assert.equal((await restarted.open(record.id)).path,folder.name);
+  await assert.rejects(api.create('Different title, same directory',choice,randomUUID()),/^Error: PROJECT_EXISTS$/);
+  const renamed=await api.update(record,'Renamed');
+  assert.equal(renamed.path,folder.name);assert.equal(renamed.directory.path,folder.name);
 });

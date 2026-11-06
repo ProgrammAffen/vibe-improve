@@ -5,8 +5,11 @@ export type ProjectRecord = {
   path: string; available: boolean; completedNodes: number; totalNodes: number; directory?: DirectoryChoice;
 };
 export type ProjectDraft = {name: string; directory?: DirectoryChoice};
+export function projectResumePage(project: ProjectRecord): 'agents' | 'new-project' {
+  return project.available && Boolean(project.path.trim()) ? 'agents' : 'new-project';
+}
 export const PROJECT_ERRORS = [
-  'PROJECT_NAME_INVALID', 'PROJECT_DIRECTORY_REQUIRED', 'PROJECT_EXISTS', 'PROJECT_UNAVAILABLE',
+  'PROJECT_NAME_INVALID', 'PROJECT_DIRECTORY_REQUIRED', 'PROJECT_DIRECTORY_LOCKED', 'PROJECT_EXISTS', 'PROJECT_UNAVAILABLE',
   'PROJECT_INVALID', 'PROJECT_CONFLICT', 'PROJECT_LIMIT', 'PROJECT_STORAGE_UNAVAILABLE', 'PROJECT_PICKER_UNSUPPORTED',
 ] as const;
 export type ProjectErrorCode = typeof PROJECT_ERRORS[number];
@@ -43,9 +46,10 @@ export function selectProjects(records: ProjectRecord[], search: string, sort: '
 export function projectMessage(code: ProjectErrorCode, english: boolean): string {
   const messages: Record<ProjectErrorCode, [string,string]> = {
     PROJECT_NAME_INVALID: ['名称须为 1–80 个字符，不含路径符号或保留名称。','Use 1–80 characters without path symbols or reserved names.'],
+    PROJECT_DIRECTORY_LOCKED: ['项目目录已锁定，请新建项目使用其他目录。','The project location is locked. Create a new project to use another folder.'],
     PROJECT_DIRECTORY_REQUIRED: ['请选择项目目录。','Choose a project location.'],
-    PROJECT_EXISTS: ['此位置已有同名项目或文件夹，请更改名称或目录。','A project or folder with this name exists here. Choose a different name or location.'],
-    PROJECT_UNAVAILABLE: ['无法访问目录，请重新选择。','The folder is unavailable. Choose it again.'],
+    PROJECT_EXISTS: ['此目录已有项目，请打开已有项目或选择其他目录。','This folder already has a project. Open it or choose another folder.'],
+    PROJECT_UNAVAILABLE: ['无法访问项目目录，请恢复原目录或检查权限后重试。','The project folder is unavailable. Restore it or check permissions and retry.'],
     PROJECT_INVALID: ['所选目录不是兼容的 Vibe Improve 项目。','The selected folder is not a compatible Vibe Improve project.'],
     PROJECT_CONFLICT: ['项目已在其他窗口更新，请重新打开。','This project changed in another window. Open it again.'],
     PROJECT_LIMIT: ['已达到本地项目记录上限。','The local project index is full.'],

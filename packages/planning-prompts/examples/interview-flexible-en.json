@@ -1,0 +1,37 @@
+{
+  "name": "interview-flexible-en",
+  "task": "interview",
+  "input": {
+    "locale": "en",
+    "currentQuestion": "time",
+    "messages": [
+      {
+        "ref": "U1",
+        "role": "user",
+        "text": "I deliberately want a flexible schedule with short sessions and a review after the first week."
+      }
+    ]
+  },
+  "response": {
+    "status": "ok",
+    "reply": "Please check this schedule summary.",
+    "result": {
+      "questionId": "time",
+      "complete": true,
+      "summary": "An intentionally flexible schedule, with small sessions and a workload review after the first week.",
+      "fields": {
+        "schedule": "Flexible, short sessions; review feasibility after one week."
+      },
+      "evidence": [
+        {
+          "field": "schedule",
+          "messageRef": "U1",
+          "proposalRef": null,
+          "quote": "The user explicitly chose a flexible arrangement."
+        }
+      ],
+      "unresolved": []
+    },
+    "missing": []
+  }
+}

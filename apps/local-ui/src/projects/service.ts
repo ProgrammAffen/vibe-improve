@@ -75,8 +75,8 @@ async function documentIn(directory: Directory) {
 }
 async function noCollision(parent: Directory, name: string, except?: string) {
   const entries = await read<Entry[]>('projects');
-  for (const entry of entries) if (entry.id !== except && entry.kind === 'draft' && entry.record.name.toLocaleLowerCase() === name.toLocaleLowerCase() && await entry.parent.isSameEntry(parent)) throw new Error('PROJECT_EXISTS');
-  try {await parent.getDirectoryHandle(name); throw new Error('PROJECT_EXISTS');}
+  for (const entry of entries) if (entry.id !== except && await entry.parent.isSameEntry(parent)) throw new Error('PROJECT_EXISTS');
+  try {await parent.getDirectoryHandle('.vibe-improve'); throw new Error('PROJECT_EXISTS');}
   catch (cause) {
     if (cause instanceof DOMException && cause.name === 'NotFoundError') return;
     if (cause instanceof DOMException && ['NotAllowedError','SecurityError'].includes(cause.name)) throw new Error('PROJECT_UNAVAILABLE');
@@ -94,7 +94,7 @@ async function browserRequest(action: string, value: Record<string,unknown>): Pr
         if (typeof entry.parent.queryPermission === 'function' && await entry.parent.queryPermission({mode:'readwrite'}) === 'denied') throw new Error('PROJECT_UNAVAILABLE');
         const record=entry.kind==='project'?await documentIn(entry.parent):validateProject(entry.record);
         if(record.id!==entry.id)throw new Error('PROJECT_INVALID');
-        return {...record,kind:entry.kind,path:entry.record.path};
+        return {...record,kind:entry.kind,path:entry.parent.name};
       }
       catch {return {...validateProject(entry.record),available:false};}
     }));
@@ -108,15 +108,15 @@ async function browserRequest(action: string, value: Record<string,unknown>): Pr
     if (!/^proj_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u.test(id)) throw new Error('PROJECT_INVALID');
     if (existing) {
       if (existing.record.name !== name || !(await existing.parent.isSameEntry(parent))) throw new Error('PROJECT_CONFLICT');
-      return existing.record;
+      return {...existing.record,path:parent.name,directory:grant(parent)};
     }
     if ((await read<Entry[]>('projects')).length >= 256) throw new Error('PROJECT_LIMIT');
     await noCollision(parent,name);
     const now=new Date().toISOString();
-    const record:ProjectRecord={format:'vibe-improve.project',schemaVersion:1,id,name,revision:1,state:'draft',kind:'draft',createdAt:now,updatedAt:now,lastOpenedAt:now,path:parent.name+'/'+name,available:true,completedNodes:0,totalNodes:0};
+    const record:ProjectRecord={format:'vibe-improve.project',schemaVersion:1,id,name,revision:1,state:'draft',kind:'draft',createdAt:now,updatedAt:now,lastOpenedAt:now,path:parent.name,available:true,completedNodes:0,totalNodes:0};
     await write('projects',{id,record,parent,kind:'draft'} satisfies Entry);
     await write('form',{name:''},'current');
-    return record;
+    return {...record,directory:grant(parent)};
   }
   if (action === 'chooseProject') {
     const parent=await choose(); if (!parent) return null;
@@ -151,7 +151,7 @@ async function browserRequest(action: string, value: Record<string,unknown>): Pr
     await permission(entry.parent);
     let record=entry.kind==='project' ? await documentIn(entry.parent) : validateProject(entry.record);
     if (record.id !== entry.id) throw new Error('PROJECT_INVALID');
-    record={...record,kind:entry.kind,path:entry.record.path,lastOpenedAt:new Date().toISOString(),available:true};
+    record={...record,kind:entry.kind,path:entry.parent.name,lastOpenedAt:new Date().toISOString(),available:true};
     await mutateEntry(entry.id,entry.record.revision,{...entry,record});
     return {...record,...(entry.kind==='draft' && {directory:grant(entry.parent)})};
   }
@@ -159,13 +159,14 @@ async function browserRequest(action: string, value: Record<string,unknown>): Pr
     const name=String(value.name ?? '').normalize('NFC'), parent=choices.get(String(value.parentToken)) ?? entry.parent;
     if (!validProjectName(name)) throw new Error('PROJECT_NAME_INVALID');
     if (entry.record.revision !== value.expectedRevision) throw new Error('PROJECT_CONFLICT');
+    if(value.parentToken&&!(await parent.isSameEntry(entry.parent)))throw new Error('PROJECT_DIRECTORY_LOCKED');
     await permission(parent);
     if (entry.kind === 'draft') await noCollision(parent,name,entry.id);
     else {
       const current=await documentIn(entry.parent);
       if (current.id !== entry.id || current.revision !== value.expectedRevision) throw new Error('PROJECT_CONFLICT');
     }
-    const record={...entry.record,name,revision:entry.record.revision+1,updatedAt:new Date().toISOString(),path:entry.kind==='draft'?parent.name+'/'+name:entry.record.path,available:true};
+    const record={...entry.record,name,revision:entry.record.revision+1,updatedAt:new Date().toISOString(),path:parent.name,available:true};
     if (entry.kind === 'project') {
       const marker=await entry.parent.getDirectoryHandle('.vibe-improve');
       const file=await (await marker.getFileHandle('project.json')).createWritable();
@@ -173,7 +174,7 @@ async function browserRequest(action: string, value: Record<string,unknown>): Pr
       await file.write(JSON.stringify(document,null,2)); await file.close();
     }
     await mutateEntry(entry.id,entry.record.revision,{...entry,parent,record});
-    return record;
+    return {...record,...(entry.kind==='draft' && {directory:grant(parent)})};
   }
   throw new Error('PROJECT_INVALID');
 }

@@ -1,23 +1,27 @@
 import Cocoa
 import WebKit
 import Network
+import UniformTypeIdentifiers
 
 let appRoot = Bundle.main.bundleURL.deletingLastPathComponent()
-let runtimeRoot = appRoot.appendingPathComponent("Vibe Improve Runtime", isDirectory: true)
 func prepareRuntime() -> RuntimeDirectory {
     do {
-        let directory = try RuntimeDirectory(url: runtimeRoot)
-        try directory.migratePreferences(from: appRoot.appendingPathComponent("runtime", isDirectory: true))
-        return directory
+        var legacy = [appRoot.appendingPathComponent("Vibe Improve Runtime", isDirectory: true), appRoot.appendingPathComponent("runtime", isDirectory: true)]
+        if appRoot.lastPathComponent == "output" {
+            let repository = appRoot.deletingLastPathComponent()
+            legacy += ["tmp/build/Vibe Improve Runtime", "tmp/build/macos/Vibe Improve Runtime", "tmp/build/runtime"].map { repository.appendingPathComponent($0, isDirectory: true) }
+        }
+        return try RuntimeLocation.prepare(legacy: legacy)
     } catch {
         let alert = NSAlert()
         alert.messageText = "无法访问运行时文件夹 / Runtime folder unavailable"
-        alert.informativeText = "请将应用放在可写目录后重试。 / Move the app to a writable folder and retry."
+        alert.informativeText = "请检查 Application Support/Vibe Improve 的访问权限；迁移失败时原数据仍保留。 / Check access to Application Support/Vibe Improve. Original data is retained if migration fails."
         alert.runModal()
         exit(1)
     }
 }
 let runtimeFiles = prepareRuntime()
+let runtimeRoot = runtimeFiles.url
 let diagnosticLog = DiagnosticLog(runtimeRoot: runtimeRoot)
 
 var savedState = (try? runtimeFiles.read("preferences.json", maximumBytes: 65_536)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
@@ -123,7 +127,23 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     let sessionQueue = DispatchQueue(label: "vibe-improve.session")
     let projectQueue = DispatchQueue(label: "vibe-improve.projects")
     let projectStore = try? ProjectStore(runtime: runtimeFiles)
-    let agentManager = try? AgentManager(runtime: runtimeFiles)
+    lazy var routeStore = try? RoutePreparationStore(runtime: runtimeFiles, workspace: { [weak self] id in
+        guard let store=self?.projectStore else{throw ProjectError.storage}
+        return try store.projectWorkspace(for:id)
+    })
+    lazy var agentManager = try? AgentManager(runtime: runtimeFiles, projectWorkspace: { [weak self] id in
+        guard let store = self?.projectStore else { throw ProjectError.storage }
+        return try store.projectWorkspace(for: id)
+    })
+    lazy var planningStore = try? PlanningStore(runtime: runtimeFiles, workspace: { [weak self] id in
+        guard let store=self?.projectStore else{throw ProjectError.storage}
+        return try store.projectWorkspace(for:id)
+    })
+    lazy var planningAgent:PlanningAgentManager? = agentManager.map{PlanningAgentManager(agents:$0)}
+    lazy var planningCoordinator:PlanningCoordinator? = {
+        guard let store=planningStore,let routes=routeStore,let agents=agentManager,let runner=planningAgent else{return nil}
+        return PlanningCoordinator(store:store,routes:routes,agents:agents,runner:runner,log:{event,code,details in diagnosticLog.record(event,level:event.hasSuffix("failed") ? "warn":"info",resultCode:code,diagnostic:details)})
+    }()
     let agentQueue = DispatchQueue(label: "vibe-improve.agents", attributes: .concurrent)
     var wakeObserver: NSObjectProtocol?
     func applicationDidBecomeActive(_ notification: Notification) { checkLicenseTime() }
@@ -239,9 +259,11 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     private func handleProjectMessage(_ message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
         guard message.frameInfo.isMainFrame, let origin = message.frameInfo.request.url, isAllowed(origin),
               let body = message.body as? [String: Any], body.count <= 2, let action = body["action"] as? String,
-              let bytes = try? JSONSerialization.data(withJSONObject: body), bytes.count <= 65_536,
+              let bytes = try? JSONSerialization.data(withJSONObject: body), bytes.count <= (action.hasPrefix("planning.") ? 2_097_152:65_536),
               let store = projectStore else { replyHandler(nil, "PROJECT_STORAGE_UNAVAILABLE"); return }
         let value = body["value"] as? [String: Any] ?? [:]
+        if action.hasPrefix("planning."){handlePlanning(action,value:value,replyHandler:replyHandler);return}
+        if action.hasPrefix("route."){handleRoutePreparation(action,value:value,replyHandler:replyHandler);return}
         if action == "chooseParent" || action == "chooseProject" {
             let panel = NSOpenPanel()
             panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.allowsMultipleSelection = false
@@ -294,6 +316,52 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             }
         }
     }
+    private func handlePlanning(_ action:String,value:[String:Any],replyHandler:@escaping(Any?,String?)->Void){
+        guard let coordinator=planningCoordinator else{replyHandler(nil,PlanningError.storage.rawValue);return}
+        projectQueue.async{
+            do{let result=try coordinator.request(action,value:value);DispatchQueue.main.async{replyHandler(result,nil)}}
+            catch{let code=(error as? PlanningError)?.rawValue ?? (error as? PlanningAgentError)?.rawValue ?? (error as? AgentError)?.rawValue ?? (error as? RoutePreparationError)?.rawValue ?? PlanningError.storage.rawValue;diagnosticLog.record("native.planning.failed",level:"warn",resultCode:code);DispatchQueue.main.async{replyHandler(nil,code)}}
+        }
+    }
+    private func handleRoutePreparation(_ action:String,value:[String:Any],replyHandler:@escaping(Any?,String?)->Void){
+        guard let store=routeStore,let id=value["projectId"] as? String else{replyHandler(nil,RoutePreparationError.invalid.rawValue);return}
+        if action=="route.import.choose" {
+            guard Set(value.keys)==["projectId"] else{replyHandler(nil,RoutePreparationError.invalid.rawValue);return}
+            let panel=NSOpenPanel();panel.canChooseFiles=true;panel.canChooseDirectories=false;panel.allowsMultipleSelection=false
+            panel.allowedContentTypes=[.json];panel.allowsOtherFileTypes=false
+            let english=preferences["language"] as? String=="en"
+            panel.title=english ? "Import local route":"导入本地路线";panel.prompt=english ? "Choose":"选择"
+            panel.beginSheetModal(for:window){[self] response in
+                guard response == .OK,let url=panel.url else{replyHandler(NSNull(),nil);return}
+                projectQueue.async{
+                    do{let result=try store.stage(projectID:id,url:url);DispatchQueue.main.async{replyHandler(result,nil)}}
+                    catch{let code=(error as? RoutePreparationError)?.rawValue ?? RoutePreparationError.read.rawValue;DispatchQueue.main.async{replyHandler(nil,code)}}
+                }
+            }
+            return
+        }
+        projectQueue.async{
+            do{
+                let result:Any
+                switch action{
+                case "route.read":guard Set(value.keys)==["projectId"] else{throw RoutePreparationError.invalid};result=try store.read(projectID:id)
+                case "route.agent.confirm":guard Set(value.keys)==["projectId"] else{throw RoutePreparationError.invalid};result=try store.confirmAgent(projectID:id)
+                case "route.choice.save":
+                    guard Set(value.keys)==["projectId","source","aiAssisted","expectedRevision"],let source=value["source"] as? String,
+                          let ai=value["aiAssisted"] as? NSNumber,CFGetTypeID(ai)==CFBooleanGetTypeID(),
+                          let revision=value["expectedRevision"] as? NSNumber,CFGetTypeID(revision) != CFBooleanGetTypeID(),revision.doubleValue==Double(revision.intValue) else{throw RoutePreparationError.invalid}
+                    result=try store.choose(projectID:id,source:source,aiAssisted:ai.boolValue,expectedRevision:revision.intValue)
+                case "route.import.save":
+                    guard Set(value.keys)==["projectId","importId","expectedRevision"],let token=value["importId"] as? String,
+                          let revision=value["expectedRevision"] as? NSNumber,CFGetTypeID(revision) != CFBooleanGetTypeID(),revision.doubleValue==Double(revision.intValue) else{throw RoutePreparationError.invalid}
+                    result=try store.saveImport(projectID:id,importID:token,expectedRevision:revision.intValue)
+                case "route.import.cancel":guard Set(value.keys)==["projectId","importId"],let token=value["importId"] as? String else{throw RoutePreparationError.invalid};try store.cancelImport(projectID:id,importID:token);result=NSNull()
+                default:throw RoutePreparationError.invalid
+                }
+                DispatchQueue.main.async{replyHandler(result,nil)}
+            }catch{let code=(error as? RoutePreparationError)?.rawValue ?? RoutePreparationError.storage.rawValue;DispatchQueue.main.async{replyHandler(nil,code)}}
+        }
+    }
     private func handleAgentMessage(_ message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
         guard message.frameInfo.isMainFrame, let origin=message.frameInfo.request.url, isAllowed(origin),
               let body=message.body as? [String:Any],Set(body.keys).isSubset(of:["action","value"]),let action=body["action"] as? String,
@@ -303,9 +371,11 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             do {
                 var result:Any=NSNull()
                 switch action {
+                case "detection.read": guard value.isEmpty else{throw AgentError.invalid};result=try manager.detection()
                 case "probe": guard Set(value.keys)==["id"],let id=value["id"] as? String else{throw AgentError.invalid};result=try manager.probe(id)
                 case "choice.read": guard Set(value.keys)==["scope"],let scope=value["scope"] as? String else{throw AgentError.invalid};result=try manager.choice(scope)
                 case "choice.save": guard Set(value.keys)==["scope","choice"],let scope=value["scope"] as? String,let choice=value["choice"] as? String else{throw AgentError.invalid};try manager.save(scope,choice:choice)
+                case "session.prepare": guard Set(value.keys)==["projectId"],let id=value["projectId"] as? String else{throw AgentError.invalid};result=try manager.prepareSession(projectID:id).summary
                 case "install.begin": guard Set(value.keys)==["id"],let id=value["id"] as? String else{throw AgentError.invalid};result=try manager.beginInstall(id)
                 case "login.begin": guard Set(value.keys)==["id"],let id=value["id"] as? String else{throw AgentError.invalid};result=try manager.beginLogin(id)
                 case "login.state": guard Set(value.keys)==["loginId"],let id=value["loginId"] as? String else{throw AgentError.invalid};result=try manager.loginState(id)
@@ -325,7 +395,7 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     private func isAllowed(_ url: URL) -> Bool {
         LocalClientOrigin(port: port).permits(url)
     }
-    func applicationWillTerminate(_ notification: Notification) { agentManager?.shutdown() }
+    func applicationWillTerminate(_ notification: Notification) { planningAgent?.shutdown();agentManager?.shutdown() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }
 let app = NSApplication.shared

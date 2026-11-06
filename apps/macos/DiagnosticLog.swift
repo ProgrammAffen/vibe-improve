@@ -4,7 +4,8 @@ import Darwin
 final class DiagnosticLog {
     static let maximumBytes = 1_048_576
     private static let clientEvents: Set<String> = ["app.started", "operation.started", "operation.completed", "operation.failed", "cloud.started", "cloud.completed", "cloud.failed", "background.started", "background.completed", "background.failed", "runtime.error", "runtime.unhandled_rejection"]
-    private static let nativeEvents: Set<String> = ["native.started", "native.server.ready", "native.server.failed", "native.local.started", "native.local.failed", "native.remote.started", "native.remote.failed", "native.offline.started", "native.navigation.completed", "native.agent.completed", "native.agent.failed"]
+    private static let nativeEvents: Set<String> = ["native.started", "native.server.ready", "native.server.failed", "native.local.started", "native.local.failed", "native.remote.started", "native.remote.failed", "native.offline.started", "native.navigation.completed", "native.agent.completed", "native.agent.failed", "native.planning.started", "native.planning.completed", "native.planning.failed"]
+    private static let planningResultCodes:Set<String> = ["PLANNING_GENERATION_INVALID","PLANNING_GENERATION_STALE","PLANNING_GENERATION_EXISTS","PLANNING_NEEDS_INPUT","PLANNING_CANNOT_COMPLETE","PLANNING_AGENT_OPTIONS","PLANNING_INVALID","PLANNING_TOO_LARGE","PLANNING_CONFLICT","PLANNING_BUSY","PLANNING_INCOMPLETE","PLANNING_EVIDENCE_INVALID","PLANNING_RESPONSE_INVALID","PLANNING_ROUTE_INVALID","PLANNING_TARGET_UNAVAILABLE","PLANNING_LIMIT","PLANNING_STORAGE_UNAVAILABLE","PLANNING_PROJECT_UNAVAILABLE","PLANNING_AGENT_INVALID","PLANNING_AGENT_UNSUPPORTED","PLANNING_AGENT_BUSY","PLANNING_AGENT_UNAVAILABLE","PLANNING_AGENT_AUTH_REQUIRED","PLANNING_AGENT_PERMISSION_REQUIRED","PLANNING_AGENT_TIMEOUT","PLANNING_AGENT_CANCELLED","PLANNING_AGENT_NETWORK","PLANNING_AGENT_QUOTA","PLANNING_AGENT_PROTOCOL","PLANNING_AGENT_OUTPUT_TOO_LARGE","PLANNING_AGENT_FAILED","PLANNING_AGENT_RESULT_REJECTED","PLANNING_AGENT_ROUTE_MISSING","PLANNING_AGENT_ROUTE_ENCODING","AGENT_INVALID","AGENT_AUTH_REQUIRED","AGENT_UNAVAILABLE","AGENT_PROJECT_UNAVAILABLE","ROUTE_INVALID","ROUTE_STORAGE_UNAVAILABLE"]
     private static let operations: Set<String> = ["project.storage", "auth.login", "auth.registration.send", "auth.registration.verify", "auth.password.reset.send", "auth.password.reset", "auth.password.change.send", "auth.password.change", "auth.logout", "auth.session.refresh", "auth.session.restore", "auth.session.persist", "auth.session.clear", "auth.identity.read", "license.activate", "license.bind", "license.revoke", "license.refresh", "license.status", "license.devices", "license.renew", "license.certificate.verify"]
     private static let levels: Set<String> = ["debug", "info", "warn", "error"]
     private static let resultCodes: Set<String> = ["OK", "DEVICE_BINDING_CONFIRMATION_REQUIRED", "NETWORK_RETRIES_EXHAUSTED", "LICENSE_CLOCK_UNTRUSTED", "SESSION_STORAGE_UNAVAILABLE", "SESSION_STORAGE_INVALID", "BUSY", "AUTH_REQUIRED", "AUTH_CONTEXT_UNAVAILABLE", "AUTH_CONTEXT_UNSUPPORTED", "ACTIVATION_CODE_UNAVAILABLE", "INVALID_ACTIVATION_CODE", "DEVICE_LIMIT_REACHED", "DEVICE_REVOKED", "DEVICE_NOT_FOUND", "LICENSE_ALREADY_ACTIVE", "LICENSE_REQUIRED", "LICENSE_EXPIRED", "LICENSE_REVOKED", "LICENSE_INVALID", "LICENSE_CHANGED", "CERTIFICATE_INVALID", "RATE_LIMITED", "VERIFICATION_REQUIRED", "EMAIL_ALREADY_SIGNED_IN", "SERVICE_UNCONFIGURED", "PASSWORD_INVALID", "RESEND_TOO_SOON", "SERVICE_UNAVAILABLE", "INVALID_REQUEST", "INVALID_CREDENTIALS", "SESSION_INVALID", "UNKNOWN_ERROR", "RUNTIME_ERROR", "UNHANDLED_REJECTION", "GRANT_EXPIRED", "INVALID_GRANT", "IDEMPOTENCY_KEY_REUSED", "DATA_INTEGRITY_ERROR", "SIGNING_KEY_INVALID", "DATABASE_UNAVAILABLE", "DATABASE_UNSUPPORTED", "AUTH_EMAIL_INVALID", "AUTH_EMAIL_EXISTS", "AUTH_EMAIL_UNVERIFIED", "AUTH_CODE_INVALID", "AUTH_CODE_EXPIRED", "AUTH_CODE_REJECTED", "AUTH_PASSWORD_WEAK", "AUTH_USER_NOT_FOUND", "AUTH_USER_BLOCKED", "AUTH_PROVIDER_DISABLED", "AUTH_CLIENT_DISABLED", "AUTH_DOMAIN_DENIED", "AUTH_CHANNEL_UNCONFIGURED", "AUTH_MAIL_DELIVERY_FAILED", "AUTH_CAPTCHA_REQUIRED", "AUTH_CAPTCHA_INVALID", "AUTH_MFA_REQUIRED", "AUTH_PRECONDITION_FAILED", "AUTH_PARAMETER_MISSING", "PASSWORD_MISMATCH", "DATABASE_CONFLICT", "DATABASE_PERMISSION_DENIED", "DATABASE_COLLECTION_MISSING", "NETWORK_OFFLINE", "NETWORK_TIMEOUT", "NETWORK_UNREACHABLE", "REQUEST_ABORTED", "PROVIDER_ERROR"]
@@ -28,10 +29,12 @@ final class DiagnosticLog {
         runtime = runtimeRoot.standardizedFileURL
         directory = runtime.appendingPathComponent("logs", isDirectory: true)
     }
-    func record(_ event: String, level: String = "info", resultCode: String = "OK") {
-        guard Self.nativeEvents.contains(event), Self.levels.contains(level), Self.resultCodes.contains(resultCode) else { return }
+    func record(_ event: String, level: String = "info", resultCode: String = "OK", diagnostic: [String:Any] = [:]) {
+        guard Self.nativeEvents.contains(event), Self.levels.contains(level), (Self.resultCodes.contains(resultCode) || (event.hasPrefix("native.planning.") && Self.planningResultCodes.contains(resultCode))) else { return }
         queue.sync {
-            self.append(["schemaVersion": 1, "timestamp": self.formatter.string(from: Date()), "level": level, "event": event, "sessionId": self.sessionID, "resultCode": resultCode])
+            var entry:[String:Any]=["schemaVersion": 1, "timestamp": self.formatter.string(from: Date()), "level": level, "event": event, "sessionId": self.sessionID, "resultCode": resultCode]
+            if event.hasPrefix("native.planning."){for key in ["traceId","provider","intent","stage","durationMs","receivedCharacters","validationIssues","completedChapters","chapterCount","promptVersion"]{entry[key]=diagnostic[key]}}
+            if let safe=Self.sanitize(entry,allowNative:true){self.append(safe)}
         }
     }
     func receive(_ value: [String: Any]) {
@@ -87,7 +90,7 @@ final class DiagnosticLog {
         var safe: [String: Any] = ["schemaVersion": 1, "timestamp": timestamp, "level": level, "event": event, "sessionId": session.lowercased()]
         if let trace = value["traceId"] as? String, validUUID(trace) { safe["traceId"] = trace.lowercased() }
         if let operation = value["operation"] as? String, operations.contains(operation) { safe["operation"] = operation }
-        if let result = value["resultCode"] as? String, resultCodes.contains(result) { safe["resultCode"] = result }
+        if let result = value["resultCode"] as? String, resultCodes.contains(result) || (allowNative && event.hasPrefix("native.planning.") && planningResultCodes.contains(result)) { safe["resultCode"] = result }
         if let status = value["licenseStatus"] as? String, licenseStatuses.contains(status) { safe["licenseStatus"] = status }
         if let duration = value["durationMs"] as? NSNumber, CFGetTypeID(duration) != CFBooleanGetTypeID(), duration.doubleValue.isFinite {
             safe["durationMs"] = Int(min(86_400_000, max(0, duration.doubleValue)).rounded())
@@ -97,6 +100,18 @@ final class DiagnosticLog {
         }
         let enums: [String: Set<String>] = ["causeCode": resultCodes, "stage": stages, "reason": reasons, "providerCode": providerCodes, "providerCategory": providerCategories, "errorType": errorTypes, "site": sites]
         for (key, allowed) in enums { if let item = value[key] as? String, allowed.contains(item) { safe[key] = item } }
+        if allowNative && event.hasPrefix("native.planning.") {
+            let fields:[String:Set<String>]=["provider":["codex","claude-code","codebuddy"],"intent":["interview","generate","edit","consistency"],"stage":["preparing","connecting","waiting","thinking","generating","receiving","finishing","parsing","validating","total_timeout","idle_timeout","handshake_timeout"]]
+            for (key,allowed) in fields{if let item=value[key] as? String,allowed.contains(item){safe[key]=item}}
+            if let version=value["promptVersion"] as? String,version.range(of:"^planning\\.[0-9]{1,4}$",options:.regularExpression) != nil{safe["promptVersion"]=version}
+            if let count=value["receivedCharacters"] as? NSNumber,CFGetTypeID(count) != CFBooleanGetTypeID(),count.doubleValue.isFinite,count.doubleValue==Double(count.intValue),count.intValue>=0,count.intValue<=1_048_576{safe["receivedCharacters"]=count.intValue}
+            if let index=value["completedChapters"] as? NSNumber,let count=value["chapterCount"] as? NSNumber,CFGetTypeID(index) != CFBooleanGetTypeID(),CFGetTypeID(count) != CFBooleanGetTypeID(),index.doubleValue==Double(index.intValue),count.doubleValue==Double(count.intValue),index.intValue>=0,index.intValue<=count.intValue,count.intValue>=1,count.intValue<=24{safe["completedChapters"]=index.intValue;safe["chapterCount"]=count.intValue}
+            if let issues=value["validationIssues"] as? [[String:String]] {
+                let allowed=Set(["route","format","schemaVersion","id","revision","title","locale","sourceLanguage","chapters","nodes","stageGoal","objectives","description","prerequisites","estimatedMinutes","activities","assessment","task","passCriteria","objectiveIds","mode","evaluatorPrompt","updates","evidence","field","messageId","proposalMessageId","result","status","questionId","complete","summary","unresolved","messageRef","proposalRef","missing","consistency","issues","kind","reason","suggestion"])
+                let filtered=issues.prefix(24).filter{item in guard let path=item["path"],path.count<=256,let code=item["code"],["required","invalid","count","duplicate","dependencies","identity","reference","role","scope","order","field"].contains(code) else{return false};return path.split(separator:".",omittingEmptySubsequences:false).allSatisfy{allowed.contains(String($0)) || $0.range(of:"^[0-9]{1,3}$",options:.regularExpression) != nil}}.map{["path":$0["path"]!,"code":$0["code"]!]}
+                if !filtered.isEmpty{safe["validationIssues"]=filtered}
+            }
+        }
         for (key, bounds) in ["httpStatus": (100,599), "providerErrorNumber": (0,65535), "retryAfterSeconds": (0,86400), "line": (1,10000000), "column": (1,10000000)] {
             if let item = value[key] as? NSNumber, CFGetTypeID(item) != CFBooleanGetTypeID(), item.doubleValue.isFinite, item.doubleValue == Double(item.intValue), item.intValue >= bounds.0, item.intValue <= bounds.1 { safe[key] = item.intValue }
         }

@@ -1,0 +1,70 @@
+{
+  "name": "outline-late-consistency-conflict",
+  "task": "outline",
+  "input": {
+    "locale": "en",
+    "confirmedBackground": {
+      "goal": {
+        "summary": "Train a character-level language model.",
+        "fields": {
+          "topic": "Character-level language models",
+          "outcome": "Train on my text and explain generated samples"
+        }
+      },
+      "purpose": {
+        "summary": "Train an image classifier and analyze mistakes.",
+        "fields": {
+          "context": "Personal experiments",
+          "criteria": "Train an image classifier, report accuracy and analyze misclassified images"
+        }
+      },
+      "baseline": {
+        "summary": "Previously trained a small image classifier.",
+        "fields": {
+          "experience": "Trained an image classifier with guidance"
+        }
+      },
+      "time": {
+        "summary": "Five hours each week, one hour per session.",
+        "fields": {
+          "weekly": "Five hours",
+          "session": "One hour"
+        }
+      },
+      "constraints": {
+        "summary": "A laptop and small text data; no hard deadline.",
+        "fields": {
+          "conditions": "Laptop and small text data",
+          "scope": "Small local examples"
+        }
+      }
+    }
+  },
+  "response": {
+    "status": "needs_input",
+    "reply": "The success criteria still describe a different task. Please review them.",
+    "result": null,
+    "missing": [
+      "Success criteria must reflect the adopted text-generation goal"
+    ],
+    "consistency": {
+      "status": "requires_review",
+      "issues": [
+        {
+          "questionId": "purpose",
+          "fields": [
+            "criteria"
+          ],
+          "kind": "incompatible",
+          "reason": "The adopted goal is a character-level language model, while the adopted success criteria still require image classification.",
+          "suggestion": {
+            "summary": "Train on text, show generated samples, and explain training behavior and limits.",
+            "fields": {
+              "criteria": "Show generated text and explain training/validation loss trends and limits without a fabricated score threshold."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

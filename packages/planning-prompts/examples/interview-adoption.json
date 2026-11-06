@@ -1,0 +1,55 @@
+{
+  "name": "interview-adoption",
+  "task": "interview",
+  "input": {
+    "locale": "zh-CN",
+    "currentQuestion": "goal",
+    "acceptedAnswers": {},
+    "messages": [
+      {
+        "ref": "U1",
+        "role": "user",
+        "text": "我想学 Python 数据分析。"
+      },
+      {
+        "ref": "A1",
+        "role": "assistant",
+        "text": "可以把目标定为清洗销售数据并向同事解释趋势与异常，你愿意吗？"
+      },
+      {
+        "ref": "U2",
+        "role": "user",
+        "text": "可以，就按你刚才的建议。"
+      }
+    ]
+  },
+  "response": {
+    "status": "ok",
+    "reply": "请核对结果。",
+    "result": {
+      "questionId": "goal",
+      "complete": true,
+      "summary": "学习 Python 数据分析，清洗销售数据并向同事解释趋势与异常。",
+      "fields": {
+        "topic": "Python 数据分析",
+        "outcome": "清洗销售数据并解释趋势与异常"
+      },
+      "evidence": [
+        {
+          "field": "topic",
+          "messageRef": "U1",
+          "proposalRef": null,
+          "quote": "用户给出方向"
+        },
+        {
+          "field": "outcome",
+          "messageRef": "U2",
+          "proposalRef": "A1",
+          "quote": "用户同意明确建议"
+        }
+      ],
+      "unresolved": []
+    },
+    "missing": []
+  }
+}

@@ -1,0 +1,1826 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "userRef": {
+      "type": "string",
+      "pattern": "^U[1-9][0-9]{0,3}$"
+    },
+    "assistantRef": {
+      "type": "string",
+      "pattern": "^A[1-9][0-9]{0,3}$"
+    },
+    "lessonRef": {
+      "type": "string",
+      "pattern": "^L[1-9][0-9]{0,3}$"
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "enum": [
+            "aids",
+            "conditions",
+            "context",
+            "criteria",
+            "deadline",
+            "deadlineType",
+            "experience",
+            "outcome",
+            "schedule",
+            "scope",
+            "session",
+            "strategy",
+            "support",
+            "topic",
+            "weekly"
+          ]
+        },
+        "messageRef": {
+          "$ref": "#/$defs/userRef"
+        },
+        "proposalRef": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/assistantRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "field",
+        "messageRef",
+        "proposalRef",
+        "quote"
+      ],
+      "additionalProperties": false
+    },
+    "interviewResult": {
+      "type": "object",
+      "properties": {
+        "questionId": {
+          "enum": [
+            "goal",
+            "purpose",
+            "baseline",
+            "time",
+            "constraints"
+          ]
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 2000
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "aids": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "conditions": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "context": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "criteria": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "deadline": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "deadlineType": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "experience": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "outcome": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "schedule": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "scope": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "session": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "strategy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "support": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "topic": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "weekly": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          },
+          "minItems": 0,
+          "maxItems": 8
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400,
+            "pattern": "\\S"
+          },
+          "minItems": 0,
+          "maxItems": 12
+        },
+        "consistency": {
+          "$ref": "#/$defs/consistencyAssessment"
+        }
+      },
+      "required": [
+        "questionId",
+        "complete",
+        "summary",
+        "fields",
+        "evidence",
+        "unresolved"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "questionId": {
+                "const": "goal"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "propertyNames": {
+                  "enum": [
+                    "topic",
+                    "outcome"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "questionId": {
+                "const": "purpose"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "propertyNames": {
+                  "enum": [
+                    "context",
+                    "criteria",
+                    "aids"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "questionId": {
+                "const": "baseline"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "propertyNames": {
+                  "enum": [
+                    "experience",
+                    "support",
+                    "strategy"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "questionId": {
+                "const": "time"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "propertyNames": {
+                  "enum": [
+                    "weekly",
+                    "session",
+                    "schedule",
+                    "deadline",
+                    "deadlineType"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "questionId": {
+                "const": "constraints"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "propertyNames": {
+                  "enum": [
+                    "scope",
+                    "conditions",
+                    "strategy"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "complete": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "summary": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000,
+                "pattern": "\\S"
+              },
+              "unresolved": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "outlineLesson": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        "focus": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "title",
+        "focus"
+      ],
+      "additionalProperties": false
+    },
+    "outlineChapter": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        "stageGoal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600,
+          "pattern": "\\S"
+        },
+        "lessons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/outlineLesson"
+          },
+          "minItems": 1,
+          "maxItems": 64
+        }
+      },
+      "required": [
+        "title",
+        "stageGoal",
+        "lessons"
+      ],
+      "additionalProperties": false
+    },
+    "outlineResult": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        "chapters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/outlineChapter"
+          },
+          "minItems": 1,
+          "maxItems": 24
+        }
+      },
+      "required": [
+        "title",
+        "chapters"
+      ],
+      "additionalProperties": false
+    },
+    "assessment": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "\\S"
+        },
+        "passCriteria": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          },
+          "minItems": 1,
+          "maxItems": 24,
+          "uniqueItems": true
+        },
+        "mode": {
+          "enum": [
+            "quantitative",
+            "qualitative"
+          ]
+        },
+        "evaluatorPrompt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000,
+              "pattern": "\\S"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "task",
+        "passCriteria",
+        "mode",
+        "evaluatorPrompt"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "qualitative"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "evaluatorPrompt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000,
+                "pattern": "\\S"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "lesson": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/lessonRef"
+        },
+        "objectives": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          },
+          "minItems": 1,
+          "maxItems": 12
+        },
+        "prerequisites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/lessonRef"
+          },
+          "minItems": 0,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "estimatedMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1440
+        },
+        "activities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          },
+          "minItems": 1,
+          "maxItems": 24
+        },
+        "assessment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/assessment"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ref",
+        "objectives",
+        "prerequisites",
+        "estimatedMinutes",
+        "activities",
+        "assessment"
+      ],
+      "additionalProperties": false
+    },
+    "lessonsResult": {
+      "type": "object",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/lesson"
+          },
+          "minItems": 1,
+          "maxItems": 3
+        }
+      },
+      "required": [
+        "nodes"
+      ],
+      "additionalProperties": false
+    },
+    "issue": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "enum": [
+            "coverage",
+            "alignment",
+            "specificity",
+            "prerequisite",
+            "feasibility",
+            "unsupported_fact"
+          ]
+        },
+        "targetRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(L|C)[1-9][0-9]{0,3}$"
+          },
+          "minItems": 0,
+          "maxItems": 32
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "\\S"
+        },
+        "fixHint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "\\S"
+        },
+        "blocking": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "targetRefs",
+        "message",
+        "fixHint",
+        "blocking"
+      ],
+      "additionalProperties": false
+    },
+    "reviewResult": {
+      "type": "object",
+      "properties": {
+        "ready": {
+          "type": "boolean"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/issue"
+          },
+          "minItems": 0,
+          "maxItems": 24
+        }
+      },
+      "required": [
+        "ready",
+        "issues"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ready": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "blocking": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "interviewResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "ok",
+            "needs_input",
+            "cannot_complete"
+          ]
+        },
+        "reply": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000,
+          "pattern": "\\S"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interviewResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400,
+            "pattern": "\\S"
+          },
+          "minItems": 0,
+          "maxItems": 12
+        },
+        "consistency": {
+          "$ref": "#/$defs/consistencyAssessment",
+          "properties": {
+            "status": {
+              "const": "requires_review"
+            }
+          }
+        }
+      },
+      "required": [
+        "status",
+        "reply",
+        "result",
+        "missing"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/interviewResult"
+              },
+              "missing": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "needs_input"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              },
+              "missing": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "cannot_complete"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "consistency"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "outlineResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "ok",
+            "needs_input",
+            "cannot_complete"
+          ]
+        },
+        "reply": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000,
+          "pattern": "\\S"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/outlineResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400,
+            "pattern": "\\S"
+          },
+          "minItems": 0,
+          "maxItems": 12
+        },
+        "consistency": {
+          "$ref": "#/$defs/consistencyAssessment",
+          "properties": {
+            "status": {
+              "const": "requires_review"
+            }
+          }
+        }
+      },
+      "required": [
+        "status",
+        "reply",
+        "result",
+        "missing"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/outlineResult"
+              },
+              "missing": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "needs_input"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              },
+              "missing": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "cannot_complete"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "consistency"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "lessonsResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "ok",
+            "needs_input",
+            "cannot_complete"
+          ]
+        },
+        "reply": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000,
+          "pattern": "\\S"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/lessonsResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400,
+            "pattern": "\\S"
+          },
+          "minItems": 0,
+          "maxItems": 12
+        },
+        "consistency": {
+          "$ref": "#/$defs/consistencyAssessment",
+          "properties": {
+            "status": {
+              "const": "requires_review"
+            }
+          }
+        }
+      },
+      "required": [
+        "status",
+        "reply",
+        "result",
+        "missing"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/lessonsResult"
+              },
+              "missing": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "needs_input"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              },
+              "missing": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "cannot_complete"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "consistency"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "reviewResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "ok",
+            "needs_input",
+            "cannot_complete"
+          ]
+        },
+        "reply": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000,
+          "pattern": "\\S"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/reviewResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400,
+            "pattern": "\\S"
+          },
+          "minItems": 0,
+          "maxItems": 12
+        },
+        "consistency": {
+          "$ref": "#/$defs/consistencyAssessment",
+          "properties": {
+            "status": {
+              "const": "requires_review"
+            }
+          }
+        }
+      },
+      "required": [
+        "status",
+        "reply",
+        "result",
+        "missing"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/reviewResult"
+              },
+              "missing": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "needs_input"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              },
+              "missing": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "cannot_complete"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "consistency"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "editResponse": {
+      "type": "object",
+      "properties": {
+        "reply": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000,
+          "pattern": "\\S"
+        },
+        "route": {
+          "anyOf": [
+            {
+              "$ref": "route.schema.json#/$defs/routeV2"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "reply",
+        "route"
+      ],
+      "additionalProperties": false
+    },
+    "consistencySuggestion": {
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "\\S"
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "aids": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "conditions": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "context": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "criteria": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "deadline": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "deadlineType": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "experience": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "outcome": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "schedule": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "scope": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "session": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "strategy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "support": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "topic": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "weekly": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "anyOf": [
+            {
+              "required": [
+                "aids"
+              ]
+            },
+            {
+              "required": [
+                "conditions"
+              ]
+            },
+            {
+              "required": [
+                "context"
+              ]
+            },
+            {
+              "required": [
+                "criteria"
+              ]
+            },
+            {
+              "required": [
+                "deadline"
+              ]
+            },
+            {
+              "required": [
+                "deadlineType"
+              ]
+            },
+            {
+              "required": [
+                "experience"
+              ]
+            },
+            {
+              "required": [
+                "outcome"
+              ]
+            },
+            {
+              "required": [
+                "schedule"
+              ]
+            },
+            {
+              "required": [
+                "scope"
+              ]
+            },
+            {
+              "required": [
+                "session"
+              ]
+            },
+            {
+              "required": [
+                "strategy"
+              ]
+            },
+            {
+              "required": [
+                "support"
+              ]
+            },
+            {
+              "required": [
+                "topic"
+              ]
+            },
+            {
+              "required": [
+                "weekly"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "summary",
+        "fields"
+      ],
+      "additionalProperties": false
+    },
+    "consistencyIssue": {
+      "type": "object",
+      "properties": {
+        "questionId": {
+          "enum": [
+            "goal",
+            "purpose",
+            "baseline",
+            "time",
+            "constraints"
+          ]
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "aids",
+              "conditions",
+              "context",
+              "criteria",
+              "deadline",
+              "deadlineType",
+              "experience",
+              "outcome",
+              "schedule",
+              "scope",
+              "session",
+              "strategy",
+              "support",
+              "topic",
+              "weekly"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        },
+        "kind": {
+          "enum": [
+            "incompatible",
+            "uncertain"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "\\S"
+        },
+        "suggestion": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/consistencySuggestion"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "questionId",
+        "fields",
+        "kind",
+        "reason",
+        "suggestion"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "questionId": {
+                "const": "goal"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "items": {
+                  "enum": [
+                    "topic",
+                    "outcome"
+                  ]
+                }
+              },
+              "suggestion": {
+                "properties": {
+                  "fields": {
+                    "propertyNames": {
+                      "enum": [
+                        "topic",
+                        "outcome"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "questionId": {
+                "const": "purpose"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "items": {
+                  "enum": [
+                    "context",
+                    "criteria",
+                    "aids"
+                  ]
+                }
+              },
+              "suggestion": {
+                "properties": {
+                  "fields": {
+                    "propertyNames": {
+                      "enum": [
+                        "context",
+                        "criteria",
+                        "aids"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "questionId": {
+                "const": "baseline"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "items": {
+                  "enum": [
+                    "experience",
+                    "support",
+                    "strategy"
+                  ]
+                }
+              },
+              "suggestion": {
+                "properties": {
+                  "fields": {
+                    "propertyNames": {
+                      "enum": [
+                        "experience",
+                        "support",
+                        "strategy"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "questionId": {
+                "const": "time"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "items": {
+                  "enum": [
+                    "weekly",
+                    "session",
+                    "schedule",
+                    "deadline",
+                    "deadlineType"
+                  ]
+                }
+              },
+              "suggestion": {
+                "properties": {
+                  "fields": {
+                    "propertyNames": {
+                      "enum": [
+                        "weekly",
+                        "session",
+                        "schedule",
+                        "deadline",
+                        "deadlineType"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "questionId": {
+                "const": "constraints"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "items": {
+                  "enum": [
+                    "scope",
+                    "conditions",
+                    "strategy"
+                  ]
+                }
+              },
+              "suggestion": {
+                "properties": {
+                  "fields": {
+                    "propertyNames": {
+                      "enum": [
+                        "scope",
+                        "conditions",
+                        "strategy"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "consistencyAssessment": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "consistent",
+            "requires_review"
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/consistencyIssue"
+          },
+          "minItems": 0,
+          "maxItems": 5
+        }
+      },
+      "required": [
+        "status",
+        "issues"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "consistent"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "issues": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "requires_review"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "issues": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "consistencyResult": {
+      "$ref": "#/$defs/consistencyAssessment"
+    },
+    "consistencyResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "ok",
+            "needs_input",
+            "cannot_complete"
+          ]
+        },
+        "reply": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000,
+          "pattern": "\\S"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/consistencyResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400,
+            "pattern": "\\S"
+          },
+          "minItems": 0,
+          "maxItems": 12
+        },
+        "consistency": {
+          "$ref": "#/$defs/consistencyAssessment",
+          "properties": {
+            "status": {
+              "const": "requires_review"
+            }
+          }
+        }
+      },
+      "required": [
+        "status",
+        "reply",
+        "result",
+        "missing"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/consistencyResult"
+              },
+              "missing": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "needs_input"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              },
+              "missing": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "cannot_complete"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "consistency"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

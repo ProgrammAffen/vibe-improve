@@ -1,0 +1,1171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vibe-improve:planning:1",
+  "title": "Private learning-route planning state v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "revision",
+    "step",
+    "provider",
+    "locale",
+    "currentQuestion",
+    "questions",
+    "messages"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "projectId": {
+      "type": "string",
+      "pattern": "^proj_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 999999
+    },
+    "step": {
+      "enum": [
+        "intake",
+        "editor"
+      ]
+    },
+    "provider": {
+      "enum": [
+        null,
+        "codex",
+        "claude-code",
+        "codebuddy",
+        "qoder",
+        "openclaw",
+        "hermes"
+      ]
+    },
+    "locale": {
+      "enum": [
+        "zh-CN",
+        "en"
+      ]
+    },
+    "currentQuestion": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/questionId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "questions": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "$ref": "#/$defs/question"
+      }
+    },
+    "messages": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "$ref": "#/$defs/message"
+      }
+    },
+    "routeDraft": {
+      "$ref": "#/$defs/route"
+    },
+    "importedOriginal": {
+      "$ref": "#/$defs/route"
+    },
+    "undoRoute": {
+      "$ref": "#/$defs/route"
+    },
+    "confirmedRevision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "pending": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "baseRevision",
+        "questionId"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        },
+        "kind": {
+          "enum": [
+            "interview",
+            "generate",
+            "edit",
+            "consistency"
+          ]
+        },
+        "baseRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
+        },
+        "questionId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/questionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "backgroundEpoch": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
+        },
+        "factsHash": {
+          "$ref": "#/$defs/factsHash"
+        }
+      }
+    },
+    "proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "route",
+        "reply",
+        "baseRevision",
+        "routeRevision"
+      ],
+      "properties": {
+        "route": {
+          "$ref": "#/$defs/route"
+        },
+        "reply": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        },
+        "baseRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
+        },
+        "routeRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        }
+      }
+    },
+    "agentOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "effort"
+      ],
+      "properties": {
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$"
+        },
+        "effort": {
+          "enum": [
+            null,
+            "none",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        }
+      }
+    },
+    "history": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "past",
+        "future"
+      ],
+      "description": "Up to 20 snapshots total and 2 MiB across both stacks. Legacy undoRoute remains readable.",
+      "properties": {
+        "past": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/route"
+          }
+        },
+        "future": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/route"
+          }
+        }
+      }
+    },
+    "intakeChanged": {
+      "type": "boolean"
+    },
+    "resources": {
+      "type": "string",
+      "maxLength": 4000
+    },
+    "backgroundEpoch": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 999999
+    },
+    "consistency": {
+      "$ref": "#/$defs/consistencyRecord"
+    },
+    "answerEvents": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/answerEvent"
+      }
+    },
+    "generationDraft": {
+      "$ref": "#/$defs/generationDraft"
+    }
+  },
+  "$defs": {
+    "token": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,100}$"
+    },
+    "questionId": {
+      "enum": [
+        "goal",
+        "purpose",
+        "baseline",
+        "time",
+        "constraints"
+      ]
+    },
+    "route": {
+      "type": "object",
+      "description": "Route v1 source or v2 editor draft; validated by the shared route and planning domain validators."
+    },
+    "editorResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reply"
+      ],
+      "description": "Conversational answers omit route or use null; explicit changes return a complete validated route proposal. Ordinary answers do not change the draft, confirmation or existing proposal.",
+      "properties": {
+        "reply": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        },
+        "route": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/route"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "evidence": {
+      "description": "Evidence is linked either to real messages or to an explicit user acceptance event; suggestion adoption is not represented as a fabricated chat message.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/legacyEvidence"
+        },
+        {
+          "$ref": "#/$defs/acceptanceEvidence"
+        }
+      ]
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "summary",
+        "fields",
+        "evidence",
+        "missing"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/questionId"
+        },
+        "status": {
+          "description": "Collected answers remain stored while cross-answer issues require review; completion and consistency are distinct runtime conditions.",
+          "enum": [
+            "pending",
+            "current",
+            "needs-detail",
+            "complete",
+            "awaiting-confirmation",
+            "needs-review"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 2000
+        },
+        "fields": {
+          "type": "object",
+          "maxProperties": 8,
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "missing": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        },
+        "conversationFrom": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 128
+        },
+        "answerProposal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "summary",
+            "messageId"
+          ],
+          "properties": {
+            "summary": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "messageId": {
+              "$ref": "#/$defs/token"
+            },
+            "consistency": {
+              "$ref": "#/$defs/boundConsistency"
+            }
+          }
+        },
+        "acceptedSnapshot": {
+          "$ref": "#/$defs/acceptedAnswer"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "needs-review"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "acceptedSnapshot"
+            ]
+          }
+        }
+      ]
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "role",
+        "text",
+        "createdAt"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/token"
+        },
+        "role": {
+          "enum": [
+            "user",
+            "assistant"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "questionId": {
+          "$ref": "#/$defs/questionId"
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "mentions": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/mention"
+          },
+          "description": "Inline mention token bound to stable IDs; chapter content is resolved by the runtime before the request. Legacy single target remains readable."
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chapterId"
+      ],
+      "properties": {
+        "chapterId": {
+          "$ref": "route.schema.json#/$defs/id"
+        },
+        "nodeId": {
+          "$ref": "route.schema.json#/$defs/id"
+        }
+      }
+    },
+    "mention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "token"
+      ],
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        }
+      }
+    },
+    "requestToken": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "factsHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "answerFields": {
+      "type": "object",
+      "maxProperties": 8,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      }
+    },
+    "legacyEvidence": {
+      "type": "object",
+      "description": "AI-assessed context supporting a collected field. Links identify real messages; semantic support and completion are judged by the agent, without literal text or confirmation-keyword matching. Existing v1 quotations remain readable.",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "messageId",
+        "quote"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "messageId": {
+          "$ref": "#/$defs/token"
+        },
+        "quote": {
+          "type": "string",
+          "description": "A concise supporting-context explanation; may paraphrase or summarize conversation turns and is not guaranteed to be a verbatim quotation.",
+          "minLength": 1,
+          "maxLength": 8000
+        },
+        "proposalMessageId": {
+          "$ref": "#/$defs/token"
+        }
+      }
+    },
+    "acceptanceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "acceptanceEventId",
+        "quote"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "acceptanceEventId": {
+          "$ref": "#/$defs/token"
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        }
+      }
+    },
+    "acceptedAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "summary",
+        "fields",
+        "evidence"
+      ],
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 2000
+        },
+        "fields": {
+          "$ref": "#/$defs/answerFields"
+        },
+        "evidence": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "revision": {
+                "minimum": 1
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "summary": {
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "consistencySuggestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary",
+        "fields"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "fields": {
+          "$ref": "#/$defs/answerFields"
+        }
+      }
+    },
+    "consistencyIssue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "questionId",
+        "fields",
+        "kind",
+        "reason",
+        "suggestion"
+      ],
+      "properties": {
+        "questionId": {
+          "$ref": "#/$defs/questionId"
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          }
+        },
+        "kind": {
+          "enum": [
+            "incompatible",
+            "uncertain"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "suggestion": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/consistencySuggestion"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "consistencyAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "issues"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "consistent",
+            "requires_review"
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/consistencyIssue"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "consistent"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "issues": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "requires_review"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "issues": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "boundConsistency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "baseEpoch",
+        "proposedFactsHash",
+        "assessment"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^answer-consistency\\.v[0-9]+$",
+          "maxLength": 80
+        },
+        "baseEpoch": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
+        },
+        "proposedFactsHash": {
+          "$ref": "#/$defs/factsHash"
+        },
+        "assessment": {
+          "$ref": "#/$defs/consistencyAssessment"
+        }
+      }
+    },
+    "storedConsistencyIssue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "questionId",
+        "fields",
+        "kind",
+        "reason",
+        "suggestion",
+        "id",
+        "answerRevision",
+        "sourceRequestId",
+        "anchorQuestionId"
+      ],
+      "properties": {
+        "questionId": {
+          "$ref": "#/$defs/questionId"
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          }
+        },
+        "kind": {
+          "enum": [
+            "incompatible",
+            "uncertain"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "suggestion": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/consistencySuggestion"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/token"
+        },
+        "answerRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
+        },
+        "sourceRequestId": {
+          "$ref": "#/$defs/requestToken"
+        },
+        "anchorQuestionId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/questionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "consistencyRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "status",
+        "epoch",
+        "factsHash",
+        "issues"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^answer-consistency\\.v[0-9]+$",
+          "maxLength": 80
+        },
+        "status": {
+          "enum": [
+            "dirty",
+            "consistent",
+            "requires_review"
+          ]
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
+        },
+        "factsHash": {
+          "$ref": "#/$defs/factsHash"
+        },
+        "issues": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/storedConsistencyIssue"
+          }
+        },
+        "checkedRequestId": {
+          "$ref": "#/$defs/requestToken"
+        },
+        "anchorQuestionId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/questionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "anchorRevision": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 999999
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "consistent",
+                  "requires_review"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "checkedRequestId"
+            ]
+          }
+        }
+      ]
+    },
+    "answerEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "questionId",
+        "answerRevision",
+        "epoch",
+        "summary",
+        "fields",
+        "createdAt"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/token"
+        },
+        "kind": {
+          "const": "suggestion"
+        },
+        "questionId": {
+          "$ref": "#/$defs/questionId"
+        },
+        "answerRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "fields": {
+          "$ref": "#/$defs/answerFields"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sourceRequestId": {
+          "$ref": "#/$defs/requestToken"
+        },
+        "issueId": {
+          "$ref": "#/$defs/token"
+        }
+      }
+    },
+    "generationDraft": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "id",
+        "revision",
+        "createdAt",
+        "updatedAt",
+        "backgroundEpoch",
+        "factsHash",
+        "policyVersion",
+        "locale",
+        "baseRouteHash",
+        "routeId",
+        "outline",
+        "chapters"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^generation_[A-Za-z0-9._-]{1,64}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "backgroundEpoch": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
+        },
+        "factsHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "baseRouteHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "policyVersion": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "locale": {
+          "enum": [
+            "zh-CN",
+            "en"
+          ]
+        },
+        "routeId": {
+          "type": "string",
+          "pattern": "^route_[a-f0-9-]{36}$"
+        },
+        "outline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reply",
+            "result",
+            "missing"
+          ],
+          "properties": {
+            "status": {
+              "const": "ok"
+            },
+            "reply": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8000
+            },
+            "result": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "title",
+                "chapters"
+              ],
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "chapters": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 24,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "title",
+                      "stageGoal",
+                      "lessons"
+                    ],
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "stageGoal": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 600
+                      },
+                      "lessons": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 64,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "title",
+                            "focus"
+                          ],
+                          "properties": {
+                            "title": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160
+                            },
+                            "focus": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 300
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "missing": {
+              "type": "array",
+              "maxItems": 0
+            }
+          }
+        },
+        "chapters": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 24,
+          "items": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "title",
+                  "stageGoal",
+                  "nodes"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/token"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "stageGoal": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 600
+                  },
+                  "nodes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 64,
+                    "items": {
+                      "$ref": "route.schema.json#/$defs/nodeV2"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "description": "Outline-ordered, contiguous validated lesson prefixes. Runtime validates identity, field schema, dependencies and monotonic persistence."
+        }
+      }
+    }
+  }
+}

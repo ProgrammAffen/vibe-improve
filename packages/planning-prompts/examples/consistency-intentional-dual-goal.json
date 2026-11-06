@@ -1,0 +1,53 @@
+{
+  "name": "consistency-intentional-dual-goal",
+  "task": "consistency",
+  "input": {
+    "locale": "en",
+    "acceptedAnswers": {
+      "goal": {
+        "summary": "I explicitly want both image classification and text generation, in separate stages.",
+        "fields": {
+          "topic": "Image classification and character-level text generation",
+          "outcome": "Compare both tasks through small staged experiments"
+        }
+      },
+      "purpose": {
+        "summary": "Compare both learning tasks through small staged experiments.",
+        "fields": {
+          "context": "Personal learning experiments",
+          "criteria": "Run one small image classifier and one small character-level text model, then explain observed mistakes, generated samples and limitations."
+        }
+      },
+      "baseline": {
+        "summary": "Previously trained a small image classifier.",
+        "fields": {
+          "experience": "Trained an image classifier with guidance"
+        }
+      },
+      "time": {
+        "summary": "Five hours each week, one hour per session.",
+        "fields": {
+          "weekly": "Five hours",
+          "session": "One hour"
+        }
+      },
+      "constraints": {
+        "summary": "A laptop and small text data; no hard deadline.",
+        "fields": {
+          "conditions": "Laptop and small text data",
+          "scope": "Small local examples"
+        }
+      }
+    },
+    "anchorQuestionId": "goal"
+  },
+  "response": {
+    "status": "ok",
+    "reply": "Both goals are intentional; plan them as small stages within the confirmed budget.",
+    "result": {
+      "status": "consistent",
+      "issues": []
+    },
+    "missing": []
+  }
+}

@@ -1,0 +1,11 @@
+import type {PlanningTarget,PlanningMention} from './planning.mjs';
+import type {RouteDocument} from './route-validation.mjs';
+export function targetShape(value:unknown):boolean;
+export function validatePlanningTarget(route:RouteDocument,target:PlanningTarget):PlanningTarget;
+export function mentionShape(value:unknown):boolean;
+export function planningMentionTokens(text:string):string[];
+export function planningMentionDeletion(text:string,start:number,end:number,direction:'backward'|'forward',bindings?:PlanningMention[]):{start:number;end:number}|null;
+export function planningMentionToken(route:RouteDocument,target:PlanningTarget,locale:string):string;
+export function validatePlanningMentions(route:RouteDocument|undefined,text:string,mentions:PlanningMention[],resolve?:boolean):PlanningMention[];
+export function resolvePlanningMentions(route:RouteDocument,text:string,bindings?:PlanningMention[]):PlanningMention[];
+export function refreshPlanningMentions(route:RouteDocument,text:string,bindings:PlanningMention[],locale:string):{text:string;mentions:PlanningMention[]};

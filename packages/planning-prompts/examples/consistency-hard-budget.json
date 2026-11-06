@@ -1,0 +1,65 @@
+{
+  "name": "consistency-hard-budget",
+  "task": "consistency",
+  "input": {
+    "locale": "en",
+    "acceptedAnswers": {
+      "goal": {
+        "summary": "Train a character-level language model.",
+        "fields": {
+          "topic": "Character-level language models",
+          "outcome": "Independently train and compare several models on a large dataset before next week"
+        }
+      },
+      "purpose": {
+        "summary": "Explore text generation.",
+        "fields": {
+          "context": "Personal experiments",
+          "criteria": "Show generated samples and explain observed training behavior"
+        }
+      },
+      "baseline": {
+        "summary": "Previously trained a small image classifier.",
+        "fields": {
+          "experience": "Trained an image classifier with guidance"
+        }
+      },
+      "time": {
+        "summary": "One hour weekly with a hard deadline in one week.",
+        "fields": {
+          "weekly": "One hour",
+          "session": "One hour",
+          "deadline": "Next week",
+          "deadlineType": "Hard"
+        }
+      },
+      "constraints": {
+        "summary": "A laptop and small text data; no hard deadline.",
+        "fields": {
+          "conditions": "Laptop and small text data",
+          "scope": "Small local examples"
+        }
+      }
+    },
+    "anchorQuestionId": "time"
+  },
+  "response": {
+    "status": "ok",
+    "reply": "The new time budget is preserved. Please review the requested outcome rather than assume extra hours.",
+    "result": {
+      "status": "requires_review",
+      "issues": [
+        {
+          "questionId": "goal",
+          "fields": [
+            "outcome"
+          ],
+          "kind": "incompatible",
+          "reason": "The requested large comparison requires learning and practice beyond one hour before the hard deadline; the budget and deadline cannot silently change.",
+          "suggestion": null
+        }
+      ]
+    },
+    "missing": []
+  }
+}

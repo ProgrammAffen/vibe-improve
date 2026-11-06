@@ -85,10 +85,13 @@ def load_route(path: str | Path) -> Any:
         raise RouteFormatError(str(error)[:300]) from error
 
 
-@lru_cache(maxsize=1)
-def _validator() -> Draft202012Validator:
+@lru_cache(maxsize=3)
+def _validator(version: int | None = None) -> Draft202012Validator:
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
+    if version in (1, 2):
+        schema = {**schema["$defs"][f"routeV{version}"], "$defs": schema["$defs"],
+                  "$schema": "https://json-schema.org/draft/2020-12/schema"}
     return Draft202012Validator(schema)
 
 
@@ -103,7 +106,8 @@ def validate_route(data: Any) -> list[str]:
         return [str(error)[:300]]
 
     errors = []
-    for error in _validator().iter_errors(data):
+    version = data.get("schemaVersion") if type(data) is dict else None
+    for error in _validator(version if type(version) is int else None).iter_errors(data):
         location = "/" + "/".join(str(part)[:80] for part in error.absolute_path)
         errors.append(f"{location}: {error.message[:300]}")
         if len(errors) >= MAX_ERRORS:
@@ -128,7 +132,7 @@ def validate_route(data: Any) -> list[str]:
             objective_ids = [objective["id"] for objective in node["objectives"]]
             if len(set(objective_ids)) != len(objective_ids):
                 errors.append(f"{node_id}: duplicate objective id")
-            if set(node["assessment"]["objectiveIds"]) != set(objective_ids):
+            if "assessment" in node and set(node["assessment"]["objectiveIds"]) != set(objective_ids):
                 errors.append(f"{node_id}: assessment objectiveIds must match all node objectives")
 
     dependents: dict[str, list[str]] = {node_id: [] for node_id in nodes}

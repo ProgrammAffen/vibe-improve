@@ -5,9 +5,13 @@ import GameButton from './components/GameButton';
 import BackHomeButton from './components/BackHomeButton';
 import Modal from './components/Modal';
 import {NewProjectPage, ProjectListPage} from './components/ProjectPages';
-import {type ProjectRecord} from './projects/domain';
+import {projectResumePage, type ProjectRecord} from './projects/domain';
 import SettingsPage, {type SoundPreferences} from './components/SettingsPage';
 import AgentSelectionPage from './components/AgentSelectionPage';
+import RouteSourcePage from './components/RouteSourcePage';
+import {routeService} from './routes/service';
+import PlanningPage from './components/PlanningPage';
+import {planningService,type PlanningEntry} from './planning/service';
 import {Info, Mail, TriangleAlert} from 'lucide-react';
 import {dateLabel, readLanguage, translate, type Language} from './i18n';
 import {logEvent} from './logger';
@@ -16,7 +20,7 @@ import './styles.css';
 import './dialogs.css';
 
 type Snapshot = Awaited<ReturnType<typeof service.getSnapshot>>;
-type Page = 'home' | 'settings' | 'account' | 'projects' | 'new-project' | 'agents';
+type Page = 'home' | 'settings' | 'account' | 'projects' | 'new-project' | 'agents' | 'route-source' | 'planning';
 type AuthMode = 'login' | 'register' | 'verify' | 'forgot' | 'reset' | 'change';
 type NativeBridge = {preferences?: Record<string, unknown>; setPreferences?: (value: Record<string, unknown>) => void; quit?: () => void};
 const ASSET = import.meta.env.BASE_URL + 'assets/';
@@ -40,7 +44,7 @@ function readSound(): SoundPreferences {
 
 function initialPage(): Page {
   const path = window.location.hash.replace(/^#\/?/, '');
-  return ['settings', 'account', 'projects', 'new-project', 'agents'].includes(path) ? path as Page : 'home';
+  return ['settings', 'account', 'projects', 'new-project', 'agents', 'route-source', 'planning'].includes(path) ? path as Page : 'home';
 }
 
 function licenseStatus(license: any): string {
@@ -54,6 +58,7 @@ export default function App() {
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [page, setPage] = useState<Page>(initialPage);
   const [selectedProject, setSelectedProject] = useState<ProjectRecord | null>(null);
+  const [planningEntry,setPlanningEntry]=useState<PlanningEntry|'resume'>('resume');
   const [agentOrigin,setAgentOrigin]=useState<'settings'|'project'>('settings');
   const [settingsTab, setSettingsTab] = useState('general');
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -199,6 +204,16 @@ export default function App() {
     window.location.hash = next === 'home' ? '/' : `/${next}`;
   }
 
+  function openProject(record: ProjectRecord) {
+    setSelectedProject(record);
+    setAgentOrigin('project');
+    const resume = projectResumePage(record);
+    if (resume === 'new-project') {navigate(resume); return;}
+    void Promise.all([planningService.read(record.id),routeService.read(record.id)])
+      .then(([planning,saved]) => {if(planning&&saved.source!==null){setPlanningEntry('resume');navigate('planning')}else if(saved.source==='import'&&saved.routeDraft){setPlanningEntry('import');navigate('planning')}else navigate(saved.agentConfirmed ? 'route-source' : resume)})
+      .catch(() => navigate('route-source'));
+  }
+
   async function run(action: () => Promise<unknown>, completed?: () => void) {
     if (busy) return;
     setLocalBusy(true);
@@ -336,7 +351,7 @@ export default function App() {
   }
 
   return <main className={`app lang-${language}`} aria-busy={busy} onInvalidCapture={event => {if (event.target instanceof HTMLInputElement && event.target.type === 'email') logEvent('operation.failed', {operation: auth === 'register' ? 'auth.registration.send' : auth === 'forgot' ? 'auth.password.reset.send' : 'auth.login', stage: 'client.validation', resultCode: 'AUTH_EMAIL_INVALID', reason: 'email_invalid'});}} onClickCapture={playClick}>
-    {page === 'home' ? renderHome() : page === 'settings' ? renderSettings() : page === 'projects' ? <ProjectListPage language={language} onBack={() => navigate('home')} onNew={() => {setSelectedProject(null); navigate('new-project');}} onOpen={record => {setSelectedProject(record); navigate('new-project');}} /> : page === 'new-project' ? <NewProjectPage key={selectedProject?.id ?? 'new'} language={language} record={selectedProject} onBack={() => navigate('home')} onSaved={record => {setSelectedProject(record);setAgentOrigin('project');navigate('agents');}} /> : page === 'agents' ? <AgentSelectionPage language={language} project={agentOrigin==='project'?selectedProject:null} settings={agentOrigin==='settings'} onPrevious={()=>navigate(agentOrigin==='settings'?'settings':'new-project')} onHome={()=>navigate('home')} onDone={()=>{navigate(agentOrigin==='settings'?'settings':'projects');}} /> : renderAccount()}
+    {page === 'home' ? renderHome() : page === 'settings' ? renderSettings() : page === 'projects' ? <ProjectListPage language={language} onBack={() => navigate('home')} onNew={() => {setSelectedProject(null); navigate('new-project');}} onOpen={openProject} /> : page === 'new-project' ? <NewProjectPage key={selectedProject?.id ?? 'new'} language={language} record={selectedProject} onBack={() => navigate('home')} onSaved={record => {setSelectedProject(record);setAgentOrigin('project');navigate('agents');}} /> : page === 'agents' ? <AgentSelectionPage key={agentOrigin==='project'?selectedProject?.id:'settings'} language={language} project={agentOrigin==='project'?selectedProject:null} settings={agentOrigin==='settings'} onPrevious={()=>navigate(agentOrigin==='settings'?'settings':'home')} onHome={()=>navigate('home')} onDone={()=>{navigate(agentOrigin==='settings'?'settings':'route-source');}} /> : page === 'route-source' && selectedProject ? <RouteSourcePage key={selectedProject.id} language={language} project={selectedProject} onPrevious={()=>{setAgentOrigin('project');navigate('agents')}} onHome={()=>navigate('home')} onPlanning={mode=>{setPlanningEntry(mode);navigate('planning')}}/> : page === 'planning' && selectedProject ? <PlanningPage key={selectedProject.id+planningEntry} language={language} project={selectedProject} entryMode={planningEntry} onPrevious={()=>navigate('route-source')} onHome={()=>navigate('home')}/> : page === 'route-source' || page === 'planning' ? <ProjectListPage language={language} onBack={()=>navigate('home')} onNew={()=>{setSelectedProject(null);navigate('new-project')}} onOpen={openProject}/> : renderAccount()}
     {auth && <Modal title={authTitle} onClose={closeAuth} closeLabel={t('关闭', 'Close')} busy={busy} className={`auth-dialog auth-${auth}`}>
       <form className="auth-form" onSubmit={submitAuth}>
         {auth === 'register' && <Field label={t('昵称', 'Nickname')} value={nickname} onChange={event => setNickname(event.target.value)} autoComplete="nickname" maxLength={64} disabled={busy} required />}

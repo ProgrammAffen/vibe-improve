@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import ts from 'typescript';
-import {readFile,mkdir,mkdtemp,writeFile,stat,rm,symlink} from 'node:fs/promises';
+import {readFile,readdir,mkdir,mkdtemp,writeFile,stat,rm,symlink} from 'node:fs/promises';
 import {spawnSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {join} from 'node:path';
@@ -12,7 +12,7 @@ const root=fileURLToPath(new URL('../',import.meta.url)),base=join(root,'tmp/che
 const compile=async file=>ts.transpileModule(await readFile(join(root,file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const domain={exports:{}};
 vm.runInNewContext(await compile('apps/local-ui/src/projects/domain.ts'),{module:domain,exports:domain.exports,TextEncoder});
-const {validProjectName,validateProject,selectProjects}=domain.exports;
+const {validProjectName,validateProject,selectProjects,projectResumePage}=domain.exports;
 const now='2026-10-23T06:00:00.000Z';
 const document=(name='Synthetic quest')=>({format:'vibe-improve.project',schemaVersion:1,id:'proj_'+randomUUID(),name,revision:1,createdAt:now,updatedAt:now,lastOpenedAt:now,state:'draft'});
 
@@ -30,6 +30,13 @@ test('unplanned projects never inherit fabricated progress and invalid metadata 
   assert.equal(selectProjects(records,' ENGLISH ','recent')[0].name,'English practice');
   assert.equal(selectProjects(records,'','recent')[0].name,'English practice');
   assert.equal(records[0].name,'数据分析');
+});
+
+test('saved projects with a selected directory resume at agent selection',()=>{
+  const record=validateProject({...document(),path:'/synthetic/chosen folder'});
+  assert.equal(projectResumePage(record),'agents');
+  assert.equal(projectResumePage({...record,available:false}),'new-project');
+  assert.equal(projectResumePage({...record,path:''}),'new-project');
 });
 
 test('native project bridge receives opaque grants and diagnostic events omit names and paths',async()=>{
@@ -56,6 +63,7 @@ async function binary(){
   return executable??=(async()=>{
     await mkdir(base,{recursive:true});const build=await mkdtemp(join(base,'build-')),source=join(build,'main.swift'),out=join(build,'project-test');
     await writeFile(source,`import Foundation
+import Darwin
 let root = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
 do {
     let data = FileManager.default.contents(atPath: CommandLine.arguments[2])!
@@ -69,11 +77,40 @@ do {
     case "list": result = try store.list()
     case "create": result = try store.create(name: input["name"] as! String, parentToken: token ?? "forged", commandID: input["commandId"] as! String)
     case "open": result = try store.openProject(id: input["id"] as! String)
+    case "workspace": result = try store.projectWorkspace(for: input["id"] as! String).path
     case "update": result = try store.rename(id: input["id"] as! String, name: input["name"] as! String, expectedRevision: input["revision"] as! Int, parentToken: token)
     case "remove": try store.remove(id: input["id"] as! String, expectedRevision: input["revision"] as! Int)
     case "draft.save": try store.saveDraft(name: input["name"] as! String, parentToken: token)
     case "draft.read": result = try store.loadDraft()
     case "register": result = try store.register(URL(fileURLWithPath: input["path"] as! String), replacing: input["id"] as? String)
+    case "concurrent":
+        let id = input["id"] as! String, expectedPath = input["expectedPath"] as! String, failureLock = NSLock()
+        var failures: [String] = []
+        DispatchQueue.concurrentPerform(iterations: 256) { index in
+            do {
+                if index % 2 == 0 {
+                    guard try store.projectWorkspace(for: id).path == expectedPath else { throw ProjectError.unavailable }
+                } else {
+                    let records = try store.list()
+                    guard records.count == 1, records[0]["id"] as? String == id, records[0]["available"] as? Bool == true else { throw ProjectError.unavailable }
+                }
+            } catch { failureLock.lock(); failures.append(String(describing: error)); failureLock.unlock() }
+        }
+        guard failures.isEmpty else { throw ProjectError.conflict }
+        let lockPath = root.appendingPathComponent("projects/session.lock").path
+        let descriptor = open(lockPath, O_RDWR | O_CLOEXEC)
+        guard descriptor >= 0, flock(descriptor, LOCK_EX | LOCK_NB) == 0 else { throw ProjectError.storage }
+        defer { flock(descriptor, LOCK_UN); close(descriptor) }
+        let probe = root.appendingPathComponent("external-lock-probe.json")
+        try JSONSerialization.data(withJSONObject: ["action": "list"]).write(to: probe)
+        defer { try? FileManager.default.removeItem(at: probe) }
+        let process = Process(), output = Pipe()
+        process.executableURL = URL(fileURLWithPath: CommandLine.arguments[0]); process.arguments = [root.path, probe.path]
+        process.standardOutput = output; process.standardError = FileHandle.nullDevice
+        let started = Date(); try process.run()
+        let reply = output.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
+        guard process.terminationStatus == 3, String(decoding: reply, as: UTF8.self).contains("PROJECT_STORAGE_UNAVAILABLE"), Date().timeIntervalSince(started) < 3 else { throw ProjectError.conflict }
+        result = ["concurrentOperations": 256, "foreignLockRejected": true]
     default: throw ProjectError.invalid
     }
     print(String(data: try JSONSerialization.data(withJSONObject: result, options: [.fragmentsAllowed]), encoding: .utf8)!)
@@ -96,12 +133,21 @@ async function fixture(){
 test('desktop drafts survive restart with folder bookmarks without writing a premature project folder',options,async()=>{
   const f=await fixture(),commandId=randomUUID(),value={action:'create',name:'Synthetic project',parent:f.parent,commandId};
   const created=await f.run(value),again=await f.run(value);assert.equal(again.id,created.id);assert.equal(again.revision,1);
+  assert.equal(created.path,f.parent);
+  assert.equal(await f.run({action:'workspace',id:created.id}),f.parent);
   await assert.rejects(stat(join(f.parent,'Synthetic project')),{code:'ENOENT'});
   assert.equal((await stat(f.parent)).mode&0o777,0o755);
   assert.equal((await f.run({action:'list'})).length,1);
   const opened=await f.run({action:'open',id:created.id});assert.equal(opened.directory.path,f.parent);assert.ok(opened.directory.token);
   await f.run({action:'draft.save',name:'Unfinished form',parent:f.parent});const restored=await f.run({action:'draft.read'});assert.equal(restored.name,'Unfinished form');assert.equal(restored.directory.path,f.parent);
   assert.equal((await stat(join(f.runtime,'projects/index.json'))).mode&0o777,0o600);
+});
+
+test('one ProjectStore serializes concurrent workspace/list requests and still rejects another process holding its file lock',options,async()=>{
+  const f=await fixture(),created=await f.run({action:'create',name:'Concurrent workspace',parent:f.parent,commandId:randomUUID()});
+  const result=await f.run({action:'concurrent',id:created.id,expectedPath:f.parent});
+  assert.equal(result.concurrentOperations,256);assert.equal(result.foreignLockRejected,true);
+  assert.equal((await f.run({action:'list'}))[0].id,created.id);
 });
 
 test('draft commands reject duplicates, unsafe names, forged directory grants and stale revisions',options,async()=>{
@@ -114,16 +160,41 @@ test('draft commands reject duplicates, unsafe names, forged directory grants an
   const updated=await f.run({action:'update',id:created.id,name:'Beta',revision:1});assert.equal(updated.revision,2);
   assert.equal(await f.run({action:'update',id:created.id,name:'Stale',revision:1},true),'PROJECT_CONFLICT');
   await mkdir(join(f.parent,'Occupied'));
-  assert.equal(await f.run({action:'update',id:created.id,name:'Occupied',revision:2},true),'PROJECT_EXISTS');
+  const renamed=await f.run({action:'update',id:created.id,name:'Occupied',revision:2});
+  assert.equal(renamed.path,f.parent);
+  const another=join(f.dir,'Another folder');await mkdir(another);
+  const independent=await f.run({action:'create',name:'Occupied',parent:another,commandId:randomUUID()});
+  assert.equal(independent.path,another);
+  assert.equal(await f.run({action:'update',id:independent.id,name:'Same folder rejected',parent:f.parent,revision:1},true),'PROJECT_DIRECTORY_LOCKED');
 });
 
-test('missing folders retain their index record and can be explicitly relocated',options,async()=>{
+test('a confirmed workspace cannot be replaced, even after its original folder goes missing',options,async()=>{
   const f=await fixture(),created=await f.run({action:'create',name:'Recovery',parent:f.parent,commandId:randomUUID()});
   await rm(f.parent,{recursive:true});assert.equal((await f.run({action:'list'}))[0].available,false);
   assert.equal(await f.run({action:'open',id:created.id},true),'PROJECT_UNAVAILABLE');
   const replacement=join(f.dir,'Replacement');await mkdir(replacement);
-  await f.run({action:'update',id:created.id,name:'Recovery',revision:1,parent:replacement});
-  const record=(await f.run({action:'list'}))[0];assert.equal(record.available,true);assert.equal(record.path,join(replacement,'Recovery'));
+  assert.equal(await f.run({action:'update',id:created.id,name:'Recovery',revision:1,parent:replacement},true),'PROJECT_UNAVAILABLE');
+  const record=(await f.run({action:'list'}))[0];assert.equal(record.available,false);assert.equal(record.path,f.parent);
+  assert.deepEqual(await readdir(replacement),[]);
+});
+
+test('legacy draft paths use the bookmarked selected folder and never switch into an unapproved child',options,async()=>{
+  const f=await fixture(),record=await f.run({action:'create',name:'Legacy draft',parent:f.parent,commandId:randomUUID()});
+  const file=join(f.runtime,'projects/index.json'),entries=JSON.parse(await readFile(file,'utf8'));
+  entries[0].path=join(f.parent,'Legacy draft');await writeFile(file,JSON.stringify(entries));
+  await mkdir(entries[0].path);
+  assert.equal((await f.run({action:'list'}))[0].path,f.parent);
+  assert.equal((await f.run({action:'open',id:record.id})).path,f.parent);
+  assert.equal(await f.run({action:'workspace',id:record.id}),f.parent);
+  assert.equal(await f.run({action:'workspace',id:'proj_'+randomUUID()},true),'PROJECT_UNAVAILABLE');
+});
+
+test('workspace resolution rejects replaced symlink folders and existing project markers',options,async()=>{
+  const f=await fixture(),record=await f.run({action:'create',name:'Trusted directory',parent:f.parent,commandId:randomUUID()});
+  await rm(f.parent,{recursive:true});const outside=join(f.dir,'Not selected');await mkdir(outside);await symlink(outside,f.parent);
+  assert.equal(await f.run({action:'workspace',id:record.id},true),'PROJECT_UNAVAILABLE');
+  const selected=join(f.dir,'Existing project');await mkdir(join(selected,'.vibe-improve'),{recursive:true});
+  assert.equal(await f.run({action:'create',name:'Another project',parent:selected,commandId:randomUUID()},true),'PROJECT_EXISTS');
 });
 
 test('corrupt or symlinked draft indexes fail without discarding or changing existing data',options,async()=>{

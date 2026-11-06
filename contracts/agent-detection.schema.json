@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vibe-improve:agent-detection:1",
+  "title": "Saved local agent detection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "checkedAt",
+    "probes"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "checkedAt": {
+      "type": "string",
+      "format": "date-time",
+      "maxLength": 64
+    },
+    "probes": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "state"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "codex",
+              "claude-code",
+              "codebuddy",
+              "qoder",
+              "openclaw",
+              "hermes"
+            ]
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "login-required",
+              "not-installed",
+              "unverified",
+              "unknown",
+              "runtime-required"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "maxLength": 99,
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+.][A-Za-z0-9.]+)?$"
+          }
+        }
+      }
+    }
+  }
+}

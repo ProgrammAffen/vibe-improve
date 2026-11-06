@@ -116,6 +116,12 @@ final class CodeBuddyAdapter {
         guard let entry=result["entry"] as? String else{return(nil,result["state"] as? String ?? "unknown")}
         return(CodeBuddyInvocation(executable:node,prefix:[entry]),"installed")
     }
+    func prepareSession(projectID:String,workspace:URL)throws->AgentSessionLaunch {
+        guard let invocation=resolve().0 else{throw AgentError.unavailable}
+        guard CodeBuddyControl.authenticated(try CodeBuddyControl().initialize(invocation,working:working)) else{throw AgentError.auth}
+        return try AgentSessionLaunch(provider:"codebuddy",projectID:projectID,executable:invocation.executable,
+            arguments:invocation.prefix+Self.streamArguments,workspace:workspace,environment:Self.environment(working))
+    }
     func probe()->[String:Any] {
         let (invocation,state)=resolve();guard let invocation else{return["id":"codebuddy","state":state]}
         do{

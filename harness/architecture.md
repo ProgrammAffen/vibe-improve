@@ -2,15 +2,15 @@
 
 ## 第一阶段实现基线
 
-当前增量采用 React / TypeScript / Vite 共用界面、CloudBase 官方认证 SDK 与 Node 事件云函数、Swift WKWebView macOS 壳。依赖版本及 lockfile 同仓，中间构建位于 `tmp/`，未压缩应用位于 `output/`。已实现动态主页、设置、账号、license、项目名称/目录草稿及项目列表；学习与 Agent 功能按 H1 交付。
+当前增量采用React / TypeScript / Vite共用界面、CloudBase官方认证SDK与Node事件云函数、Swift WKWebView macOS壳。依赖版本及lockfile同仓，中间构建位于`tmp/`，未压缩应用位于`output/`。已实现动态主页、设置、账号、license、项目准备、智能体选择、路线来源/导入、对话采集、路线生成与章节编辑；地图及学习工作台仍按H1交付。
 
-智能体准备增量使用 `apps/local-ui/src/agents/` 与 `apps/macos/AgentManager.swift`：限定provider ID的原生桥负责可信CLI发现、版本/认证探测与官方登录进程；默认与项目选择保存至运行目录 `agents/choices.json`，不改动项目文档或CloudBase账号。前端不能传可执行路径、任意参数或shell脚本。临时输出有界，登录超时或取消终止本次子进程，凭据仍由厂商CLI管理。CodeBuddy独立npm CLI由`CodeBuddyAdapter.swift`承载，配置及托管安装位于`agents/codebuddy/`，发行锁文件与文件指纹随签名应用打包；厂商凭据由官方CLI管理，不复制。此增量不包含学习对话适配器。
+智能体准备使用`apps/local-ui/src/agents/`与`apps/macos/AgentManager.swift`：限定provider ID的原生桥负责可信CLI发现、版本/认证探测与官方登录进程；默认与项目选择保存至运行目录`agents/choices.json`。前端不能传可执行路径、任意参数或shell脚本。临时输出有界，登录超时或取消终止本次子进程，凭据由厂商CLI管理。CodeBuddy独立npm CLI由`CodeBuddyAdapter.swift`承载，配置及托管安装位于`agents/codebuddy/`，发行锁文件与文件指纹随应用打包，不复制厂商凭据。
 
-macOS 壳始终从安装包加载界面、视频、字体与其他静态资源，通过当前启动的loopback端口提供。CloudBase仅作为账号、license、数据库及云端日志后台；应用启动不依赖公网前端。原生桥提供随机安装ID、偏好保存、退出、受限日志写入和固定运行时会话文件操作，导航与桥仅允许本次端口的 `/vibe-improve/` 路径。状态保存在 `.app` 同级 `Vibe Improve Runtime/`。会话令牌加密存于 `auth/`，共享界面负责恢复与清除，平台壳只适配文件操作；重启按到期时间恢复，未到期不重复请求后台；密码不持久化；诊断边界见[日志规范](observability.md)。后台接入与安全来源验收见[部署规范](cloud-deployment.md)。
+macOS 壳始终从安装包加载界面、视频、字体与其他静态资源，通过当前启动的loopback端口提供。CloudBase仅作为账号、license、数据库及云端日志后台；应用启动不依赖公网前端。原生桥提供随机安装ID、偏好保存、退出、受限日志写入和固定运行时会话文件操作，导航与桥仅允许本次端口的 `/vibe-improve/` 路径。状态固定保存在 `~/Library/Application Support/Vibe Improve/`。会话令牌加密存于 `auth/`，共享界面负责恢复与清除，平台壳只适配文件操作；重启按到期时间恢复，未到期不重复请求后台；密码不持久化；诊断边界见[日志规范](observability.md)。后台接入与安全来源验收见[部署规范](cloud-deployment.md)。
 
 学习功能采用 TypeScript 领域层、Node 本地运行时与 SQLite 私有存储；新增本地业务 API 前落实本文件的 Origin、会话凭据与文件访问约束。
 
-H1 同时实现 `packages/agent-bridge/`：真实 Codex 承担访谈、路线与学习辅助，运行时管理上下文、提案和采用。AI 不直接访问学习数据库；聊天与流式状态不等于已提交学习进度。
+当前规划执行由`PlanningAgent.swift`承载Codex app-server与Claude Code / CodeBuddy stream-json文本协议；三者共用[版本化内置提示词包](../packages/planning-prompts/README.md)，共享核心、教学标准与按任务拼装的访谈、总纲、课批次、审阅、纠错和编辑规则，不按模型添加专用教学提示。`PlanningPromptPack.swift`通过生成的`PlanningPromptPackResources.swift`读取同一任务契约，构建有界上下文并将任务局部U/A/L引用映射到持久ID。生成统一先总纲、每批至多3课、最多2章并行，最后校验真实完整依赖图再一次应用；协议、模型参数和认证差异留在传输边界。每次CLI在用户选定项目目录启动，不复用其他工具的私有会话。`PlanningCoordinator.swift`校验可信工具选择、预期修订和固定操作，完整协议成功后才向领域层提交。文本通道关闭工具并拒绝权限请求，前端不传任意提示词；不将对话输出当作学习进度。其他工具未经真实能力验证不启用规划，统一规则不代表所有模型均已通过真实验收。
 
 地图先使用 DOM/SVG 节点与分层美术资产；按实际场景引入 Canvas / WebGL 与模型渲染。交互语义和学习状态不放在渲染引擎中。
 
@@ -58,21 +58,35 @@ H1 首页采用审定火山场景静图生成的本地循环视频与静态 post
 
 ## 存储分层
 
-桌面应用管理的运行数据集中在`.app`同级`Vibe Improve Runtime/`，更新二进制不替换或清空该目录。`device.json`为安装身份，`preferences.json`为设置，`auth/`为加密登录/授权/时间锚/设备快照，`projects/`为项目索引和未提交草稿，`agents/`为工具选择与本应用启动的CLI临时文件，`logs/`为内部诊断，`local-server.json`为本次本地端口。WKWebView使用非持久数据存储，网页内存及临时UI缓存不作为持久数据来源。
+macOS桌面应用管理的运行数据固定在`~/Library/Application Support/Vibe Improve/`，通过系统Application Support API定位，与应用路径、版本和构建目录无关；未来Windows适配使用`%LOCALAPPDATA%/Vibe Improve/`，保持相同内部结构。更新、移动二进制不替换或清空数据目录。`device.json`为安装身份，`preferences.json`为设置，`auth/`为加密登录/授权/时间锚/设备快照，`projects/`为项目索引和未提交草稿，`agents/`为工具选择与本应用启动的CLI临时文件，`logs/`为内部诊断，`local-server.json`为本次本地端口。WKWebView使用非持久数据存储，网页内存及临时UI缓存不作为持久数据来源。
 
-用户选择的项目目录保存项目自身文件；第三方CLI继续使用其官方凭据目录。本应用不复制或迁移厂商账号。macOS可能维护系统偏好、原生文件选择器状态及系统临时文件；这些不作为登录、授权、设备身份或业务数据来源，不承诺操作系统完全不在工作目录外写文件。迁移或复制应用时一并保留运行目录；不同运行目录代表不同安装。
+用户选择的项目目录保存项目自身文件；第三方CLI继续使用其官方凭据目录。本应用不从第三方应用目录读取、复制或迁移其凭据；本应用运行目录内由官方CLI维护的配置随整体数据目录不透明迁移。macOS可能维护系统偏好、原生文件选择器状态及系统临时文件；这些不作为登录、授权、设备身份或业务数据来源，不承诺操作系统完全不在工作目录外写文件。首次启动按固定优先级从旧应用同级`Vibe Improve Runtime/`及旧`runtime/`复制到标准目录；开发output构建额外识别旧tmp/build位置。身份、成对加密会话、项目索引、智能体配置与托管CLI、日志同源复制，保持CLI可执行位和树内相对链接；拒绝目录外链接、硬链接、非本用户文件和不完整会话。迁移使用有界复制及原子目录发布，源目录保留；失败不创建新身份。已有标准目录的持久数据为权威，不按文件混合不同身份；只有空目录或仅临时端口/锁/日志时才采用旧数据，已有日志单独归档至`migration-backup/`。端口和锁重新创建。打包脚本仅替换应用，不写用户数据目录。
 
-项目准备阶段的正式实现为 `apps/local-ui/src/projects/` 与 `apps/macos/ProjectStore.swift`。`Vibe Improve Runtime/projects/index.json` 原子保存最多256条项目记录、父目录书签与修订号，最大2MB；`draft.json` 保存未提交表单。此阶段只保存待规划草稿，不创建目标项目文件夹；采用路线时才建立学习库。重新打包保留运行目录。名称须NFC规范化、1–80个Unicode码点、UTF-8不超过255字节，无首尾空白、路径符号、控制字符、末尾点及Windows保留名。
+项目准备阶段的正式实现为`apps/local-ui/src/projects/`与`apps/macos/ProjectStore.swift`。`projects/index.json`原子保存最多256条项目记录、所选工作目录书签与修订号，最大2MB；`draft.json`保存未提交表单。选定目录本身就是项目与Agent工作目录，不追加项目名称或自动建立子目录；同一目录只登记一个项目，名称仅作项目标题。当前项目元数据与路线规划保存在运行目录，确认路线不创建学习库文件。旧草稿按已授予的目录书签恢复，不依据旧显示路径切换到子目录，不移动原文件。重新打包保留运行目录。名称须NFC规范化、1–80个Unicode码点、UTF-8不超过255字节，无首尾空白、路径符号、控制字符、末尾点及Windows保留名。
 
 项目列表的“删除”仅移除本地索引记录，不删除项目目录、文档或资料。共享项目服务通过原生桥与ProjectStore执行原子移除，浏览器使用IndexedDB事务；确认后成功提交才更新界面，取消或写入失败保留原记录，重复移除不影响其他项目。重新打包与重启不恢复已移除索引。分页与名称缩略属于界面层；列表展示最多15个字素簇，存储仍保留完整名称及1–80个Unicode码点校验。
 
-原生目录选择器授予不透明token，网页不传可写绝对路径；桥仅接受当前本机来源主框架的有界请求。Swift串行队列与运行目录文件锁保护索引，创建以commandId幂等，修改检查expectedRevision；目录不存在时保留记录并提供重新定位，拒绝覆盖既有目标。兼容本地项目仅识别 [.vibe-improve/project.json 契约](../contracts/project-draft.schema.json)，未知版本、额外字段及非法文档拒绝；此阶段打开后仅编辑项目元信息。浏览器预览使用可用时的系统目录句柄与IndexedDB；不支持目录选择时明确提示使用桌面应用。此数据不发往CloudBase，诊断不记录名称、路径和书签。
+原生目录选择器授予不透明token，网页不传可写绝对路径；桥仅接受当前本机来源主框架的有界请求。Swift串行队列与运行目录文件锁保护索引，创建以commandId幂等，修改检查expectedRevision；目录不存在时保留记录，草稿需恢复原位置后重试，不允许以新目录替换；正式项目的书签恢复须验证同一项目身份，拒绝覆盖既有目标。兼容本地项目仅识别 [.vibe-improve/project.json 契约](../contracts/project-draft.schema.json)，未知版本、额外字段及非法文档拒绝。已有可用目录的草稿直接恢复到智能体选择，目录锁定；修改接口同样拒绝更换目录。浏览器预览使用可用时的系统目录句柄与IndexedDB；不支持目录选择时明确提示使用桌面应用。此数据不发往CloudBase，诊断不记录名称、路径和书签。
 
 发布后用户自行选择学习库根目录；开发仅使用 `tmp/runtime/`。每个库包含 SQLite、资源副本、派生索引、作品与备份；凭据与学习库分离，放应用运行时的加密会话目录，遵循[登录保持](license.md)。SQLite 使用事务和一致性备份接口，不直接复制活跃数据库文件作为备份。
 
 原文件、提取文本、摘要、嵌入索引有独立版本和来源哈希。索引可重建，笔记和学习证据不可当缓存清理。迁移先备份，失败回滚；磁盘不足、只读目录、损坏数据库保留可恢复副本。
 
 开发 `tmp/` 规则针对本仓库工作产物；正式用户学习库是持久数据，不因清理开发缓存而删除。
+
+## 路线准备与导入
+
+`RoutePreparationStore.swift` 管理 `projects/route-preparation/<projectId>.json`，记录已确认的智能体步骤、路线来源、AI辅助开关与路线草稿，契约见 [route-preparation](../contracts/route-preparation.schema.json)。写入检查项目目录授权及版本，使用原子提交；浏览器预览使用独立 IndexedDB。已确认智能体的项目重开进入路线来源，有导入草稿时恢复预览；未确认时进入智能体选择。
+
+`PlanningStore.swift`在固定运行目录`projects/planning/<projectId>.json`原子保存规划状态，单项目上限8MiB，使用运行目录锁；只校验用户项目目录，不写学习文件。`PlanningValidation/planning.js`由同一纯领域模块打包给JavaScriptCore，生产端按AI的完成判断复核结构、消息关联与修订；不接收前端自行勾选完成，不用文字匹配推翻AI的语义判断。规划存在时优先恢复访谈或编辑步骤、摘要、消息、提案和草稿。新进程首次读取项目时仅清理旧活动请求，不自动重发；正常读取保留当前活动任务。浏览器预览使用独立IndexedDB，真实CLI仅桌面可用。同一文件的可选`generationDraft`独立保存冻结总纲、宿主路线ID、各章已校验前缀和背景/原路线绑定，限2MiB；旧无此字段项目兼容读取。进度写入绑定活动请求和基础修订，使用独立进度修订、只增前缀，不改变任务基础修订；两路批次串行落盘防止丢失更新。最终路线提交与清除进度同一次原子写入，跨进程恢复只清理pending，保留续生草稿。
+
+规划问题的草稿与`acceptedSnapshot`分开持久化；逐题历史兼容读取；重新回答使用`restartIntakeFrom`原子清除所选题及之后的快照、证据、消息、总结和采用事件，保留之前答案，并重映射保留题的消息起点；保留题的未采用总结撤去旧一致性凭据，已知未解问题继续阻塞。整轮重新采集清除五项内容。两者均递增epoch，保留已生成路线直到新结果成功。`answerEvents`记录用户采用跨题建议，字段证据可引用真实采用事件；旧消息证据和revision0快照兼容读取。`consistency`保存结构化复核项、策略版本、epoch、规范化事实哈希及改动意图依据；任务提交检查请求ID、修订、epoch与哈希。持久化仍使用规划v1的可选扩展，不重置旧项目，旧策略记录可读但不得作为当前生成凭据。
+
+章节草稿允许未完成内容；正式确认必须通过完整v2路线校验，仅记录确认修订。AI编辑先存提案，用户采用后覆盖草稿；手动保存与提案采用保留单步撤销。新导入替换已有稿须明确确认和预期修订，普通重开不重新覆盖。v1源完整保留并升级为阶段目标待填写的v2草稿。当前不建立地图、学习实例或完成进度。
+
+`packages/domain/route-validation.mjs` 读取同一 [路线契约](../contracts/route.schema.json)，供前端及打包后的 JavaScriptCore 校验器共用。只接受 UTF-8 JSON，最多1MiB、16层、512个小章节；检查版本、未知字段、重复JSON键、Unicode、ID、目标引用和依赖DAG。文件内容为数据，不执行脚本、不下载资料、不发给智能体或云端。
+
+原生文件选择器仅选择JSON。校验后分配绑定项目的10分钟不透明预览凭据；保存仅接收凭据和预期版本，网页不能提交文件路径或替换已校验内容。取消、超时或退出不覆盖原草稿。用户确认后保存路线草稿，保留导入源文件；本增量不建立学习实例、地图或完成进度，后续采用流程另行提交。
 
 ## 同步边界（后续）
 

@@ -1,0 +1,49 @@
+{
+  "name": "lessons-qualitative",
+  "task": "lessons",
+  "input": {
+    "locale": "zh-CN",
+    "confirmedBackground": {
+      "goal": "在产品需求讨论中独立澄清诉求与约束",
+      "purpose": "工作会议；不改变原始需求含义",
+      "baseline": "做过产品访谈",
+      "time": "每次一小时",
+      "constraints": "无额外限制"
+    },
+    "requestedLessons": [
+      {
+        "ref": "L4",
+        "title": "需求澄清"
+      }
+    ],
+    "availablePrerequisites": []
+  },
+  "response": {
+    "status": "ok",
+    "reply": "请核对结果。",
+    "result": {
+      "nodes": [
+        {
+          "ref": "L4",
+          "objectives": [
+            "在给定需求澄清情境中，区分诉求与约束，说明仍待确认的问题及下一步。"
+          ],
+          "prerequisites": [],
+          "estimatedMinutes": 45,
+          "activities": [
+            "比较两份需求澄清示例；独立改写另一份含糊需求；按问题是否可回答复核。"
+          ],
+          "assessment": {
+            "task": "提交需求澄清记录",
+            "passCriteria": [
+              "区分已知诉求、约束与未知条件；每个追问对应一个影响方案的具体缺口。"
+            ],
+            "mode": "qualitative",
+            "evaluatorPrompt": "检查用户提供的原需求与澄清记录。按诉求忠实度、约束区分、问题可回答性评判；缺原需求则证据不足。存在改变原意或未指出关键缺口时要求修改，并给出对应位置；不要仅凭语气流畅判通过。"
+          }
+        }
+      ]
+    },
+    "missing": []
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "name": "consistency-history-and-paraphrase",
+  "task": "consistency",
+  "input": {
+    "locale": "en",
+    "acceptedAnswers": {
+      "goal": {
+        "summary": "Train a character-level language model.",
+        "fields": {
+          "topic": "Character-level language models",
+          "outcome": "Train on my text and explain generated samples"
+        }
+      },
+      "purpose": {
+        "summary": "Explore text generation.",
+        "fields": {
+          "context": "Personal experiments",
+          "criteria": "Show generated samples and explain observed training behavior"
+        }
+      },
+      "baseline": {
+        "summary": "Previously trained a small image classifier.",
+        "fields": {
+          "experience": "Trained an image classifier with guidance"
+        }
+      },
+      "time": {
+        "summary": "Five hours each week, one hour per session.",
+        "fields": {
+          "weekly": "Five hours",
+          "session": "One hour"
+        }
+      },
+      "constraints": {
+        "summary": "A laptop and small text data; no hard deadline.",
+        "fields": {
+          "conditions": "Laptop and small text data",
+          "scope": "Small local examples"
+        }
+      }
+    },
+    "anchorQuestionId": "goal"
+  },
+  "response": {
+    "status": "ok",
+    "reply": "These answers are compatible. The earlier image-classification experience remains your starting history.",
+    "result": {
+      "status": "consistent",
+      "issues": []
+    },
+    "missing": []
+  }
+}

@@ -32,3 +32,7 @@
 | WorkBuddy内置CLI真实请求 | 2026-10-27 | 默认启动缺少桌面凭据密钥、账户401；官方进程内认证后两轮真实回复通过，跨进程恢复未通过 | [结果](agent-access/2026-10-27-workbuddy-builtin-cli.md) |
 | CodeBuddy独立CLI | 2026-10-27 | 官方npm 2.177.0国内站真实回复、两轮上下文和登录进程退出后的新进程认证复用通过 | [结果](agent-access/2026-10-27-codebuddy-code.md) |
 | CodeBuddy替换与一键安装 | 2026-10-27 | App替换WorkBuddy并移除TRAE；托管安装、认证保持、两轮真实回复与取消保护验证 | [结果](agent-access/2026-10-27-codebuddy-integration.md) |
+| CLI项目工作目录 | 2026-10-27 | 原生项目ID解析、Codex显式cd、Claude/CodeBuddy进程cwd与运行数据分离；合成执行验证 | [结果](agent-access/2026-10-27-project-workspace.md) |
+| 学习计划与信息采集 | 2026-10-29 | 成果与证据对齐、具体先备表现、真实预算及表现校准；渐进采集，不设万能课时或复习常数，产品效果待实测 | [结果](learning-plan/2026-10-29.md) |
+| 统一内置提示词与跨智能体规划 | 2026-11-04 | 提示词同源、统一任务/示例/自检；最少通用编排与校验支撑，候选包仅离线验证 | [结果](unified-planning/2026-11-04.md) |
+| 规划回答修改与跨题一致性 | 2026-11-04 | 同次语义检查、定向复核、显式建议采用与版本门禁；三协议回放及CodeBuddy两模型合成背景实测 | [结果](unified-planning/2026-11-04-answer-consistency.md) |

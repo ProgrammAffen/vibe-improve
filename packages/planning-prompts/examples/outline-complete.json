@@ -1,0 +1,53 @@
+{
+  "name": "outline-complete",
+  "task": "outline",
+  "input": {
+    "locale": "zh-CN",
+    "confirmedBackground": {
+      "goal": "用 Python 清洗销售数据并解释趋势与异常",
+      "purpose": "周会使用；结果能与已核对的汇总表一致并解释异常；允许查文档",
+      "baseline": "会基本 Python 语法，未用过表格分析工具",
+      "time": "每周四小时，每次约一小时，无硬截止日",
+      "constraints": "普通电脑与小型CSV可用；不学机器学习和部署"
+    },
+    "limits": {
+      "chapters": 24,
+      "lessonsPerChapter": 64,
+      "totalLessons": 512
+    }
+  },
+  "response": {
+    "status": "ok",
+    "reply": "请核对结果。",
+    "result": {
+      "title": "用 Python 分析销售数据",
+      "chapters": [
+        {
+          "title": "表格读取与数据类型",
+          "stageGoal": "能读取销售CSV并区分文本和数值列，为清洗建立可检查的数据表。",
+          "lessons": [
+            {
+              "title": "读取CSV与核对列类型",
+              "focus": "读取表格、辨认列类型，并把错误的金额文本定位到行。"
+            }
+          ]
+        },
+        {
+          "title": "清洗与分组分析",
+          "stageGoal": "能识别缺失和无效金额，按产品分组汇总，解释清洗选择怎样影响结果。",
+          "lessons": [
+            {
+              "title": "缺失值与金额转换",
+              "focus": "区分缺失与无效金额，按明确策略清洗并记录影响。"
+            },
+            {
+              "title": "分组汇总与结果解释",
+              "focus": "计算各产品销售额，用手算样例核对并解释异常。"
+            }
+          ]
+        }
+      ]
+    },
+    "missing": []
+  }
+}

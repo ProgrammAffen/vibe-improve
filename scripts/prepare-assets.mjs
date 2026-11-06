@@ -19,7 +19,9 @@ const files = [
   'images/project-grassland-scene-v1.png', 'images/project-creation-camp-scene-v1.png',
   'images/project-grassland-scene-v2.png', 'images/project-create-blackboard-scene-v1.png',
   'images/project-panel-blank-v1.png', 'images/hamster-traveler-v1.png',
-  'images/agent-selection-camp-blank-v1.png', 'images/agent-codex.png', 'images/agent-claude-code.png', 'images/agent-qoder.png', 'images/agent-codebuddy.svg', 'images/agent-openclaw.svg', 'images/agent-hermes.png',
+  'images/agent-selection-camp-blank-v3.png', 'images/agent-codex.png', 'images/agent-claude-code.png', 'images/agent-qoder.png', 'images/agent-codebuddy.svg', 'images/agent-openclaw.svg', 'images/agent-hermes.png',
+  'images/route-grassland-base-v2.png', 'images/route-stone-create-v1.png', 'images/route-stone-import-v1.png', 'images/route-local-folder-v1.png',
+  'images/planning-library-blank-v1.png', 'images/route-editor-brown-blank-v1.png', 'images/route-editor-scroll-cutout-v2.png',
   'fonts/SourceHanSansCN-Bold.otf', 'licenses/SourceHanSans-LICENSE.txt',
 ];
 for (const file of files) {

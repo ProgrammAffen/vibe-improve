@@ -3,6 +3,7 @@ import {Bot, ChevronDown, Film, Globe2, Settings, SlidersHorizontal, UserRound, 
 import {translate, type Language} from '../i18n';
 import BackHomeButton from './BackHomeButton';
 import GameButton from './GameButton';
+import GameToggle from './GameToggle';
 import './settings.css';
 
 const ASSET = import.meta.env.BASE_URL + 'assets/images/';
@@ -79,7 +80,7 @@ function SettingRow({item, language, id}: {item: SettingsItem; language: Languag
     <div className="camp-row-label"><Icon aria-hidden="true" /><label id={`${id}-label`} htmlFor={item.kind === 'select' || item.kind === 'range' ? id : undefined}>{label}</label></div>
     <div className="camp-row-control">
       {item.kind === 'select' && <div className="camp-select"><Plate kind="neutral" /><span className="camp-select-value" aria-hidden="true">{item.options.find(option => option.value === item.value)?.label}</span><select id={id} value={item.value} disabled={item.disabled} onChange={event => item.onChange(event.target.value)}>{item.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select><ChevronDown aria-hidden="true" /></div>}
-      {item.kind === 'switch' && <button type="button" className="camp-switch" role="switch" aria-labelledby={`${id}-label`} aria-checked={item.value} disabled={item.disabled} onClick={() => item.onChange(!item.value)}><span className={`camp-switch-track ${item.value ? 'is-on' : ''}`} aria-hidden="true"><Plate kind={item.value ? 'selected' : 'neutral'} /><span className="camp-switch-thumb"><Plate kind="thumb" /></span></span><span className="camp-switch-value">{translate(language, item.value ? '开启' : '关闭', item.value ? 'On' : 'Off')}</span></button>}
+      {item.kind === 'switch' && <GameToggle label={label} checked={item.value} disabled={item.disabled} onChange={item.onChange}/>}
       {item.kind === 'range' && <div className="camp-volume"><input id={id} type="range" min="0" max="100" value={item.value} disabled={item.disabled} onChange={event => item.onChange(Number(event.target.value))} /><output htmlFor={id}>{item.value}%</output></div>}
       {item.kind === 'text' && <span className="camp-account-name">{item.value}</span>}
     </div>

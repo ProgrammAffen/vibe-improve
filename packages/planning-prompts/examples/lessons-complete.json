@@ -1,0 +1,78 @@
+{
+  "name": "lessons-complete",
+  "task": "lessons",
+  "input": {
+    "locale": "zh-CN",
+    "confirmedBackground": {
+      "goal": "用 Python 清洗销售数据并解释趋势与异常",
+      "purpose": "周会使用；结果能与已核对的汇总表一致并解释异常；允许查文档",
+      "baseline": "会基本 Python 语法，未用过表格分析工具",
+      "time": "每周四小时，每次约一小时，无硬截止日",
+      "constraints": "普通电脑与小型CSV可用；不学机器学习和部署"
+    },
+    "requestedLessons": [
+      {
+        "ref": "L1",
+        "title": "读取CSV与核对列类型"
+      },
+      {
+        "ref": "L2",
+        "title": "缺失值与金额转换"
+      },
+      {
+        "ref": "L3",
+        "title": "分组汇总与结果解释"
+      }
+    ],
+    "availablePrerequisites": []
+  },
+  "response": {
+    "status": "ok",
+    "reply": "请核对结果。",
+    "result": {
+      "nodes": [
+        {
+          "ref": "L1",
+          "objectives": [
+            "给定小型销售CSV，独立读取表格并指出金额列中导致字符串类型的具体值。"
+          ],
+          "prerequisites": [],
+          "estimatedMinutes": 45,
+          "activities": [
+            "观察一份包含金额文本的CSV；读取并核对列类型；独立定位异常行并解释。"
+          ],
+          "assessment": null
+        },
+        {
+          "ref": "L2",
+          "objectives": [
+            "区分空金额与无效金额，按选定策略清洗并说明被排除的行。"
+          ],
+          "prerequisites": [
+            "L1"
+          ],
+          "estimatedMinutes": 45,
+          "activities": [
+            "比较空值与错误文本的样例，跟随示例转换金额，再独立清洗另一组数据并核对影响。"
+          ],
+          "assessment": null
+        },
+        {
+          "ref": "L3",
+          "objectives": [
+            "按产品汇总销售额，与给定手算样例一致，并解释一个异常产品的结果。"
+          ],
+          "prerequisites": [
+            "L2"
+          ],
+          "estimatedMinutes": 45,
+          "activities": [
+            "跟随两产品分组示例，再独立汇总另一组数据；用手算结果检查并修正。"
+          ],
+          "assessment": null
+        }
+      ]
+    },
+    "missing": []
+  }
+}

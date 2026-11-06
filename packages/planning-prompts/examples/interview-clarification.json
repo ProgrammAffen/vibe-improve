@@ -1,0 +1,30 @@
+{
+  "name": "interview-clarification",
+  "task": "interview",
+  "input": {
+    "locale": "zh-CN",
+    "currentQuestion": "goal",
+    "messages": [
+      {
+        "ref": "U1",
+        "role": "user",
+        "text": "我想提升自己"
+      }
+    ]
+  },
+  "response": {
+    "status": "ok",
+    "reply": "想先解决哪件具体工作？比如整理报表，或分析销售变化。",
+    "result": {
+      "questionId": "goal",
+      "complete": false,
+      "summary": "",
+      "fields": {},
+      "evidence": [],
+      "unresolved": [
+        "希望独立完成什么任务？"
+      ]
+    },
+    "missing": []
+  }
+}

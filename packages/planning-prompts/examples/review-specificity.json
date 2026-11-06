@@ -1,0 +1,48 @@
+{
+  "name": "review-specificity",
+  "task": "review",
+  "input": {
+    "locale": "zh-CN",
+    "confirmedBackground": {
+      "goal": "用 Python 清洗销售数据并解释趋势与异常",
+      "purpose": "周会使用；结果能与已核对的汇总表一致并解释异常；允许查文档",
+      "baseline": "会基本 Python 语法，未用过表格分析工具",
+      "time": "每周四小时，每次约一小时，无硬截止日",
+      "constraints": "普通电脑与小型CSV可用；不学机器学习和部署"
+    },
+    "knownRefs": [
+      "L1"
+    ],
+    "candidate": [
+      {
+        "ref": "L1",
+        "title": "读取CSV",
+        "objectives": [
+          "掌握基础"
+        ],
+        "activities": [
+          "阅读材料"
+        ]
+      }
+    ]
+  },
+  "response": {
+    "status": "ok",
+    "reply": "请核对结果。",
+    "result": {
+      "ready": false,
+      "issues": [
+        {
+          "code": "specificity",
+          "targetRefs": [
+            "L1"
+          ],
+          "message": "目标只写掌握基础，无法知道具体要会什么。",
+          "fixHint": "写出要处理的具体数据、动作和可检查表现。",
+          "blocking": true
+        }
+      ]
+    },
+    "missing": []
+  }
+}

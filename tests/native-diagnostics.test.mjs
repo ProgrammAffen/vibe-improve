@@ -51,6 +51,54 @@ let detailedText = try String(contentsOf: first, encoding: .utf8)
 check(detailedText.contains("credentials_rejected"))
 check(detailedText.contains("providerRequestId"))
 check(!detailedText.contains("SENSITIVE"))
+let planningTrace="9749be68-9784-482f-8d6d-7efbc72af76a"
+log.record("native.planning.failed",level:"warn",resultCode:"PLANNING_AGENT_TIMEOUT",diagnostic:["traceId":planningTrace,"provider":"codebuddy","intent":"edit","stage":"total_timeout","durationMs":1800123,"receivedCharacters":125,"reply":"SENSITIVE_REPLY","token":"SENSITIVE_TOKEN"])
+let planningExport=try JSONSerialization.jsonObject(with:log.exportData("{\\"entries\\":[]}")!) as! [String:Any]
+let planning=(planningExport["nativeEntries"] as! [[String:Any]]).last!
+check(planning["resultCode"] as? String=="PLANNING_AGENT_TIMEOUT" && planning["traceId"] as? String==planningTrace)
+check(planning["stage"] as? String=="total_timeout")
+check(planning["stage"] as? String=="total_timeout" && planning["provider"] as? String=="codebuddy" && planning["intent"] as? String=="edit")
+check(planning["durationMs"] as? Int==1800123 && planning["receivedCharacters"] as? Int==125)
+check(planning["reply"]==nil && planning["token"]==nil)
+var unsafePlanning=planning
+unsafePlanning["provider"]="SENSITIVE_PROVIDER";unsafePlanning["stage"]="SENSITIVE_STAGE";unsafePlanning["intent"]="SENSITIVE_INTENT";unsafePlanning["receivedCharacters"] = -1
+let cleanedPlanning=DiagnosticLog.sanitize(unsafePlanning,allowNative:true)!
+check(cleanedPlanning["provider"]==nil && cleanedPlanning["stage"]==nil && cleanedPlanning["intent"]==nil && cleanedPlanning["receivedCharacters"]==nil)
+check(DiagnosticLog.sanitize(planning)==nil)
+var businessOutcome=planning
+businessOutcome["resultCode"]="PLANNING_NEEDS_INPUT";businessOutcome["promptVersion"]="planning.1";businessOutcome["userReply"]="SENSITIVE_QUESTION"
+let businessSafe=DiagnosticLog.sanitize(businessOutcome,allowNative:true)!
+check(businessSafe["resultCode"] as? String=="PLANNING_NEEDS_INPUT" && businessSafe["promptVersion"] as? String=="planning.1")
+check(businessSafe["userReply"]==nil)
+businessOutcome["promptVersion"]="SENSITIVE_VERSION"
+check(DiagnosticLog.sanitize(businessOutcome,allowNative:true)?["promptVersion"]==nil)
+var rejectedPlanning=planning
+rejectedPlanning["validationIssues"]=[["path":"chapters.0.nodes.1.prerequisites","code":"dependencies","value":"SENSITIVE_DATA"],["path":"SENSITIVE_PATH","code":"invalid"],["path":"chapters..title","code":"invalid"],["path":"chapters.0.title","code":"SENSITIVE_CODE"]]
+rejectedPlanning["partialReply"]="SENSITIVE_PARTIAL"
+let rejectedSafe=DiagnosticLog.sanitize(rejectedPlanning,allowNative:true)!
+let issueList=rejectedSafe["validationIssues"] as! [[String:String]]
+check(issueList.count==1 && issueList[0]==["path":"chapters.0.nodes.1.prerequisites","code":"dependencies"])
+check(rejectedSafe["partialReply"]==nil)
+var badReference=planning
+badReference["resultCode"]="PLANNING_EVIDENCE_INVALID"
+badReference["validationIssues"]=[["path":"updates.0.evidence.0.proposalMessageId","code":"reference","value":"SENSITIVE_REFERENCE"],["path":"updates.SENSITIVE_ID.evidence","code":"reference"],["path":"updates.0.evidence.0.messageId","code":"SENSITIVE_REASON"]]
+let referenceSafe=DiagnosticLog.sanitize(badReference,allowNative:true)!
+check(referenceSafe["resultCode"] as? String=="PLANNING_EVIDENCE_INVALID")
+check(referenceSafe["validationIssues"] as? [[String:String]]==[["path":"updates.0.evidence.0.proposalMessageId","code":"reference"]])
+check(!String(describing:referenceSafe).contains("SENSITIVE"))
+var missingRoute=planning
+missingRoute["resultCode"]="PLANNING_AGENT_ROUTE_MISSING";missingRoute["validationIssues"]=[["path":"route","code":"required","value":"SENSITIVE_ROUTE"]]
+let missingSafe=DiagnosticLog.sanitize(missingRoute,allowNative:true)!
+check(missingSafe["resultCode"] as? String=="PLANNING_AGENT_ROUTE_MISSING")
+check(missingSafe["validationIssues"] as? [[String:String]]==[["path":"route","code":"required"]])
+missingRoute["resultCode"]="PLANNING_AGENT_ROUTE_ENCODING";missingRoute["validationIssues"]=[["path":"route","code":"invalid","value":"SENSITIVE_ROUTE"]]
+let encodingSafe=DiagnosticLog.sanitize(missingRoute,allowNative:true)!
+check(encodingSafe["resultCode"] as? String=="PLANNING_AGENT_ROUTE_ENCODING")
+check(encodingSafe["validationIssues"] as? [[String:String]]==[["path":"route","code":"invalid"]])
+missingRoute["completedChapters"]=3;missingRoute["chapterCount"]=8
+check(DiagnosticLog.sanitize(missingRoute,allowNative:true)?["completedChapters"] as? Int==3)
+missingRoute["completedChapters"]=9
+check(DiagnosticLog.sanitize(missingRoute,allowNative:true)?["completedChapters"]==nil)
 
 check(log.exportData(String(repeating: "X", count: 262_145)) == nil)
 check(log.exportData("{}") == nil)

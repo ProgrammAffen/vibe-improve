@@ -1,0 +1,50 @@
+{
+  "name": "edit-question",
+  "task": "edit",
+  "input": {
+    "locale": "en",
+    "routeDraft": {
+      "format": "vibe-improve.route",
+      "schemaVersion": 2,
+      "id": "route_example",
+      "revision": 1,
+      "title": "CSV sales analysis",
+      "locale": "en",
+      "sourceLanguage": "en",
+      "chapters": [
+        {
+          "id": "chapter_tables",
+          "title": "Read tables",
+          "stageGoal": "Read a sales CSV and explain the types of its columns.",
+          "nodes": [
+            {
+              "id": "lesson_csv",
+              "title": "Read CSV columns",
+              "objectives": [
+                {
+                  "id": "objective_types",
+                  "description": "Read a given sales CSV and identify the amount column type without assistance."
+                }
+              ],
+              "prerequisites": [],
+              "estimatedMinutes": 30,
+              "activities": [
+                "Read a small CSV example, inspect column types, then independently locate an amount stored as text."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "messages": [
+      {
+        "role": "user",
+        "text": "What will I learn in the first chapter?"
+      }
+    ]
+  },
+  "response": {
+    "reply": "You will read a sales CSV, inspect column types, and locate an amount that was stored as text.",
+    "route": null
+  }
+}

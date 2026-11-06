@@ -1,0 +1,92 @@
+{
+  "name": "interview-consistency-paraphrase",
+  "task": "interview",
+  "input": {
+    "locale": "en",
+    "currentQuestion": "goal",
+    "acceptedAnswers": {
+      "goal": {
+        "summary": "Train a character-level language model.",
+        "fields": {
+          "topic": "Character-level language models",
+          "outcome": "Train on my text and explain generated samples"
+        }
+      },
+      "purpose": {
+        "summary": "Explore text generation.",
+        "fields": {
+          "context": "Personal experiments",
+          "criteria": "Show generated samples and explain observed training behavior"
+        }
+      },
+      "baseline": {
+        "summary": "Previously trained a small image classifier.",
+        "fields": {
+          "experience": "Trained an image classifier with guidance"
+        }
+      },
+      "time": {
+        "summary": "Five hours each week, one hour per session.",
+        "fields": {
+          "weekly": "Five hours",
+          "session": "One hour"
+        }
+      },
+      "constraints": {
+        "summary": "A laptop and small text data; no hard deadline.",
+        "fields": {
+          "conditions": "Laptop and small text data",
+          "scope": "Small local examples"
+        }
+      }
+    },
+    "messages": [
+      {
+        "ref": "U1",
+        "role": "user",
+        "text": "The same goal: train a tiny model on my text to predict the next character and explain the generated samples."
+      }
+    ],
+    "acceptedAnswer": {
+      "summary": "Train a character-level language model.",
+      "fields": {
+        "topic": "Character-level language models",
+        "outcome": "Train on my text and explain generated samples"
+      }
+    },
+    "currentFields": {}
+  },
+  "response": {
+    "status": "ok",
+    "reply": "Please review this reworded goal; the other adopted answers remain compatible.",
+    "result": {
+      "questionId": "goal",
+      "complete": true,
+      "summary": "Train a character-level language model.",
+      "fields": {
+        "topic": "Character-level language models",
+        "outcome": "Train on my text and explain generated samples"
+      },
+      "evidence": [
+        {
+          "field": "topic",
+          "messageRef": "U1",
+          "proposalRef": null,
+          "quote": "The user explicitly chose the new text-generation goal."
+        },
+        {
+          "field": "outcome",
+          "messageRef": "U1",
+          "proposalRef": null,
+          "quote": "The user explicitly chose the new text-generation goal."
+        }
+      ],
+      "unresolved": [],
+      "consistency": {
+        "status": "consistent",
+        "issues": []
+      }
+    },
+    "missing": []
+  }
+}

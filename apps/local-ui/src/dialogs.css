@@ -82,3 +82,6 @@
 .stone-dialog .license-redeem-form .confirmation-actions{margin-top:8px}
 .stone-dialog .redeem-current-expiry{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px 18px;margin:0;color:#66513a;font-size:16px;line-height:1.6}
 .stone-dialog .redeem-current-expiry dd{margin:0;overflow-wrap:anywhere}
+
+.stone-dialog *{scrollbar-width:none}
+.stone-dialog *::-webkit-scrollbar{display:none}
