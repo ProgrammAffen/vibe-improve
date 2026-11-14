@@ -30,7 +30,11 @@
           "quote": "The user explicitly chose a flexible arrangement."
         }
       ],
-      "unresolved": []
+      "unresolved": [],
+      "consistency": {
+        "status": "consistent",
+        "issues": []
+      }
     },
     "missing": []
   }

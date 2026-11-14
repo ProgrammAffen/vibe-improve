@@ -1,0 +1,47 @@
+{
+  "name": "interview-beginner-baseline",
+  "task": "interview",
+  "input": {
+    "locale": "zh-CN",
+    "currentQuestion": "baseline",
+    "questionIds": [
+      "goal",
+      "purpose",
+      "baseline",
+      "time"
+    ],
+    "messages": [
+      {
+        "ref": "U1",
+        "role": "user",
+        "text": "我以前没做过销售报表。"
+      }
+    ]
+  },
+  "response": {
+    "status": "ok",
+    "reply": "之前没有做过销售报表。是否确认该回答？",
+    "result": {
+      "questionId": "baseline",
+      "complete": true,
+      "summary": "之前没有做过销售报表。",
+      "fields": {
+        "experience": "未做过销售报表"
+      },
+      "evidence": [
+        {
+          "field": "experience",
+          "messageRef": "U1",
+          "proposalRef": null,
+          "quote": "用户明确说未做过目标任务。"
+        }
+      ],
+      "unresolved": [],
+      "consistency": {
+        "status": "consistent",
+        "issues": []
+      }
+    },
+    "missing": []
+  }
+}

@@ -31,7 +31,7 @@ final class PlanningCoordinator {
             catch PlanningAgentError.invalid{try clean(id,["id":running.jobID,"state":"failed"])}
         }
         if let saved=try store.read(projectID:id),saved["importedOriginal"] != nil,(try routes.read(projectID:id))["routeDraft"] == nil {
-            _ = try store.removeImportedRoute(projectID:id,expectedRevision:revision(saved["revision"]))
+            try store.reconcileMissingImport(projectID:id,expectedRevision:revision(saved["revision"]))
         }
         switch action {
         case "planning.import.remove":
@@ -41,8 +41,13 @@ final class PlanningCoordinator {
             else{guard value["expectedPlanningRevision"] is NSNull else{throw PlanningError.conflict}}
             let originalID=(saved?["importedOriginal"] as? [String:Any])?["id"] as? String
             let currentID=(saved?["routeDraft"] as? [String:Any])?["id"] as? String
-            _ = try routes.removeImport(projectID:id,expectedRevision:routeRevision,preserveCreated:currentID != nil && currentID != originalID)
-            if let saved{return try store.removeImportedRoute(projectID:id,expectedRevision:revision(saved["revision"]))}
+            let removePreparation = {
+                _ = try self.routes.removeImport(projectID:id,expectedRevision:routeRevision,preserveCreated:currentID != nil && currentID != originalID)
+            }
+            if let saved {
+                return try store.removeImportedRoute(projectID:id,expectedRevision:revision(saved["revision"]),beforeCommit:removePreparation)
+            }
+            try removePreparation()
             return NSNull()
         case "planning.models":
             guard Set(value.keys)==["projectId"] || Set(value.keys)==["projectId","refresh"],value["refresh"]==nil || value["refresh"] is Bool else{throw PlanningError.invalid};return try runner.models(projectID:id,refresh:value["refresh"] as? Bool ?? false)
@@ -54,6 +59,32 @@ final class PlanningCoordinator {
             return try store.setAgentOptions(projectID:id,options:options,expectedRevision:expected)
         case "planning.read":
             try keys(value,["projectId"]);return try store.read(projectID:id) ?? NSNull()
+        case "planning.learning.read", "planning.learning.start", "planning.learning.complete", "planning.learning.skip", "planning.learning.reset":
+            var expected: Set<String> = ["projectId", "routeId", "routeRevision"]
+            let change: PlanningStore.LearningChange?
+            switch action {
+            case "planning.learning.read": change = nil
+            case "planning.learning.reset":
+                expected.insert("progressRevision")
+                change = .reset
+            default:
+                expected.insert("nodeId")
+                expected.insert("progressRevision")
+                guard let nodeID = value["nodeId"] as? String else { throw PlanningError.invalid }
+                if action == "planning.learning.start" {
+                    change = .start(nodeID)
+                } else if action == "planning.learning.complete" {
+                    change = .complete(nodeID)
+                } else {
+                    expected.insert("reason")
+                    guard let reason = value["reason"] as? String else { throw PlanningError.invalid }
+                    change = .skip(nodeID, reason: reason)
+                }
+            }
+            try keys(value, expected)
+            guard let routeID = value["routeId"] as? String else { throw PlanningError.invalid }
+            return try store.learningProgress(projectID: id, routeID: routeID, revision: revision(value["routeRevision"]),
+                change: change, expectedProgressRevision: value["progressRevision"].map { try revision($0) })
         case "planning.enter":
             guard Set(value.keys)==["projectId","locale","mode"] || Set(value.keys)==["projectId","locale","mode","expectedRevision"],let locale=value["locale"] as? String,["zh-CN","en"].contains(locale),let mode=value["mode"] as? String,["ai","manual","import"].contains(mode) else{throw PlanningError.invalid}
             let routeState=try routes.read(projectID:id)
@@ -82,6 +113,7 @@ final class PlanningCoordinator {
             let requestID=UUID().uuidString.lowercased(),state:[String:Any]
             if intent=="generate"{guard value["text"]==nil else{throw PlanningError.invalid};state=try store.startGeneration(projectID:id,requestID:requestID,expectedRevision:expected,replaceExisting:value["replaceExisting"] as? Bool ?? false,generationMode:value["generationMode"] as? String ?? "new")}
             else if intent=="consistency"{guard value["text"]==nil else{throw PlanningError.invalid};state=try store.beginConsistencyCheck(projectID:id,requestID:requestID,expectedRevision:expected)}
+            else if intent=="interview",value["text"]==nil{state=try store.beginInterviewPrefill(projectID:id,requestID:requestID,expectedRevision:expected)}
             else{guard let text=value["text"] as? String,!text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,text.utf8.count<=32_000 else{throw PlanningError.invalid};state=try store.appendUser(projectID:id,text:text,messageID:UUID().uuidString.lowercased(),requestID:requestID,expectedRevision:expected,target:value["target"] as? [String:Any],mentions:value["mentions"] as? [[String:Any]])}
             guard let pending=state["pending"] as? [String:Any] else{throw PlanningError.invalid}
             let base=try revision(pending["baseRevision"])
@@ -100,7 +132,10 @@ final class PlanningCoordinator {
                     case "generate":
                         if result["generationBlocked"] as? Bool==true,let consistency=result["consistency"] as? [String:Any],consistency["status"] as? String=="requires_review",let reply=result["reply"] as? String {
                             applied=try store.applyConsistencyCheck(projectID:id,result:["reply":reply,"consistency":consistency],requestID:requestID,baseRevision:base)
-                        }else{guard let route=result["route"] as? [String:Any] else{throw PlanningError.response};applied=try store.applyGenerated(projectID:id,route:route,requestID:requestID,baseRevision:base)}
+                        }else{
+                            guard let route=result["route"] as? [String:Any] else{throw PlanningError.response}
+                            applied=try store.applyGenerated(projectID:id,route:route,requestID:requestID,baseRevision:base,revisedLessons:result["revisedLessons"] as? [String] ?? [],renamedLessons:result["renamedLessons"] as? [String] ?? [])
+                        }
                     default:applied=try store.applyEdit(projectID:id,result:result,requestID:requestID,baseRevision:base)
                     }}catch PlanningError.evidence{
                         let details=(try? store.agentInterviewDiagnostics(projectID:id,result:result)) ?? [:]

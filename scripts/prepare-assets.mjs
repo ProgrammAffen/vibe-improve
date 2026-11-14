@@ -3,6 +3,11 @@ import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+const {assets} = JSON.parse(await readFile(join(root, 'assets/manifest.json'), 'utf8'));
+const mapFiles = assets
+  .filter(asset => asset.kind === 'images' && asset.id.startsWith('map-'))
+  .map(asset => asset.path.slice('assets/'.length));
+
 await rm(join(root, 'tmp/build/public/assets'), {recursive: true, force: true});
 const files = [
   'images/home-volcano-background-1920x1080.png', 'video/home-volcano-loop-1080p-v1.mp4',
@@ -23,6 +28,7 @@ const files = [
   'images/route-grassland-base-v2.png', 'images/route-stone-create-v1.png', 'images/route-stone-import-v1.png', 'images/route-local-folder-v1.png',
   'images/planning-library-blank-v1.png', 'images/route-editor-brown-blank-v1.png', 'images/route-editor-scroll-cutout-v2.png',
   'fonts/SourceHanSansCN-Bold.otf', 'licenses/SourceHanSans-LICENSE.txt',
+  ...mapFiles,
 ];
 for (const file of files) {
   const output = join(root, 'tmp/build/public/assets', file);

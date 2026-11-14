@@ -1,10 +1,12 @@
 import {parseRoute,validateRoute,MAX_ROUTE_BYTES,type RouteDocument} from '../../../../packages/domain/route-validation.mjs';
+import {assertStudiedRouteUnchanged} from '../../../../packages/domain/planning.mjs';
 import type {Language} from '../i18n';
+import {browserProjectTransaction, withProjectLock} from '../planning/browser-store';
 
 export type RouteDraft={route:RouteDocument;fileName:string};
 export type RouteStage=RouteDraft&{importId:string};
 export type RoutePreparation={schemaVersion:1;projectId:string;revision:number;agentConfirmed:boolean;source:'create'|'import'|null;aiAssisted:boolean;routeDraft?:RouteDraft};
-const codes=['ROUTE_INVALID','ROUTE_INVALID_JSON','ROUTE_DUPLICATE_KEYS','ROUTE_DEPTH_LIMIT','ROUTE_TOO_LARGE','ROUTE_VERSION_UNSUPPORTED','ROUTE_TOO_MANY_NODES','ROUTE_INVALID_UTF8','ROUTE_READ_FAILED','ROUTE_STORAGE_UNAVAILABLE','ROUTE_CONFLICT','ROUTE_PROJECT_UNAVAILABLE','ROUTE_IMPORT_EXPIRED'] as const;
+const codes=['ROUTE_INVALID','ROUTE_INVALID_JSON','ROUTE_DUPLICATE_KEYS','ROUTE_DEPTH_LIMIT','ROUTE_TOO_LARGE','ROUTE_VERSION_UNSUPPORTED','ROUTE_TOO_MANY_NODES','ROUTE_INVALID_UTF8','ROUTE_READ_FAILED','ROUTE_STORAGE_UNAVAILABLE','ROUTE_CONFLICT','ROUTE_PROJECT_UNAVAILABLE','ROUTE_IMPORT_EXPIRED','PLANNING_STUDIED_LESSON_LOCKED'] as const;
 export function routeCode(cause:unknown){const message=cause instanceof Error?cause.message:String(cause);return codes.find(code=>message===code)??'ROUTE_STORAGE_UNAVAILABLE'}
 export function routeMessage(cause:unknown,language:Language){
   const labels:Record<typeof codes[number],[string,string]>={
@@ -21,6 +23,7 @@ export function routeMessage(cause:unknown,language:Language){
     ROUTE_CONFLICT:['项目已更新，请重新打开。','This project changed. Open it again.'],
     ROUTE_PROJECT_UNAVAILABLE:['项目目录不可用，请重新选择。','The project folder is unavailable. Choose it again.'],
     ROUTE_IMPORT_EXPIRED:['文件预览已过期，请重新选择。','The file preview expired. Choose the file again.'],
+    PLANNING_STUDIED_LESSON_LOCKED:['请在路线编辑页清空学习记录，再替换已学路线。','Clear learning records in the route editor before replacing a studied route.'],
   };return labels[routeCode(cause)][language==='en'?1:0];
 }
 const native=()=>window.vibeNative?.projects;
@@ -68,7 +71,12 @@ export const routeService={
     const id=state.projectId;projectId(id);
     if(native())return normalize(await request('route.import.save',{projectId:id,importId:value.importId,expectedRevision:state.revision}),id);
     const item=staged.get(value.importId);if(!item||item.projectId!==id||Date.now()-item.created>600_000)throw new Error('ROUTE_IMPORT_EXPIRED');
-    const result=await browserMutate(id,s=>{if(s.revision!==state.revision)throw new Error('ROUTE_CONFLICT');if(!s.agentConfirmed)throw new Error('ROUTE_INVALID');return{...s,source:'import',routeDraft:{route:item.value.route,fileName:item.value.fileName},revision:s.revision+1}});
+    const result=await withProjectLock(id,async()=>{
+      await browserProjectTransaction(id,({state:plan,progress})=>{
+        assertStudiedRouteUnchanged(plan?.routeDraft,undefined,progress.startedNodeIds);
+      });
+      return browserMutate(id,s=>{if(s.revision!==state.revision)throw new Error('ROUTE_CONFLICT');if(!s.agentConfirmed)throw new Error('ROUTE_INVALID');return{...s,source:'import',routeDraft:{route:item.value.route,fileName:item.value.fileName},revision:s.revision+1}});
+    });
     staged.delete(value.importId);return result;
   },
   removeImport:async(state:RoutePreparation,preserveCreated=false)=>{

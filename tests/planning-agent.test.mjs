@@ -51,7 +51,7 @@ def respond():
   assert '--json-schema' not in sys.argv
   if provider=='codebuddy':assert sys.argv[sys.argv.index('--tools')+1]==''
  assert 'learning-route planner' in system and 'CONTEXT_JSON_DATA:' not in system and 'Learn Python' not in system
- task='outline' if 'TASK: outline' in system else 'lessons' if 'TASK: lessons' in system else 'edit' if 'TASK: edit' in system else 'interview'
+ task='outline' if 'TASK: outline' in system else 'lessons' if 'TASK: lessons' in system else 'review' if 'TASK: review' in system else 'edit' if 'TASK: edit' in system else 'interview'
  if task=='interview':
   assert context['currentQuestion']=='goal' and context['messages'][0]['ref']=='U1'
   assert 'id' not in context['messages'][0] and 'questions' not in context
@@ -61,11 +61,31 @@ def respond():
   payload=json.dumps(envelope({'title':'Synthetic route','chapters':[{'title':'Concepts','stageGoal':'Explain and apply a small example.','lessons':[{'title':'First concept','focus':'Trace and apply the named concept in a small example.'}]}]},'Outline ready'))
  elif task=='lessons':
   payload=json.dumps(envelope({'nodes':[{'ref':lesson['ref'],'objectives':['Explain the named concept using a small independent example.'],'prerequisites':[],'estimatedMinutes':30,'activities':['Study the example, trace its operations, then attempt independently and correct discrepancies.'],'assessment':None} for lesson in context['requestedLessons']]},'Batch ready'))
- if mode in ['stream','stream-large','stream-idle','stream-heartbeat','stream-tools','stream-no-final','stream-activity','stream-deadline']:
-  emit({'type':'stream_event','event':{'type':'content_block_start','index':0,'content_block':{'type':'tool_use','name':'Bash'} if mode=='stream-tools' else {'type':'text'}}})
-  for i in range(80 if mode=='stream-activity' else 40 if mode=='stream-deadline' else 8 if mode!='stream-large' else 30):
+ elif task=='review':
+  payload=json.dumps(envelope({'ready':True,'issues':[]},'Practice is executable.'))
+ if mode in ['stream-long-frames','stream-over-limit-frame']:
+  if provider!='codex':emit({'type':'stream_event','event':{'type':'content_block_start','index':0,'content_block':{'type':'thinking'}}})
+  delta='路'*16000 if mode=='stream-long-frames' else 'x'*(1024*1024)
+  if provider=='codex':
+   event={'method':'item/reasoning/textDelta','params':{'threadId':'thread-1','turnId':'turn-1','itemId':'item-stream','delta':delta}}
+  else:
+   event={'type':'stream_event','event':{'type':'content_block_delta','index':0,'delta':{'type':'thinking_delta','thinking':delta}}}
+  frame=(json.dumps(event,ensure_ascii=False)+'\n').encode('utf-8')
+  count=740 if mode=='stream-long-frames' else 1
+  if mode=='stream-long-frames':assert len(frame)<64*1024 and count*len(frame)>32*1024*1024
+  else:assert len(frame)>1024*1024
+  for i in range(count):
+   sys.stdout.buffer.write(frame);sys.stdout.buffer.flush()
+   if count>1:time.sleep(.005)
+ if mode in ['stream','stream-large','stream-idle','stream-heartbeat','stream-tools','stream-no-final','stream-activity','stream-active','stream-thinking']:
+  if provider!='codex':emit({'type':'stream_event','event':{'type':'content_block_start','index':0,'content_block':{'type':'tool_use','name':'Bash'} if mode=='stream-tools' else {'type':'thinking' if mode=='stream-thinking' else 'text'}}})
+  for i in range(80 if mode=='stream-activity' else 16 if mode in ['stream-active','stream-thinking'] else 8 if mode!='stream-large' else 30):
    time.sleep(.005 if mode in ['stream-large','stream-activity'] else .06)
-   emit({'type':'system'} if mode=='stream-heartbeat' else {'type':'stream_event','event':{'type':'content_block_delta','index':0,'delta':{'type':'text_delta','text':'x'*(75000 if mode=='stream-large' else 5)}}})
+   if mode=='stream-heartbeat':emit({'type':'system'})
+   else:
+    thinking=mode=='stream-thinking';delta='x'*(75000 if mode=='stream-large' else 5)
+    if provider=='codex':emit({'method':'item/reasoning/textDelta' if thinking else 'item/agentMessage/delta','params':{'threadId':'thread-1','turnId':'turn-1','itemId':'item-stream','delta':delta}})
+    else:emit({'type':'stream_event','event':{'type':'content_block_delta','index':0,'delta':{'type':'thinking_delta' if thinking else 'text_delta','thinking' if thinking else 'text':delta}}})
    if mode=='stream-activity':emit({'type':'stream_event','event':{'type':'content_block_delta','index':0,'delta':{'type':'thinking_delta','thinking':'SENSITIVE_REASONING'}}})
    if mode=='stream-idle':time.sleep(1)
   if mode=='stream-no-final':sys.exit(0)
@@ -178,12 +198,12 @@ let generatedPrompt=try PlanningAgentPrompt.make(intent:"generate",context:scope
 let generatedData=try JSONSerialization.jsonObject(with:Data(generatedPrompt.components(separatedBy:"CONTEXT_JSON_DATA:").last!.utf8)) as! [String:Any]
 check(generatedData["messages"]==nil && generatedData["routeDraft"]==nil,"generation reused old chat or draft")
 
-func manager(_ mode:String,_ provider:String="codex",_ timeout:TimeInterval=2,_ idleTimeout:TimeInterval=180)throws->PlanningAgentManager {
+func manager(_ mode:String,_ provider:String="codex",_ idleTimeout:TimeInterval=2)throws->PlanningAgentManager {
  let launch=try AgentSessionLaunch(provider:provider,projectID:id,executable:URL(fileURLWithPath:"/usr/bin/python3"),arguments:[fixture,mode,provider]+(provider=="codebuddy" ? ["--tools",""]:[]),workspace:workspace,environment:ProcessInfo.processInfo.environment)
- return PlanningAgentManager(agents:agent,timeout:timeout,idleTimeout:idleTimeout,prepare:{_ in AgentSessionPreparation(projectID:id,provider:provider,launch:launch)})
+ return PlanningAgentManager(agents:agent,idleTimeout:idleTimeout,prepare:{_ in AgentSessionPreparation(projectID:id,provider:provider,launch:launch)})
 }
-func awaitJob(_ manager:PlanningAgentManager,_ job:String)throws->[String:Any] {
- let deadline=Date().addingTimeInterval(8)
+func awaitJob(_ manager:PlanningAgentManager,_ job:String,timeout:TimeInterval=8)throws->[String:Any] {
+ let deadline=Date().addingTimeInterval(timeout)
  while Date()<deadline {let value=try manager.state(projectID:id,jobID:job);if value["state"] as? String != "pending"{return value};Thread.sleep(forTimeInterval:0.01)}
  throw PlanningAgentError.timeout
 }
@@ -200,10 +220,7 @@ for provider in ["codex","claude-code","codebuddy"] {
   check(value["state"] as? String=="completed",provider+" chat "+String(describing:value));chat.shutdown()
  }
 }
-check(PlanningAgentManager.requestTimeout(provider:"codebuddy",intent:"edit")==600)
-check(PlanningAgentManager.requestTimeout(provider:"codebuddy",intent:"generate")==1800)
-check(PlanningAgentManager.requestTimeout(provider:"codebuddy",intent:"interview")==180)
-for provider in ["codex","claude-code","codebuddy"]{check(PlanningAgentManager.requestTimeout(provider:provider,intent:"edit")==600);check(PlanningAgentManager.requestTimeout(provider:provider,intent:"generate")==1800);check(PlanningAgentManager.requestTimeout(provider:provider,intent:"interview")==180)}
+check(PlanningAgentManager.outputIdleTimeout==180,"default silence window is not three minutes")
 for provider in ["codex","claude-code","codebuddy"] {
  for mode in ["preview","preview-failed","preview-cancel"]+(provider=="codebuddy" ? ["preview-reset-failed"]:[]) {
   let m=try manager(mode,provider,4);var calls=0
@@ -226,12 +243,12 @@ for provider in ["codex","claude-code","codebuddy"] {
   check(calls==(mode=="preview" ? 1:0));m.shutdown()
  }
 }
-for (mode,expected) in [("stream","completed"),("stream-activity","completed"),("stream-large","completed"),("stream-idle","PLANNING_AGENT_TIMEOUT"),("stream-heartbeat","PLANNING_AGENT_TIMEOUT"),("stream-tools","PLANNING_AGENT_PERMISSION_REQUIRED"),("stream-no-final","PLANNING_AGENT_FAILED")] {
- let m=try manager(mode,"codebuddy",3,0.2)
+for (mode,expected) in [("stream","completed"),("stream-activity","completed"),("stream-large","completed"),("stream-tools","PLANNING_AGENT_PERMISSION_REQUIRED"),("stream-no-final","PLANNING_AGENT_FAILED")] {
+ let m=try manager(mode,"codebuddy",0.3)
  let job=try m.begin(projectID:id,intent:"interview",context:context){_ in ["saved":true]}
  let value=try awaitJob(m,job["id"] as! String),diagnostic=value["diagnostic"] as! [String:Any]
  check((value["errorCode"] as? String ?? value["state"] as? String)==expected,mode+" "+String(describing:value))
- check(diagnostic["provider"] as? String=="codebuddy" && diagnostic["intent"] as? String=="interview");if mode=="stream-idle" || mode=="stream-heartbeat"{check(diagnostic["stage"] as? String=="idle_timeout","idle timeout not identified")}
+ check(diagnostic["provider"] as? String=="codebuddy" && diagnostic["intent"] as? String=="interview")
  check(diagnostic["traceId"] as? String==job["id"] as? String)
  if expected=="completed"{check((diagnostic["receivedCharacters"] as? Int ?? 0)>0)}
  if mode=="stream-activity"{let a=value["activity"] as! [String:Any],events=a["events"] as! [[String:Any]];check((a["thinkingCharacters"] as! Int)>0 && (a["outputCharacters"] as! Int)>0,"activity counters missing");check(events.count==60 && (events.last!["sequence"] as! Int)>60,"activity list not bounded");check(!String(describing:a).contains("SENSITIVE_REASONING"),"reasoning leaked into activity")}
@@ -263,9 +280,33 @@ for (mode,expected) in [("permission","PLANNING_AGENT_PERMISSION_REQUIRED"),("fo
  let m=try manager(mode,"codebuddy"),job=try m.begin(projectID:id,intent:"edit",context:context){_ in preconditionFailure("unsafe result accepted")}
  let final=try awaitJob(m,job["id"] as! String);check(final["errorCode"] as? String==expected,mode+" "+String(describing:final));m.shutdown()
 }
-let streamingDeadline=try manager("stream-deadline","codebuddy",1,3)
-let streamingJob=try streamingDeadline.begin(projectID:id,intent:"interview",context:context){_ in preconditionFailure("active stream bypassed total timeout")}
-let timedStream=try awaitJob(streamingDeadline,streamingJob["id"] as! String);check(timedStream["errorCode"] as? String=="PLANNING_AGENT_TIMEOUT");check((timedStream["diagnostic"] as? [String:Any])?["stage"] as? String=="total_timeout","active stream did not report total deadline");streamingDeadline.shutdown()
+for provider in ["codex","claude-code","codebuddy"] {
+ for mode in ["stream-active","stream-thinking","stream-idle","stream-heartbeat"] {
+  let m=try manager(mode,provider,0.3);var applied=false
+  let job=try m.begin(projectID:id,intent:"interview",context:context){_ in applied=true;return ["saved":true]}
+  let result=try awaitJob(m,job["id"] as! String),diagnostic=result["diagnostic"] as! [String:Any]
+  if mode=="stream-active" || mode=="stream-thinking" {
+   check(applied && result["state"] as? String=="completed",provider+" stopped active "+mode+": "+String(describing:result))
+   check((diagnostic["durationMs"] as! Int)>600,"the active response did not span multiple silence windows")
+  }else{
+   check(!applied && result["errorCode"] as? String=="PLANNING_AGENT_TIMEOUT" && diagnostic["stage"] as? String=="idle_timeout",provider+" did not time out on silence: "+String(describing:result))
+  }
+  m.shutdown()
+ }
+}
+for provider in ["codex","claude-code","codebuddy"] {
+ let active=try manager("stream-long-frames",provider,3)
+ let job=try active.begin(projectID:id,intent:"interview",context:context){_ in ["saved":true]}
+ let result=try awaitJob(active,job["id"] as! String,timeout:20),activity=result["activity"] as! [String:Any]
+ check(result["state"] as? String=="completed" && (result["result"] as? [String:Any])?["saved"] as? Bool==true,provider+" failed on long active output: "+String(describing:result))
+ check(activity["thinkingCharacters"] as? Int==740*16000,provider+" lost active frames")
+ check(!String(describing:activity).contains("路"),provider+" leaked reasoning text")
+ active.shutdown()
+ let oversized=try manager("stream-over-limit-frame",provider,3)
+ let tooLarge=try oversized.begin(projectID:id,intent:"interview",context:context){_ in preconditionFailure("oversized frame committed")}
+ check(try awaitJob(oversized,tooLarge["id"] as! String)["errorCode"] as? String=="PLANNING_AGENT_OUTPUT_TOO_LARGE",provider+" accepted an oversized frame")
+ oversized.shutdown()
+}
 for provider in ["codex","claude-code","codebuddy"] {
  let metadata=try manager("models",provider),catalog=try metadata.models(projectID:id),models=catalog["models"] as! [[String:Any]]
  check(models.count==1 && models[0]["id"] as? String=="synthetic-model" && models[0]["name"] as? String=="Synthetic" && models[0]["isDefault"] as? Bool==true,"catalog filtering")
@@ -316,7 +357,8 @@ Thread.sleep(forTimeInterval:0.8)
 check(try slow.state(projectID:id,jobID:pending["id"] as! String)["state"] as? String=="cancelled");check(cancelledCalls==0);slow.shutdown()
 let timed=try manager("slow","codex",0.1)
 let timedJob=try timed.begin(projectID:id,intent:"interview",context:context){_ in preconditionFailure("timeout cannot apply")}
-check(try awaitJob(timed,timedJob["id"] as! String)["errorCode"] as? String=="PLANNING_AGENT_TIMEOUT");Thread.sleep(forTimeInterval:0.7);timed.shutdown()
+let silent=try awaitJob(timed,timedJob["id"] as! String)
+check(silent["errorCode"] as? String=="PLANNING_AGENT_TIMEOUT" && (silent["diagnostic"] as? [String:Any])?["stage"] as? String=="idle_timeout","no first response did not time out as idle");Thread.sleep(forTimeInterval:0.7);timed.shutdown()
 let committing=try manager("success"),entered=DispatchSemaphore(value:0),release=DispatchSemaphore(value:0)
 let committingJob=try committing.begin(projectID:id,intent:"interview",context:context){_ in entered.signal();_ = release.wait(timeout:.now()+2);return ["revision":3]}
 check(entered.wait(timeout:.now()+4) == .success,"apply not entered")

@@ -57,8 +57,13 @@
 .stone-dialog .warning-icon{color:#9c5c15;fill:#efc75d}
 .stone-dialog .info-icon{color:#286488;fill:#c4d9e4}
 .stone-dialog .confirmation-actions{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:26px}
-.stone-dialog .confirmation-actions .game-button{flex:1 1 150px;max-width:100%;min-width:0;font-size:17px}
+.stone-dialog .confirmation-actions .game-button{flex:1 1 150px;max-inline-size:min(100%,270px);min-width:0;font-size:17px}
 .stone-dialog .confirmation-actions>.game-button:only-child{flex:0 1 270px}
+.learning-reset-dialog .learning-reset-counts{display:flex;flex-wrap:wrap;gap:6px 20px;margin:12px 0;padding:0;list-style:none;font-size:15px}
+.learning-reset-dialog .learning-reset-lessons{font-size:15px;margin-block:10px;overflow-wrap:anywhere}
+.learning-reset-dialog .learning-reset-lessons summary{cursor:pointer}
+.learning-reset-dialog .learning-reset-lessons ul{max-block-size:120px;overflow:auto;scrollbar-width:none;padding-inline-start:22px}
+.learning-reset-dialog .learning-reset-lessons ul::-webkit-scrollbar{display:none}
 
 @media(max-width:480px){
   .stone-dialog{--dialog-top:53px;--dialog-bottom:36px}

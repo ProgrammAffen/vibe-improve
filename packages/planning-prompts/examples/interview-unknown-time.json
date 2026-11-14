@@ -1,0 +1,20 @@
+{
+  "name": "interview-unknown-time",
+  "task": "interview",
+  "input": {
+    "locale": "zh-CN", "currentQuestion": "time",
+    "messages": [{"ref": "U1", "role": "user", "text": "最近轮班不固定，还不知道每周能花多少时间。"}]
+  },
+  "response": {
+    "status": "ok",
+    "reply": "目前轮班不固定，每周可用时间还不确定。我会先按先后顺序安排学习，暂不承诺完成日期，之后再根据实际投入调整节奏。是否确认这个安排？",
+    "result": {
+      "questionId": "time", "complete": true, "summary": "轮班不固定，每周学习时间待确定；暂不设完成日期，按实际投入调整节奏。",
+      "fields": {"schedule": "轮班不固定，每周可用学习时间尚不确定"},
+      "evidence": [{"field": "schedule", "messageRef": "U1", "proposalRef": null, "quote": "用户表示轮班不固定，尚不知道每周能投入多少时间。"}],
+      "unresolved": [],
+      "consistency": {"status": "consistent", "issues": []}
+    },
+    "missing": []
+  }
+}

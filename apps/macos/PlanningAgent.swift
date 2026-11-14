@@ -7,6 +7,18 @@ enum PlanningAgentError:String,Error {
     case unavailable="PLANNING_AGENT_UNAVAILABLE", auth="PLANNING_AGENT_AUTH_REQUIRED", permission="PLANNING_AGENT_PERMISSION_REQUIRED"
     case timeout="PLANNING_AGENT_TIMEOUT", cancelled="PLANNING_AGENT_CANCELLED", network="PLANNING_AGENT_NETWORK", quota="PLANNING_AGENT_QUOTA"
     case protocolFailure="PLANNING_AGENT_PROTOCOL", tooLarge="PLANNING_AGENT_OUTPUT_TOO_LARGE", failed="PLANNING_AGENT_FAILED", rejected="PLANNING_AGENT_RESULT_REJECTED", routeMissing="PLANNING_AGENT_ROUTE_MISSING", routeEncoding="PLANNING_AGENT_ROUTE_ENCODING"
+    case qualityReview="PLANNING_AGENT_QUALITY_REVIEW"
+}
+
+private struct PlanningQualityFailure:Error,CustomStringConvertible,CustomDebugStringConvertible {
+    let reason:String,summary:String?,locale:String
+    var description:String{PlanningAgentError.qualityReview.rawValue}
+    var debugDescription:String{description}
+}
+
+private enum PlanningAgentWaitTimeout:String,Error {
+    case handshake="handshake_timeout"
+    case idle="idle_timeout"
 }
 
 struct PlanningOutputError:Error,CustomStringConvertible,CustomDebugStringConvertible {
@@ -15,6 +27,10 @@ struct PlanningOutputError:Error,CustomStringConvertible,CustomDebugStringConver
     init(code:PlanningAgentError,issues:[[String:String]],repairCandidate:String?=nil){self.code=code;self.issues=issues;self.repairCandidate=PlanningRepair.bounded(repairCandidate)}
     var description:String{code.rawValue}
     var debugDescription:String{code.rawValue}
+}
+
+struct PlanningLearningLanguageError:Error {
+    let paths:[String]
 }
 
 enum PlanningRepair {
@@ -30,9 +46,9 @@ enum PlanningRepair {
         let fixed=String(original[..<split.lowerBound]),originalData=String(original[split.upperBound...])
         guard let task=["interview","outline","lessons","review","edit","consistency"].first(where:{fixed.contains("TASK: "+$0+"\n")}),var data=try? PlanningStrictJSON.object(originalData) else{return nil}
         guard let candidate=bounded(candidate) else{return try? PlanningPromptPack.make(task:task,data:data,repair:true)}
-        let fields="status|reply|result|missing|updates|fields|evidence|messageRef|proposalRef|questionId|complete|summary|unresolved|consistency|issues|kind|reason|suggestion|route|format|schemaVersion|id|revision|title|locale|sourceLanguage|chapters|nodes|stageGoal|objectives|description|prerequisites|estimatedMinutes|activities|assessment|task|passCriteria|objectiveIds|mode|evaluatorPrompt|[0-9]+"
+        let fields="status|reply|result|missing|updates|fields|evidence|messageRef|proposalRef|questionId|complete|summary|unresolved|consistency|issues|kind|reason|suggestion|route|format|schemaVersion|id|revision|title|locale|sourceLanguage|chapters|lessons|nodes|stageGoal|practiceRules|prerequisiteChapters|objectives|description|prerequisites|estimatedMinutes|activities|assessment|task|passCriteria|objectiveIds|mode|evaluatorPrompt|ready|targetRefs|[0-9]+"
         let safe=issues.filter{issue in
-            guard Set(issue.keys)==["path","code"],let path=issue["path"],path.utf8.count<=256,let code=issue["code"],["required","invalid","count","duplicate","dependencies","identity"].contains(code) else{return false}
+            guard Set(issue.keys)==["path","code"],let path=issue["path"],path.utf8.count<=256,let code=issue["code"],["required","invalid","count","duplicate","dependencies","identity","learning_language"].contains(code) else{return false}
             return path.range(of:"^(?:"+fields+")(?:\\.(?:"+fields+"))*$",options:.regularExpression) != nil
         }
         data["repair"]=["candidate":candidate,"issues":Array(safe.prefix(24))]
@@ -76,6 +92,8 @@ private final class PlanningAgentJob {
     private let started=ProcessInfo.processInfo.systemUptime
     private var stage="preparing",provider="",receivedCharacters=0,finished:TimeInterval?
     private var partialReply="",userReply:String?
+    private var qualityFailure:PlanningQualityFailure?
+    private var restartGeneration=false
     private var lastActivityMs=0,thinkingCharacters=0,outputCharacters=0,activitySequence=0
     private var activityEvents:[[String:Any]]=[]
     private var validationIssues:[[String:String]]=[]
@@ -92,12 +110,20 @@ private final class PlanningAgentJob {
         if !validationIssues.isEmpty{var diagnostic=value["diagnostic"] as! [String:Any];diagnostic["validationIssues"]=validationIssues;value["diagnostic"]=diagnostic}
         if phase != "completed",!partialReply.isEmpty{value["partialReply"]=partialReply}
         if let userReply{value["userReply"]=userReply}
+        if phase=="failed",intent=="generate",let qualityFailure{
+            value["qualityReason"]=qualityFailure.reason
+            if let summary=qualityFailure.summary{value["qualitySummary"]=["text":summary,"locale":qualityFailure.locale]}
+        }
+        if phase=="failed",intent=="generate",restartGeneration{value["restartGeneration"]=true}
         if ["generate","consistency"].contains(intent){value["generationOutput"]=generationOutput}
         if let result{value["result"]=result};if let errorCode{value["errorCode"]=errorCode};return value
     }
     func chapterProgress(completed:Int,count:Int){lock.lock();defer{lock.unlock()};guard phase=="pending" else{return};completedChapters=completed;chapterCount=count}
     func progress(_ stage:String,characters:Int=0,provider:String?=nil){
         lock.lock();defer{lock.unlock()};guard phase=="pending" else{return}
+        recordProgress(stage,characters:characters,provider:provider)
+    }
+    private func recordProgress(_ stage:String,characters:Int,provider:String?=nil){
         let now=Int((ProcessInfo.processInfo.systemUptime-started)*1000),changed=self.stage != stage
         self.stage=stage;receivedCharacters=min(1_048_576,receivedCharacters+max(0,characters));if let provider{self.provider=provider}
         if stage=="thinking"{thinkingCharacters=min(16_777_216,thinkingCharacters+max(0,characters))}else{outputCharacters=min(16_777_216,outputCharacters+max(0,characters))}
@@ -151,24 +177,36 @@ private final class PlanningAgentJob {
     func complete(_ value:[String:Any]){lock.lock();defer{lock.unlock()};guard phase=="committing" else{return};result=value;phase="completed";partialReply="";finished=ProcessInfo.processInfo.systemUptime}
     func fail(_ error:Error){
         lock.lock();defer{lock.unlock()};guard phase=="pending" || phase=="committing" else{return}
+        let timeout=error as? PlanningAgentWaitTimeout
+        if let timeout{recordProgress(timeout.rawValue,characters:0)}
         phase="failed";interruptOutput();transports=[];finished=ProcessInfo.processInfo.systemUptime
-        if let outcome=error as? PlanningTaskOutcome{errorCode=outcome.code;userReply=outcome.userReply;partialReply=""}
+        if let quality=error as? PlanningQualityFailure{
+            errorCode=PlanningAgentError.qualityReview.rawValue;qualityFailure=quality
+            restartGeneration=completedChapters != nil && completedChapters==chapterCount
+            partialReply=""
+        }
+        else if let outcome=error as? PlanningTaskOutcome{errorCode=outcome.code;userReply=outcome.userReply;partialReply=""}
         else if let error=error as? PlanningOutputError{errorCode=error.code.rawValue;validationIssues=Array(error.issues.prefix(24))}
         else if (error as NSError).domain=="VibeImprove.PlanningValidation"{errorCode=PlanningAgentError.rejected.rawValue;validationIssues=Array(((error as NSError).userInfo["issues"] as? [[String:String]] ?? []).prefix(24))}
         else if (error as NSError).domain=="VibeImprove.PlanningEvidence"{errorCode="PLANNING_EVIDENCE_INVALID";validationIssues=Array(((error as NSError).userInfo["issues"] as? [[String:String]] ?? []).prefix(24))}
+        else if timeout != nil{errorCode=PlanningAgentError.timeout.rawValue}
         else if let error=error as? PlanningAgentError{errorCode=error.rawValue}
         else if let error=error as? AgentError{errorCode=error.rawValue}
-        else if let error=error as? any RawRepresentable,let code=error.rawValue as? String,Set(["PLANNING_GENERATION_INVALID","PLANNING_GENERATION_STALE","PLANNING_GENERATION_EXISTS","PLANNING_INVALID","PLANNING_TOO_LARGE","PLANNING_CONFLICT","PLANNING_BUSY","PLANNING_INCOMPLETE","PLANNING_EVIDENCE_INVALID","PLANNING_RESPONSE_INVALID","PLANNING_ROUTE_INVALID","PLANNING_TARGET_UNAVAILABLE","PLANNING_LIMIT","PLANNING_STORAGE_UNAVAILABLE","PLANNING_PROJECT_UNAVAILABLE"]).contains(code){errorCode=code}
+        else if let error=error as? any RawRepresentable,let code=error.rawValue as? String,Set(["PLANNING_GENERATION_INVALID","PLANNING_GENERATION_STALE","PLANNING_GENERATION_EXISTS","PLANNING_INVALID","PLANNING_TOO_LARGE","PLANNING_CONFLICT","PLANNING_BUSY","PLANNING_INCOMPLETE","PLANNING_EVIDENCE_INVALID","PLANNING_RESPONSE_INVALID","PLANNING_ROUTE_INVALID","PLANNING_TARGET_UNAVAILABLE","PLANNING_LIMIT","PLANNING_STORAGE_UNAVAILABLE","PLANNING_PROJECT_UNAVAILABLE","PLANNING_STUDIED_LESSON_LOCKED"]).contains(code){errorCode=code}
         else{errorCode=PlanningAgentError.rejected.rawValue}
     }
 }
 
 final class PlanningAgentManager {
-    private let agents:AgentManager,timeout:TimeInterval?,idleTimeout:TimeInterval,prepare:((String)throws->AgentSessionPreparation)?
+    static let outputIdleTimeout:TimeInterval=180
+    private let agents:AgentManager,idleTimeout:TimeInterval,prepare:((String)throws->AgentSessionPreparation)?
     private let lock=NSLock()
     private var jobs:[String:PlanningAgentJob]=[:],order:[String]=[],closed=false
-    init(agents:AgentManager,timeout:TimeInterval?=nil,idleTimeout:TimeInterval=180,prepare:((String)throws->AgentSessionPreparation)?=nil){self.agents=agents;self.timeout=timeout.map{max(0.1,min($0,1800))};self.idleTimeout=max(0.1,min(idleTimeout,180));self.prepare=prepare}
-    static func requestTimeout(provider:String,intent:String)->TimeInterval{intent=="generate" ? 1800:intent=="edit" ? 600:180}
+    init(agents:AgentManager,idleTimeout:TimeInterval=PlanningAgentManager.outputIdleTimeout,prepare:((String)throws->AgentSessionPreparation)?=nil){
+        self.agents=agents
+        self.idleTimeout=max(0.1,min(idleTimeout,Self.outputIdleTimeout))
+        self.prepare=prepare
+    }
     func begin(projectID:String,intent:String,context:[String:Any],saveProgress:(([String:Any])throws->Void)?=nil,validateRoute:(([String:Any])throws->Void)?=nil,apply:@escaping([String:Any])throws->[String:Any])throws->[String:Any]{
         guard projectID.range(of:"^proj_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$",options:.regularExpression) != nil,context["projectId"] as? String==projectID else{throw PlanningAgentError.invalid}
         let prompt=try PlanningAgentPrompt.make(intent:intent,context:context),job=PlanningAgentJob(projectID:projectID,intent:intent)
@@ -184,12 +222,6 @@ final class PlanningAgentManager {
             do{
                 guard !job.cancelled else{throw PlanningAgentError.cancelled}
                 let restored=try (intent=="generate" ? context["generationDraft"] as? [String:Any]:nil).map{try PlanningGeneration.restore($0,locale:context["locale"] as? String ?? "zh-CN")}
-                if let (plan,parts)=restored,parts.enumerated().allSatisfy({($0.element?["nodes"] as? [[String:Any]])?.count==plan.chapters[$0.offset].lessons.count}){
-                    try job.appendOutput("outline",text:PlanningGeneration.displayOutline(plan))
-                    for (index,part) in parts.enumerated(){if let part{try job.appendOutput("lessons",text:PlanningGeneration.displayChapter(part,plan:plan,index:index,count:plan.chapters[index].lessons.count))}}
-                    let route=try plan.completeRoute(parts.compactMap{$0});try validateRoute?(route)
-                    job.progress("validating");try job.claimCommit();job.complete(try apply(["reply":plan.reply,"route":route]));return
-                }
                 let prepared=try prepare?(projectID) ?? agents.prepareSession(projectID:projectID)
                 guard prepared.projectID==projectID else{throw PlanningAgentError.invalid}
                 guard let launch=prepared.launch else{throw PlanningAgentError.unsupported}
@@ -197,19 +229,20 @@ final class PlanningAgentManager {
                 guard ["codex","claude-code","codebuddy"].contains(prepared.provider),launch.provider==prepared.provider else{throw PlanningAgentError.unsupported}
                 if let provider=context["provider"] as? String,provider != prepared.provider{throw PlanningAgentError.unavailable}
                 job.progress("connecting",provider:prepared.provider)
-                let budget=timeout ?? Self.requestTimeout(provider:prepared.provider,intent:intent)
-                let deadline=Date().addingTimeInterval(budget)
                 func request(_ instructions:String,kind:String)throws->[String:Any]{
                     guard !job.cancelled else{throw PlanningAgentError.cancelled}
-                    let remaining=deadline.timeIntervalSinceNow
-                    guard remaining>0 else{job.progress("total_timeout");throw PlanningAgentError.timeout}
+                    let reviewing=kind=="review",revising=kind=="revision"
+                    if reviewing{job.progress("reviewing")}
+                    if revising{job.progress("revising")}
                     let outputSequence=try job.beginOutput(kind)
-                    let transport=PlanningAgentTransport(launch:launch,timeout:remaining,idleTimeout:idleTimeout,options:context["agentOptions"] as? [String:Any] ?? [:],intent:kind,progress:{[weak job] stage,count in job?.progress(stage,characters:count)},preview:{[weak job] text in job?.outputPreview(outputSequence,text);if kind != "lessons"{job?.preview(text)}})
+                    let transport=PlanningAgentTransport(launch:launch,idleTimeout:idleTimeout,options:context["agentOptions"] as? [String:Any] ?? [:],progress:{[weak job] stage,count in job?.progress(stage,characters:count)},preview:{[weak job] text in
+                        if !reviewing && !revising{job?.outputPreview(outputSequence,text)}
+                        if intent=="interview" || intent=="edit"{job?.preview(text)}
+                    })
                     try job.attach(transport);defer{job.detach(transport)}
                     let result:[String:Any]
-                    do{result=try transport.perform(prompt:instructions);try job.finishOutput(outputSequence,reply:result["reply"] as? String)}
+                    do{result=try transport.perform(prompt:instructions);try job.finishOutput(outputSequence,reply:reviewing || revising ? nil : result["reply"] as? String)}
                     catch{try? job.finishOutput(outputSequence,interrupted:true);throw error}
-                    guard Date()<deadline else{job.progress("total_timeout");throw PlanningAgentError.timeout}
                     return result
                 }
                 func checked<T>(_ instructions:String,kind:String,check:([String:Any])throws->T)throws->T{
@@ -217,7 +250,7 @@ final class PlanningAgentManager {
                     for attempt in 0...1 {
                         var response:[String:Any]?
                         do{
-                            let value=try request(current,kind:kind);response=value
+                            let value=Self.generationEnvelope(try request(current,kind:kind),kind:kind);response=value
                             if let assessment=value["consistency"] as? [String:Any] {
                                 _ = try PlanningPromptPack.consistencyResult(["status":"ok","reply":value["reply"] ?? NSNull(),"result":assessment,"missing":[]],context:context)
                             }
@@ -226,7 +259,14 @@ final class PlanningAgentManager {
                         catch {
                             if error is PlanningTaskOutcome{throw error}
                             let normalized:Error
-                            if let pack=error as? PlanningPromptPackError {
+                            if let wording=error as? PlanningLearningLanguageError {
+                                let issues=wording.paths.map{["path":$0,"code":"learning_language"]}
+                                guard attempt==0,!job.cancelled,let repaired=PlanningRepair.prompt(instructions,candidate:PlanningRepair.candidate(response),issues:issues) else{
+                                    throw PlanningQualityFailure(reason:"learning_language",summary:nil,locale:context["locale"] as? String ?? "zh-CN")
+                                }
+                                current=repaired
+                                continue
+                            }else if let pack=error as? PlanningPromptPackError {
                                 if pack == .tooLarge{throw PlanningAgentError.tooLarge}
                                 normalized=PlanningOutputError(code:pack == .evidence ? .evidence:.rejected,issues:[["path":pack == .evidence ? "result.evidence":"result","code":"invalid"]],repairCandidate:PlanningRepair.candidate(response))
                             }else{normalized=error}
@@ -238,6 +278,17 @@ final class PlanningAgentManager {
                         }
                     }
                     throw PlanningAgentError.rejected
+                }
+                func reviewCandidate(plan:PlanningGeneration.Plan,chapters:[[String:Any]],previous:PlanningGeneration.QualityReview?=nil)throws->PlanningGeneration.QualityReview{
+                    do{
+                        let instructions=try PlanningGeneration.reviewPrompt(context:context,plan:plan,chapters:chapters,previousReview:previous)
+                        return try checked(instructions,kind:"review"){try PlanningGeneration.review($0,plan:plan,chapters:chapters)}
+                    }catch PlanningPromptPackError.tooLarge{throw PlanningAgentError.qualityReview}
+                    catch PlanningAgentError.tooLarge{throw PlanningAgentError.qualityReview}
+                    catch is PlanningTaskOutcome{throw PlanningAgentError.qualityReview}
+                    catch let error as PlanningOutputError where error.code == .rejected || error.code == .routeEncoding || error.code == .evidence{
+                        throw PlanningAgentError.qualityReview
+                    }
                 }
                 let value:[String:Any]
                 if intent=="generate" {
@@ -252,18 +303,25 @@ final class PlanningAgentManager {
                     if restored==nil{try saveProgress?(plan.progress(chapters))}
                     for (index,part) in chapters.enumerated(){if let part{try job.appendOutput("lessons",text:PlanningGeneration.displayChapter(part,plan:plan,index:index,count:(part["nodes"] as? [[String:Any]] ?? []).count))}}
                     job.chapterProgress(completed:finishedCount,count:plan.chapters.count)
+                    let initialChapters=chapters
+                    var operations:[Int:BlockOperation]=[:]
                     for index in plan.chapters.indices {
-                        let savedChapter=chapters[index],savedCount=(savedChapter?["nodes"] as? [[String:Any]] ?? []).count
+                        let savedChapter=initialChapters[index],savedCount=(savedChapter?["nodes"] as? [[String:Any]] ?? []).count
                         if savedCount==plan.chapters[index].lessons.count{continue}
-                        queue.addOperation {
+                        let operation=BlockOperation {
                             generationLock.lock();let stopped=generationError != nil;generationLock.unlock()
                             guard !stopped,!job.cancelled else{return}
                             do {
                                 var currentChapter=savedChapter
                                 for start in stride(from:savedCount,to:plan.chapters[index].lessons.count,by:3) {
-                                    generationLock.lock();let stopBatch=generationError != nil;generationLock.unlock();if stopBatch{break}
+                                    generationLock.lock()
+                                    let stopBatch=generationError != nil
+                                    let earlier=chapters.prefix(index).enumerated().compactMap{position,part in
+                                        (part?["nodes"] as? [[String:Any]])?.count==plan.chapters[position].lessons.count ? part : nil
+                                    }
+                                    generationLock.unlock();if stopBatch{break}
                                     let range=start..<min(start+3,plan.chapters[index].lessons.count)
-                                    let instructions=try PlanningGeneration.chapterPrompt(context:context,plan:plan,index:index,completed:currentChapter.map{[$0]} ?? [],range:range,plannedPrerequisites:true)
+                                    let instructions=try PlanningGeneration.chapterPrompt(context:context,plan:plan,index:index,completed:currentChapter.map{[$0]} ?? [],range:range,plannedPrerequisites:true,earlierChapters:earlier)
                                     currentChapter=try checked(instructions,kind:"lessons"){response in
                                         var chapter=try PlanningGeneration.chapter(response,plan:plan,index:index,range:range)
                                         chapter["nodes"]=(currentChapter?["nodes"] as? [[String:Any]] ?? [])+(chapter["nodes"] as? [[String:Any]] ?? [])
@@ -290,14 +348,81 @@ final class PlanningAgentManager {
                                 job.abortTransports(interrupt:!business)
                             }
                         }
+                        for prerequisite in plan.chapters[index].prerequisiteChapters ?? []{
+                            if let preceding=operations[prerequisite]{operation.addDependency(preceding)}
+                        }
+                        operations[index]=operation
                     }
-                    queue.waitUntilAllOperationsAreFinished()
+                    queue.addOperations(operations.keys.sorted().compactMap{operations[$0]},waitUntilFinished:true)
                     if let generationError{throw generationError}
                     guard !job.cancelled else{throw PlanningAgentError.cancelled}
-                    let route=try plan.completeRoute(chapters.compactMap{$0})
-                    guard try JSONSerialization.data(withJSONObject:route).count<=1024*1024 else{throw PlanningAgentError.tooLarge}
+                    let originalChapters=chapters.compactMap{$0}
+                    var candidate=originalChapters,reviewedPlan=plan
+                    var route=try plan.completeRoute(candidate)
                     try validateRoute?(route)
-                    value=["reply":plan.reply,"route":route]
+                    var review=try reviewCandidate(plan:plan,chapters:candidate),repairedIssues=Set<String>(),revisedScope=Set<String>(),remainingRevisionBatches=6
+                    for pass in 0..<2{
+                        guard let reason=review.reason else{break}
+                        let blocked=PlanningQualityFailure(reason:reason,summary:review.summary,locale:plan.locale)
+                        let issueKeys=review.issueKeys
+                        guard !issueKeys.isEmpty,issueKeys.isDisjoint(with:repairedIssues),
+                              let targets=review.repairTargets,!targets.isEmpty,targets.count<=remainingRevisionBatches else{throw blocked}
+                        let scope=Set(targets.flatMap{target in plan.chapters[target.index].lessons[target.range].map(\.id)})
+                        guard revisedScope.union(scope).count<=12 else{throw blocked}
+                        revisedScope.formUnion(scope)
+                        repairedIssues.formUnion(issueKeys)
+                        remainingRevisionBatches-=targets.count
+                        var changed=false
+                        for target in targets{
+                            let renameable=review.renameableRefs(in:target,plan:reviewedPlan)
+                            let instructions:String
+                            do{instructions=try PlanningGeneration.revisionPrompt(context:context,plan:reviewedPlan,chapters:candidate,target:target,review:review)}
+                            catch PlanningPromptPackError.tooLarge{throw blocked}
+                            let replacement:(chapters:[[String:Any]],plan:PlanningGeneration.Plan)
+                            do{
+                                replacement=try checked(instructions,kind:"revision"){response in
+                                    let chapter=try PlanningGeneration.chapter(response,plan:reviewedPlan,index:target.index,range:target.range,renameableRefs:renameable,revising:true)
+                                    var next=candidate
+                                    var nodes=candidate[target.index]["nodes"] as! [[String:Any]]
+                                    nodes.replaceSubrange(target.range,with:chapter["nodes"] as! [[String:Any]])
+                                    next[target.index]["nodes"]=nodes
+                                    let nextPlan=PlanningGeneration.replacingLessonTitles(in:reviewedPlan,at:target,with:nodes)
+                                    try validateRoute?(nextPlan.completeRoute(next))
+                                    return (next,nextPlan)
+                                }
+                            }catch PlanningAgentError.tooLarge{throw blocked}
+                            catch is PlanningTaskOutcome{throw blocked}
+                            catch is PlanningQualityFailure{throw blocked}
+                            catch let error as PlanningOutputError where error.code == .rejected || error.code == .routeEncoding || error.code == .evidence{
+                                throw blocked
+                            }
+                            catch let error as NSError where error.domain=="VibeImprove.PlanningValidation"{
+                                throw blocked
+                            }
+                            let original=candidate[target.index]["nodes"] as! [[String:Any]]
+                            let updated=replacement.chapters[target.index]["nodes"] as! [[String:Any]]
+                            changed=changed || target.range.contains{!NSDictionary(dictionary:original[$0]).isEqual(to:updated[$0])}
+                            candidate=replacement.chapters;reviewedPlan=replacement.plan
+                            try job.appendOutput("revision",text:PlanningGeneration.displayChapter(candidate[target.index],plan:reviewedPlan,index:target.index,range:target.range))
+                        }
+                        guard changed else{throw blocked}
+                        route=try reviewedPlan.completeRoute(candidate)
+                        try validateRoute?(route)
+                        review=try reviewCandidate(plan:reviewedPlan,chapters:candidate,previous:review)
+                        if pass==1,let reason=review.reason{throw PlanningQualityFailure(reason:reason,summary:review.summary,locale:plan.locale)}
+                    }
+                    var revisedLessons:[String]=[],renamedLessons:[String]=[]
+                    for (index,chapter) in plan.chapters.enumerated(){
+                        let original=originalChapters[index]["nodes"] as! [[String:Any]],updated=candidate[index]["nodes"] as! [[String:Any]]
+                        for (offset,lesson) in chapter.lessons.enumerated() where !NSDictionary(dictionary:original[offset]).isEqual(to:updated[offset]){
+                            revisedLessons.append(lesson.id)
+                            if lesson.title != reviewedPlan.chapters[index].lessons[offset].title{renamedLessons.append(lesson.id)}
+                        }
+                    }
+                    var generated:[String:Any]=["reply":plan.reply,"route":route]
+                    if !revisedLessons.isEmpty{generated["revisedLessons"]=revisedLessons}
+                    if !renamedLessons.isEmpty{generated["renamedLessons"]=renamedLessons}
+                    value=generated
                     }catch let outcome as PlanningTaskOutcome{
                         guard let consistency=outcome.consistency,consistency["status"] as? String=="requires_review" else{throw outcome}
                         var blocked=try PlanningPromptPack.consistencyResult(["status":"ok","reply":outcome.userReply,"result":consistency,"missing":[]],context:context)
@@ -311,12 +436,16 @@ final class PlanningAgentManager {
                     value=try checked(prompt,kind:"edit"){response in let value=try PlanningPromptPack.unwrap(response,task:"edit");try Self.validate(value,intent:"edit");return value}
                 }
                 job.progress("validating");try Self.validate(value,intent:intent)
-                guard Date()<deadline else{job.progress("total_timeout");throw PlanningAgentError.timeout}
                 try job.claimCommit()
                 job.complete(try apply(value))
             }catch{job.fail(error)}
         }
         return job.snapshot()
+    }
+    static func generationEnvelope(_ value:[String:Any],kind:String)->[String:Any]{
+        guard ["outline","lessons","review","revision"].contains(kind),value["status"] as? String=="ok",
+              Set(value.keys)==["status","reply","result"],value["reply"] is String,value["result"] is [String:Any] else{return value}
+        var result=value;result["missing"]=[String]();return result
     }
     private func job(projectID:String,jobID:String)throws->PlanningAgentJob{
         lock.lock();defer{lock.unlock()};guard let job=jobs[jobID],job.projectID==projectID else{throw PlanningAgentError.invalid};return job
@@ -330,7 +459,9 @@ final class PlanningAgentManager {
         guard let launch=prepared.launch else{throw PlanningAgentError.unavailable}
         lock.lock();let cached=modelCache[projectID+prepared.provider];lock.unlock()
         if !refresh,let cached,Date().timeIntervalSince(cached.0)<300{return ["provider":prepared.provider,"models":cached.1]}
-        let models=try PlanningAgentTransport(launch:launch,timeout:25).catalog()
+        let models:[[String:Any]]
+        do{models=try PlanningAgentTransport(launch:launch).catalog()}
+        catch is PlanningAgentWaitTimeout{throw PlanningAgentError.timeout}
         lock.lock();modelCache[projectID+prepared.provider]=(Date(),models);if modelCache.count>64,let oldest=modelCache.min(by:{$0.value.0<$1.value.0})?.key{modelCache.removeValue(forKey:oldest)};lock.unlock()
         return ["provider":prepared.provider,"models":models]
     }
@@ -345,10 +476,10 @@ final class PlanningAgentManager {
     private static func validate(_ value:[String:Any],intent:String)throws{
         guard let reply=value["reply"] as? String,!reply.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,reply.utf16.count<=8000,reply.utf8.count<=24_000 else{throw PlanningAgentError.protocolFailure}
         if intent=="interview" {
-            guard Set(value.keys).isSubset(of:["reply","summary","updates","consistency"]),Set(["reply","updates"]).isSubset(of:Set(value.keys)),let updates=value["updates"] as? [[String:Any]],updates.count<=5 else{throw PlanningAgentError.protocolFailure}
+            guard Set(value.keys).isSubset(of:["reply","summary","updates","consistency","baselineOptions"]),Set(["reply","updates"]).isSubset(of:Set(value.keys)),let updates=value["updates"] as? [[String:Any]],updates.count<=7 else{throw PlanningAgentError.protocolFailure}
             if let summary=value["summary"]{guard let text=summary as? String,text.count<=2000 else{throw PlanningAgentError.protocolFailure}}
             for update in updates {
-                guard let id=update["id"] as? String,["goal","purpose","baseline","time","constraints"].contains(id),
+                guard let id=update["id"] as? String,["goal","purpose","baseline","time","deadline","scope","constraints"].contains(id),
                       update["fields"] is [String:String],update["evidence"] is [[String:Any]],update["missing"] is [String],update["complete"] is Bool else{throw PlanningAgentError.protocolFailure}
             }
         }else if intent=="consistency" || (intent=="generate" && value["generationBlocked"] as? Bool==true) {
@@ -358,59 +489,94 @@ final class PlanningAgentManager {
             guard Set(value.keys)==Set(["reply"]) || Set(value.keys)==Set(["reply","route"]) else{throw PlanningAgentError.protocolFailure}
             if let raw=value["route"],!(raw is NSNull){guard let route=raw as? [String:Any],route["format"] as? String=="vibe-improve.route",route["schemaVersion"] as? Int==2,route["chapters"] is [[String:Any]] else{throw PlanningAgentError.protocolFailure}}
         }else{
-            guard Set(value.keys)==Set(["reply","route"]),let route=value["route"] as? [String:Any],route["format"] as? String=="vibe-improve.route",route["schemaVersion"] as? Int==2,route["chapters"] is [[String:Any]] else{throw PlanningAgentError.protocolFailure}
+            guard Set(value.keys).isSubset(of:["reply","route","revisedLessons","renamedLessons"]),let route=value["route"] as? [String:Any],route["format"] as? String=="vibe-improve.route",route["schemaVersion"] as? Int==2,route["chapters"] is [[String:Any]] else{throw PlanningAgentError.protocolFailure}
+            if let raw=value["revisedLessons"]{
+                guard let revised=raw as? [String],(1...12).contains(revised.count),Set(revised).count==revised.count else{throw PlanningAgentError.protocolFailure}
+            }
+            if let raw=value["renamedLessons"]{
+                guard let renamed=raw as? [String],!renamed.isEmpty,Set(renamed).count==renamed.count,let revised=value["revisedLessons"] as? [String],Set(renamed).isSubset(of:revised) else{throw PlanningAgentError.protocolFailure}
+            }
         }
     }
 }
 
 private final class PlanningAgentTransport {
-    private let launch:AgentSessionLaunch,timeout:TimeInterval,options:[String:Any],process=Process(),input=Pipe(),output=Pipe(),errorPipe=Pipe()
+    private static let handshakeTimeout:TimeInterval=25
+    private let launch:AgentSessionLaunch,options:[String:Any],process=Process(),input=Pipe(),output=Pipe(),errorPipe=Pipe()
     private let condition=NSCondition(),writeLock=NSLock()
-    private var queue:[Data]=[],partial=Data(),diagnostic=Data(),byteCount=0,scanOffset=0,readFinished=false,exited=false,cancelled=false,readError:PlanningAgentError?
+    private var queue:[Data]=[],partial=Data(),diagnostic=Data(),queuedBytes=0,scanOffset=0,readFinished=false,exited=false,cancelled=false,stopping=false,readError:PlanningAgentError?
     private var threadID:String?,turnID:String?,closed=false
     private let progress:(String,Int)->Void
     private let preview:(String)->Void
     private var replyStream=PlanningReplyStream()
-    private var idleDeadline:Date?
-    private let idleTimeout:TimeInterval,intent:String
-    init(launch:AgentSessionLaunch,timeout:TimeInterval,idleTimeout:TimeInterval=180,options:[String:Any]=[:],intent:String="interview",progress:@escaping(String,Int)->Void={_,_ in},preview:@escaping(String)->Void={_ in}){self.launch=launch;self.timeout=timeout;self.idleTimeout=idleTimeout;self.options=options;self.intent=intent;self.progress=progress;self.preview=preview}
+    private var idleDeadline:TimeInterval?
+    private let idleTimeout:TimeInterval
+    init(launch:AgentSessionLaunch,idleTimeout:TimeInterval=PlanningAgentManager.outputIdleTimeout,options:[String:Any]=[:],progress:@escaping(String,Int)->Void={_,_ in},preview:@escaping(String)->Void={_ in}){
+        self.launch=launch
+        self.idleTimeout=idleTimeout
+        self.options=options
+        self.progress=progress
+        self.preview=preview
+    }
     private func replyDelta(_ text:String,reset:Bool=false){if reset{replyStream=PlanningReplyStream()};preview(replyStream.append(text))}
-    private func activity(_ stage:String,characters:Int=0){idleDeadline=Date().addingTimeInterval(idleTimeout);progress(stage,characters)}
+    private func activity(_ stage:String,characters:Int=0){idleDeadline=ProcessInfo.processInfo.systemUptime+idleTimeout;progress(stage,characters)}
+    private func checkCancellation()throws{
+        condition.lock();defer{condition.unlock()}
+        if cancelled{throw PlanningAgentError.cancelled}
+    }
     func cancel(){condition.lock();cancelled=true;condition.broadcast();condition.unlock();stop()}
     private func stop(){
+        condition.lock();stopping=true;condition.broadcast();condition.unlock()
         writeLock.lock();if !closed{closed=true;try? input.fileHandleForWriting.close()};writeLock.unlock()
         if process.isRunning{process.terminate();DispatchQueue.global().asyncAfter(deadline:.now()+1){[self] in if process.isRunning{kill(process.processIdentifier,SIGKILL)}}}
     }
     private func send(_ value:[String:Any])throws{
-        guard let data=try? JSONSerialization.data(withJSONObject:value),data.count<=900*1024 else{throw PlanningAgentError.invalid}
+        guard let data=try? JSONSerialization.data(withJSONObject:value) else{throw PlanningAgentError.invalid}
+        guard data.count<=900*1024 else{throw PlanningAgentError.tooLarge}
         writeLock.lock();defer{writeLock.unlock()};guard !closed else{throw PlanningAgentError.cancelled}
         do{try input.fileHandleForWriting.write(contentsOf:data+Data([10]))}catch{throw PlanningAgentError.unavailable}
     }
     private func observe(_ bytes:Data,isError:Bool){
         condition.lock();defer{condition.unlock();condition.broadcast()}
         if isError{if diagnostic.count<16_384{diagnostic.append(bytes.prefix(16_384-diagnostic.count))};return}
-        byteCount+=bytes.count
-        guard byteCount <= 32*1024*1024 else{readError = .tooLarge;return}
+        guard readError==nil,!stopping else{return}
         partial.append(bytes)
-        while let split=partial.range(of:Data([10]),in:scanOffset..<partial.count){let line=Data(partial[..<split.lowerBound]);partial=Data(partial[split.upperBound...]);scanOffset=0;if !line.isEmpty{queue.append(line)}}
+        while let split=partial.range(of:Data([10]),in:scanOffset..<partial.count){
+            let length=partial.distance(from:partial.startIndex,to:split.lowerBound)
+            guard length<=1024*1024 else{readError = .tooLarge;return}
+            if length>0{
+                while !stopping,readError==nil,queue.count>=2048 || queuedBytes+partial.count>4*1024*1024 {condition.wait()}
+                guard !stopping,readError==nil else{return}
+                let line=Data(partial[..<split.lowerBound]);queue.append(line);queuedBytes+=line.count
+                condition.broadcast()
+            }
+            partial=Data(partial[split.upperBound...]);scanOffset=0
+        }
         scanOffset=partial.count
-        if partial.count>1024*1024 || queue.count>2048 || queue.reduce(partial.count,{$0+$1.count})>4*1024*1024{readError = .tooLarge}
+        if partial.count>1024*1024{readError = .tooLarge}
     }
-    private func next(deadline:Date)throws->[String:Any]?{
+    private func next(handshakeDeadline:TimeInterval)throws->[String:Any]{
         condition.lock();defer{condition.unlock()}
-        let effectiveDeadline=min(deadline,idleDeadline ?? deadline)
-        while queue.isEmpty && !readFinished && !cancelled && readError==nil && Date()<effectiveDeadline{_ = condition.wait(until:min(effectiveDeadline,Date().addingTimeInterval(0.2)))}
-        if cancelled{throw PlanningAgentError.cancelled};if let readError{throw readError};if Date()>=effectiveDeadline{progress(idleDeadline==nil ? "handshake_timeout":Date()>=deadline ? "total_timeout":"idle_timeout",0);throw PlanningAgentError.timeout}
+        let deadline=idleDeadline ?? handshakeDeadline
+        while queue.isEmpty && !readFinished && !cancelled && readError==nil {
+            let remaining=deadline-ProcessInfo.processInfo.systemUptime
+            if remaining<=0{break}
+            _ = condition.wait(until:Date().addingTimeInterval(min(remaining,0.2)))
+        }
+        if cancelled{throw PlanningAgentError.cancelled}
+        if let readError{throw readError}
+        if ProcessInfo.processInfo.systemUptime>=deadline{
+            throw idleDeadline==nil ? PlanningAgentWaitTimeout.handshake : PlanningAgentWaitTimeout.idle
+        }
         if !queue.isEmpty {
-            let line=queue.removeFirst()
+            let line=queue.removeFirst();queuedBytes-=line.count;condition.broadcast()
             guard let message=try? JSONSerialization.jsonObject(with:line) as? [String:Any] else{throw PlanningAgentError.protocolFailure}
             return message
         }
-        if readFinished{throw Self.classify(diagnostic,fallback:.failed)}
-        return nil
+        throw Self.classify(diagnostic,fallback:.failed)
     }
     private func start(systemPrompt:String?=nil)throws{
-        condition.lock();let wasCancelled=cancelled;condition.unlock();guard !wasCancelled else{throw PlanningAgentError.cancelled}
+        try checkCancellation()
         try launch.configure(process)
         if ["codebuddy","claude-code"].contains(launch.provider){process.arguments=(process.arguments ?? [])+["--include-partial-messages"]}
         if let systemPrompt{guard ["claude-code","codebuddy"].contains(launch.provider) else{throw PlanningAgentError.invalid};process.arguments=(process.arguments ?? [])+["--system-prompt",systemPrompt]}
@@ -427,7 +593,15 @@ private final class PlanningAgentTransport {
         for (pipe,isError) in [(output,false),(errorPipe,true)] {
             DispatchQueue.global().async{[self] in
                 while true{let data=pipe.fileHandleForReading.availableData;if data.isEmpty{break};observe(data,isError:isError)}
-                if !isError{condition.lock();if !partial.isEmpty{queue.append(partial);partial=Data()};readFinished=true;condition.broadcast();condition.unlock()}
+                if !isError{
+                    condition.lock()
+                    if !partial.isEmpty,readError==nil,!stopping{
+                        if queue.count<2048,queuedBytes+partial.count<=4*1024*1024{queue.append(partial);queuedBytes+=partial.count}
+                        else{readError = .tooLarge}
+                        partial=Data()
+                    }
+                    readFinished=true;condition.broadcast();condition.unlock()
+                }
             }
         }
     }
@@ -436,27 +610,26 @@ private final class PlanningAgentTransport {
         guard prompt.hasPrefix(PlanningAgentPrompt.policy),let split=prompt.range(of:"\nCONTEXT_JSON_DATA:\n") else{throw PlanningAgentError.invalid}
         let systemPrompt=String(prompt[..<split.lowerBound]),requestPrompt=String(prompt[split.lowerBound...])
         try start(systemPrompt:launch.provider=="codex" ? nil:systemPrompt)
-        let deadline=Date().addingTimeInterval(timeout)
-        let text=try launch.provider=="codex" ? codex(prompt:requestPrompt,systemPrompt:systemPrompt,deadline:deadline):stream(prompt:requestPrompt,deadline:deadline)
-        condition.lock();let stopped=cancelled;condition.unlock();if !stopped,Date()>=deadline{progress("total_timeout",0)};guard !stopped,Date()<deadline else{throw stopped ? PlanningAgentError.cancelled:PlanningAgentError.timeout}
+        let handshakeDeadline=ProcessInfo.processInfo.systemUptime+Self.handshakeTimeout
+        let text=try launch.provider=="codex" ? codex(prompt:requestPrompt,systemPrompt:systemPrompt,handshakeDeadline:handshakeDeadline):stream(prompt:requestPrompt,handshakeDeadline:handshakeDeadline)
+        try checkCancellation()
         guard text.utf8.count<=1024*1024 else{throw PlanningAgentError.tooLarge}
         progress("parsing",0)
         var value:[String:Any]
         do{value=try PlanningStrictJSON.object(text)}
         catch PlanningAgentError.tooLarge{throw PlanningAgentError.tooLarge}
         catch{throw PlanningOutputError(code:.routeEncoding,issues:[["path":"result","code":"invalid"]],repairCandidate:text)}
-        condition.lock();let cancelledAfterParse=cancelled;condition.unlock()
-        if !cancelledAfterParse,Date()>=deadline{progress("total_timeout",0)};guard !cancelledAfterParse,Date()<deadline else{throw cancelledAfterParse ? PlanningAgentError.cancelled:PlanningAgentError.timeout}
+        try checkCancellation()
         return value
     }
     func catalog()throws->[[String:Any]]{
-        defer{stop()};try start();let deadline=Date().addingTimeInterval(timeout)
+        defer{stop()};try start();let handshakeDeadline=ProcessInfo.processInfo.systemUptime+Self.handshakeTimeout
         let isCodex=launch.provider=="codex"
         if isCodex{try send(["id":0,"method":"initialize","params":["clientInfo":["name":"vibe_improve","version":"0.1.0"]]])}
         else{try send(["type":"control_request","request_id":"model-catalog","request":["subtype":"initialize"]])}
         var raw:[[String:Any]]=[],pages=0,currentModelID:String?
         while true {
-            guard let message=try next(deadline:deadline) else{continue}
+            let message=try next(handshakeDeadline:handshakeDeadline)
             if message["error"] != nil{throw Self.classifyJSON(message["error"],fallback:.protocolFailure)}
             if isCodex {
                 if message["id"] as? Int==0{try send(["method":"initialized","params":[:]]);try send(["id":1,"method":"model/list","params":["limit":100,"includeHidden":false]])}
@@ -475,11 +648,11 @@ private final class PlanningAgentTransport {
             return ["id":id,"name":String(((item["displayName"] as? String) ?? (item["name"] as? String) ?? id).prefix(100)),"isDefault":item["isDefault"] as? Bool ?? (id==currentModelID),"efforts":Array(NSOrderedSet(array:efforts))]
         }
     }
-    private func codex(prompt:String,systemPrompt:String,deadline:Date)throws->String{
+    private func codex(prompt:String,systemPrompt:String,handshakeDeadline:TimeInterval)throws->String{
         try send(["id":0,"method":"initialize","params":["clientInfo":["name":"vibe_improve","title":"Vibe Improve","version":"0.1.0"]]])
         var stage=0,finalText:String?,previewItemID:String?
         while true{
-            guard let message=try next(deadline:deadline) else{continue}
+            let message=try next(handshakeDeadline:handshakeDeadline)
             if message["error"] != nil{throw Self.classifyJSON(message["error"],fallback:.protocolFailure)}
             if let method=message["method"] as? String,let requestID=message["id"] {
                 try? send(["id":requestID,"error":["code":-32601,"message":"Text-only planner cannot grant permissions or run tools."]])
@@ -508,12 +681,15 @@ private final class PlanningAgentTransport {
                 continue
             }
             guard let method=message["method"] as? String,let parameters=message["params"] as? [String:Any] else{continue}
-            if parameters["threadId"] as? String==threadID,turnID==nil || parameters["turnId"] as? String==turnID,let delta=parameters["delta"] as? String,!delta.isEmpty {
+            if stage>=2,parameters["threadId"] as? String==threadID,turnID==nil || parameters["turnId"] as? String==turnID,let delta=parameters["delta"] as? String,!delta.isEmpty {
                 if method=="item/agentMessage/delta",let itemID=parameters["itemId"] as? String{activity("generating",characters:delta.utf16.count);replyDelta(delta,reset:previewItemID != itemID);previewItemID=itemID}
                 if ["item/reasoning/summaryTextDelta","item/reasoning/textDelta"].contains(method){activity("thinking",characters:delta.utf16.count)}
             }
             if method=="item/started" || method=="item/completed",let item=parameters["item"] as? [String:Any],let type=item["type"] as? String,!Set(["userMessage","agentMessage","reasoning","plan","contextCompaction"]).contains(type){throw PlanningAgentError.permission}
-            if method=="item/completed",parameters["threadId"] as? String==threadID,let item=parameters["item"] as? [String:Any],item["type"] as? String=="agentMessage",let text=item["text"] as? String{finalText=text;replyDelta(text,reset:true)}
+            if method=="item/completed",stage>=2,parameters["threadId"] as? String==threadID,turnID==nil || parameters["turnId"] as? String==nil || parameters["turnId"] as? String==turnID,let item=parameters["item"] as? [String:Any],item["type"] as? String=="agentMessage",let text=item["text"] as? String,!text.isEmpty{
+                if finalText != text{activity("receiving")}
+                finalText=text;replyDelta(text,reset:true)
+            }
             if method=="error"{throw Self.classifyJSON(parameters,fallback:.failed)}
             if method=="turn/completed" {
                 guard stage>=2,parameters["threadId"] as? String==threadID,let turn=parameters["turn"] as? [String:Any],let id=turn["id"] as? String,turnID==nil || turnID==id else{throw PlanningAgentError.protocolFailure}
@@ -524,11 +700,11 @@ private final class PlanningAgentTransport {
             }
         }
     }
-    private func stream(prompt:String,deadline:Date)throws->String{
-        let request="planning-init",handshakeDeadline=min(deadline,Date().addingTimeInterval(25));var initialized=false,assistant=""
+    private func stream(prompt:String,handshakeDeadline:TimeInterval)throws->String{
+        let request="planning-init";var initialized=false,assistant=""
         try send(["type":"control_request","request_id":request,"request":["subtype":"initialize"]])
         while true {
-            guard let message=try next(deadline:initialized ? deadline:handshakeDeadline) else{continue}
+            let message=try next(handshakeDeadline:handshakeDeadline)
             switch message["type"] as? String {
             case "control_response":
                 guard !initialized,let response=message["response"] as? [String:Any],response["request_id"] as? String==request,response["subtype"] as? String=="success" else{throw PlanningAgentError.protocolFailure}
@@ -540,7 +716,13 @@ private final class PlanningAgentTransport {
                 guard initialized,let event=message["event"] as? [String:Any] else{throw PlanningAgentError.protocolFailure}
                 if event["type"] as? String=="content_block_start",let block=event["content_block"] as? [String:Any] {
                     guard ["text","thinking","redacted_thinking"].contains(block["type"] as? String ?? "") else{throw PlanningAgentError.permission}
-                    if block["type"] as? String=="text"{replyDelta(block["text"] as? String ?? "",reset:true)}
+                    if block["type"] as? String=="text"{
+                        let text=block["text"] as? String ?? ""
+                        if !text.isEmpty{activity("generating",characters:text.utf16.count)}
+                        replyDelta(text,reset:true)
+                    }else if block["type"] as? String=="thinking",let thinking=block["thinking"] as? String,!thinking.isEmpty{
+                        activity("thinking",characters:thinking.utf16.count)
+                    }
                 }
                 if event["type"] as? String=="content_block_delta",let delta=event["delta"] as? [String:Any] {
                     if delta["type"] as? String=="text_delta",let text=delta["text"] as? String,!text.isEmpty{activity("generating",characters:text.utf16.count);replyDelta(text)}
@@ -548,9 +730,10 @@ private final class PlanningAgentTransport {
                 }
             case "assistant":
                 guard initialized,let body=message["message"] as? [String:Any],let content=body["content"] as? [[String:Any]],content.allSatisfy({["text","thinking","redacted_thinking"].contains($0["type"] as? String ?? "")}) else{throw PlanningAgentError.permission}
-                assistant=content.compactMap{$0["type"] as? String=="text" ? $0["text"] as? String:nil}.joined()
+                let text=content.compactMap{$0["type"] as? String=="text" ? $0["text"] as? String:nil}.joined()
+                if !text.isEmpty,text != assistant{activity("receiving")}
+                assistant=text
                 replyDelta(assistant,reset:true)
-                activity("receiving")
             case "result":
                 guard initialized else{throw PlanningAgentError.protocolFailure}
                 if let reason=message["terminal_reason"] as? String {
@@ -564,8 +747,8 @@ private final class PlanningAgentTransport {
                 guard !result.isEmpty else{throw PlanningAgentError.protocolFailure}
                 progress("finishing",0)
                 writeLock.lock();if !closed{closed=true;try? input.fileHandleForWriting.close()};writeLock.unlock()
-                let exitDeadline=min(deadline,Date().addingTimeInterval(3))
-                while process.isRunning && Date()<exitDeadline{Thread.sleep(forTimeInterval:0.02)}
+                let exitDeadline=ProcessInfo.processInfo.systemUptime+3
+                while process.isRunning && ProcessInfo.processInfo.systemUptime<exitDeadline{Thread.sleep(forTimeInterval:0.02)}
                 guard !process.isRunning,process.terminationStatus==0 else{throw Self.classify(diagnostic,fallback:.failed)}
                 return result
             case "error":throw Self.classifyJSON(message,fallback:.failed)

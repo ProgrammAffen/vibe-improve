@@ -3,7 +3,7 @@
   "$defs": {
     "userRef": {
       "type": "string",
-      "pattern": "^U[1-9][0-9]{0,3}$"
+      "pattern": "^(U[1-9][0-9]{0,3}|B[1-8])$"
     },
     "assistantRef": {
       "type": "string",
@@ -72,6 +72,8 @@
             "purpose",
             "baseline",
             "time",
+            "deadline",
+            "scope",
             "constraints"
           ]
         },
@@ -198,6 +200,18 @@
           },
           "minItems": 0,
           "maxItems": 12
+        },
+        "baselineOptions": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "\\S"
+          }
         },
         "consistency": {
           "$ref": "#/$defs/consistencyAssessment"
@@ -343,6 +357,52 @@
               "unresolved": {
                 "maxItems": 0
               }
+            },
+            "required": [
+              "consistency"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "questionId": {
+                "const": "deadline"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "propertyNames": {
+                  "enum": [
+                    "deadline",
+                    "deadlineType",
+                    "strategy"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "questionId": {
+                "const": "scope"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "propertyNames": {
+                  "enum": [
+                    "scope",
+                    "strategy"
+                  ]
+                }
+              }
             }
           }
         }
@@ -385,6 +445,16 @@
           "maxLength": 600,
           "pattern": "\\S"
         },
+        "prerequisiteChapters": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 23
+          },
+          "maxItems": 23,
+          "uniqueItems": true
+        },
         "lessons": {
           "type": "array",
           "items": {
@@ -409,6 +479,18 @@
           "minLength": 1,
           "maxLength": 160,
           "pattern": "\\S"
+        },
+        "practiceRules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400,
+            "pattern": "\\S"
+          },
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true
         },
         "chapters": {
           "type": "array",
@@ -501,6 +583,12 @@
         "ref": {
           "$ref": "#/$defs/lessonRef"
         },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
         "objectives": {
           "type": "array",
           "items": {
@@ -583,7 +671,10 @@
             "coverage",
             "alignment",
             "specificity",
+            "learning_language",
+            "practice_sequence",
             "prerequisite",
+            "assessment_invalid",
             "feasibility",
             "unsupported_fact"
           ]
@@ -628,6 +719,12 @@
         "ready": {
           "type": "boolean"
         },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
         "issues": {
           "type": "array",
           "items": {
@@ -651,7 +748,7 @@
               }
             }
           },
-          "then": {
+            "then": {
             "properties": {
               "issues": {
                 "items": {
@@ -1396,6 +1493,8 @@
             "purpose",
             "baseline",
             "time",
+            "deadline",
+            "scope",
             "constraints"
           ]
         },
@@ -1632,6 +1731,74 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "questionId": {
+                "const": "deadline"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "items": {
+                  "enum": [
+                    "deadline",
+                    "deadlineType",
+                    "strategy"
+                  ]
+                }
+              },
+              "suggestion": {
+                "properties": {
+                  "fields": {
+                    "propertyNames": {
+                      "enum": [
+                        "deadline",
+                        "deadlineType",
+                        "strategy"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "questionId": {
+                "const": "scope"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "items": {
+                  "enum": [
+                    "scope",
+                    "strategy"
+                  ]
+                }
+              },
+              "suggestion": {
+                "properties": {
+                  "fields": {
+                    "propertyNames": {
+                      "enum": [
+                        "scope",
+                        "strategy"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       ]
     },
@@ -1650,7 +1817,7 @@
             "$ref": "#/$defs/consistencyIssue"
           },
           "minItems": 0,
-          "maxItems": 5
+          "maxItems": 7
         }
       },
       "required": [

@@ -27,24 +27,36 @@ for line in sys.stdin:
   text=message['message']['content'][0]['text'];assert text.lstrip().startswith('CONTEXT_JSON_DATA:') and 'learning-route planner' not in text
   context=json.loads(text.split('CONTEXT_JSON_DATA:',1)[1]);generation=context if 'requestedLessons' in context else None
   previous=[json.loads(line) for line in open('requests.ndjson')] if os.path.exists('requests.ndjson') else []
-  record={'stage':'chapter' if generation else 'outline','cwd':os.getcwd(),'repair':'repair' in context}
+  reviewing='TASK: review' in system
+  record={'stage':'review' if reviewing else 'chapter' if generation else 'outline','cwd':os.getcwd(),'repair':'repair' in context}
   if generation:
    lessons=generation['requestedLessons'];assert 1<=len(lessons)<=3
    record.update({'chapter':{'Foundations':'ch_1','Application':'ch_2','Transfer':'ch_3'}[generation['currentChapter']['title']],'ids':[n['ref'] for n in lessons],'available':[n['ref'] for n in generation['availablePrerequisites']]})
    assert 'node_' not in json.dumps(generation) and all(n['ref'].startswith('L') for n in lessons)
+   if mode=='dependencies' and record['chapter']=='ch_3':
+    assert [n['ref'] for n in generation['priorPractice'] if n['ref'] in ['L6','L7']]==['L6','L7']
   with open('requests.ndjson','a') as output:output.write(json.dumps(record)+'\n')
   event({**record,'event':'start'})
   first_batch=generation and record['chapter']=='ch_1' and lessons[0]['ref']=='L1'
   attempt=sum(p.get('ids')==record.get('ids') and p.get('chapter')==record.get('chapter') for p in previous)
-  if mode=='deadline':time.sleep(.6)
+  if mode=='long':time.sleep(.7)
+  elif mode=='idle' and generation:
+   if record['chapter']=='ch_1':time.sleep(10)
+   else:
+    for _ in range(40):
+     emit({'type':'stream_event','event':{'type':'content_block_delta','delta':{'type':'thinking_delta','thinking':'Synthetic progress'}}})
+     time.sleep(.08)
   elif generation:
    if mode=='cancel' or mode in ['bad-twice','network','auth'] and record['chapter']=='ch_2':time.sleep(10)
    else:time.sleep(.25 if record['chapter']=='ch_1' else .55)
   if mode in ['network','auth'] and generation and record['chapter']=='ch_1':
    emit({'type':'result','subtype':'error_during_execution','is_error':True,'result':'network connection reset' if mode=='network' else 'authentication required'})
   else:
-   if not generation:
+   if reviewing:
+    value={'reply':'Complete route checked.','ready':True,'issues':[]}
+   elif not generation:
     value={'reply':'Synthetic outline ready.','title':'Synthetic tutorial','chapters':[{'title':'Foundations','stageGoal':'Apply five named concepts.','lessons':[{'title':'Concept '+str(i),'focus':'Study a worked example, practice and explain the result.'} for i in range(1,6)]},{'title':'Application','stageGoal':'Apply two combined techniques.','lessons':[{'title':'Task '+str(i),'focus':'Apply the learned concepts independently.'} for i in range(1,3)]},{'title':'Transfer','stageGoal':'Transfer the method to a fresh case.','lessons':[{'title':'New case','focus':'Solve an unfamiliar case.'}]}]}
+    if mode=='dependencies':value['chapters'][2]['prerequisiteChapters']=[2]
    else:
     nodes=[];available=[n['ref'] for n in generation['availablePrerequisites']]
     for lesson in lessons:
@@ -70,11 +82,11 @@ func records(_ directory:URL,_ file:String="requests.ndjson")->[[String:Any]]{
  guard let text=try? String(contentsOf:directory.appendingPathComponent(file),encoding:.utf8) else{return []}
  return text.split(separator:"\\n").compactMap{try? JSONSerialization.jsonObject(with:Data($0.utf8)) as? [String:Any]}
 }
-for mode in ["success","bad-once","bad-twice","domain-once","network","auth","cancel","deadline"] {
+for mode in ["success","dependencies","bad-once","bad-twice","domain-once","network","auth","cancel","long","idle"] {
  let directory=base.appendingPathComponent(mode,isDirectory:true);try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
  let runtime=try RuntimeDirectory(url:directory.appendingPathComponent("runtime")),agent=try AgentManager(runtime:runtime,projectWorkspace:{_ in directory})
  let launch=try AgentSessionLaunch(provider:"codebuddy",projectID:id,executable:URL(fileURLWithPath:"/usr/bin/python3"),arguments:[fixture,mode,"--tools",""],workspace:directory,environment:ProcessInfo.processInfo.environment)
- let manager=PlanningAgentManager(agents:agent,timeout:mode=="deadline" ? 1.5:8,prepare:{_ in AgentSessionPreparation(projectID:id,provider:"codebuddy",launch:launch)})
+ let manager=PlanningAgentManager(agents:agent,idleTimeout:["long","idle"].contains(mode) ? 1.25:8,prepare:{_ in AgentSessionPreparation(projectID:id,provider:"codebuddy",launch:launch)})
  let context:[String:Any]=["projectId":id,"provider":"codebuddy","locale":"en","questions":[],"messages":[],"agentOptions":["model":"synthetic-model","effort":"high"]]
  var applies=0,checkedCounts:[Int]=[],saved:[String:Any]?;let validationLock=NSLock()
  let validate:([String:Any])throws->Void={route in
@@ -97,14 +109,16 @@ for mode in ["success","bad-once","bad-twice","domain-once","network","auth","ca
  }
  let calls=records(directory)
  for call in calls{check(call["cwd"] as? String==directory.path,"cwd changed");if let ids=call["ids"] as? [String]{check(ids.count<=3,"batch exceeded three")}}
- if ["success","bad-once","domain-once"].contains(mode) {
+ if ["success","dependencies","bad-once","domain-once","long"].contains(mode) {
   check(result["state"] as? String=="completed" && applies==1,mode+" did not apply once: "+String(describing:result))
   let chapters=saved!["chapters"] as! [[String:Any]]
   check(chapters.count==3 && (chapters[0]["nodes"] as! [[String:Any]]).count==5 && (chapters[1]["nodes"] as! [[String:Any]]).count==2 && (chapters[2]["nodes"] as! [[String:Any]]).count==1,"batching changed chapter boundaries")
   check(chapters.map{$0["title"] as! String}==["Foundations","Application","Transfer"],"chapter order changed")
   check(checkedCounts.sorted()==[1,2,3,5,8] && checkedCounts.last==8,"cumulative validation missing: "+String(describing:checkedCounts))
-  check(calls.count==(mode=="success" ? 5:6),"wrong successful request count")
-  check(calls.filter{$0["repair"] as? Bool==true}.count==(mode=="success" ? 0:1),"repair must be bounded and local")
+  let repaired=mode=="bad-once" || mode=="domain-once"
+  check(calls.count==(repaired ? 7:6) && calls.last?["stage"] as? String=="review","wrong successful request count")
+  check(calls.filter{$0["repair"] as? Bool==true}.count==(repaired ? 1:0),"repair must be bounded and local")
+  if mode=="long"{check(((result["diagnostic"] as! [String:Any])["durationMs"] as! Int)>2000,"generation did not span several requests beyond a silence window")}
   let second=calls.first{$0["chapter"] as? String=="ch_2"}!;check(second["available"] as? [String]==["L1","L2","L3","L4","L5"],"planned prerequisite references missing before prior chapter completes")
   let events=records(directory,"events.ndjson").filter{$0["stage"] as? String=="chapter"}.sorted{($0["at"] as! Double)<($1["at"] as! Double)}
   var active=Set<String>(),peak=0
@@ -112,13 +126,23 @@ for mode in ["success","bad-once","bad-twice","domain-once","network","auth","ca
   check(peak==2 && active.isEmpty,"chapter concurrency was not bounded to two")
   let firstEnd=events.first{$0["chapter"] as? String=="ch_1" && $0["event"] as? String=="end"}!["at"] as! Double,secondStart=events.first{$0["chapter"] as? String=="ch_2" && $0["event"] as? String=="start"}!["at"] as! Double
   check(secondStart<firstEnd,"later chapter waited for previous chapter output")
+  if mode=="dependencies"{
+   let producerEnd=events.first{$0["chapter"] as? String=="ch_2" && $0["event"] as? String=="end"}!["at"] as! Double
+   let consumerStart=events.first{$0["chapter"] as? String=="ch_3" && $0["event"] as? String=="start"}!["at"] as! Double
+   check(producerEnd<consumerStart,"dependent chapter started before its referenced practice was saved")
+  }
  }else{
   check(applies==0 && saved==nil,"partial generation applied")
   let expected=mode=="bad-twice" ? "PLANNING_AGENT_ROUTE_ENCODING":mode=="network" ? "PLANNING_AGENT_NETWORK":mode=="auth" ? "PLANNING_AGENT_AUTH_REQUIRED":mode=="cancel" ? "PLANNING_AGENT_CANCELLED":"PLANNING_AGENT_TIMEOUT"
   check(result["errorCode"] as? String==expected,mode+" wrong failure: "+String(describing:result))
   if mode=="bad-twice"{check(calls.count==4 && calls.filter{$0["repair"] as? Bool==true}.count==1,"invalid batch retried more than once")}
   if ["network","auth","cancel"].contains(mode){check(calls.count==3 && calls.allSatisfy{$0["repair"] as? Bool==false},"nonformat failure retried")}
-  if mode=="deadline"{let d=result["diagnostic"] as! [String:Any];check((d["durationMs"] as! Int)<2400 && calls.count>=2,"total deadline reset between batches")}
+  if mode=="idle"{
+   let diagnostic=result["diagnostic"] as! [String:Any],activity=result["activity"] as! [String:Any]
+   check(diagnostic["stage"] as? String=="idle_timeout","active sibling hid the idle diagnostic")
+   check((activity["thinkingCharacters"] as! Int)>0,"the other request did not produce progress")
+   check(calls.count==3 && calls.allSatisfy{$0["repair"] as? Bool==false},"idle timeout did not stop the active sibling and queued batches")
+  }
   let processIDs=Set(records(directory,"events.ndjson").compactMap{$0["pid"] as? Int32}),exitDeadline=Date().addingTimeInterval(2)
   while processIDs.contains(where:{kill($0,0)==0}) && Date()<exitDeadline{Thread.sleep(forTimeInterval:0.02)}
   check(processIDs.allSatisfy{kill($0,0) != 0},"failed group left a CLI process running")
@@ -130,6 +154,6 @@ for mode in ["success","bad-once","bad-twice","domain-once","network","auth","ca
  const compile=spawnSync('/usr/bin/swiftc',['-module-cache-path','tmp/cache/swift','apps/macos/RuntimeDirectory.swift','apps/macos/AgentManager.swift','apps/macos/CodeBuddyAdapter.swift','apps/macos/PlanningPromptPackResources.swift','apps/macos/PlanningPromptPack.swift','apps/macos/PlanningAgent.swift','apps/macos/PlanningGeneration.swift',source,'-o',binary],{encoding:'utf8',timeout:200_000});
  await writeFile(join(dir,'compile.log'),compile.stdout+compile.stderr);assert.equal(compile.status,0,compile.stderr);
  const run=spawnSync(binary,[join(dir,'data'),fixture,validator],{encoding:'utf8',timeout:60_000});
- await writeFile(join(dir,'run.log'),run.stdout+run.stderr);assert.equal(run.status,0,run.stderr);assert.match(run.stdout,/PASS staged deadline/);
+ await writeFile(join(dir,'run.log'),run.stdout+run.stderr);assert.equal(run.status,0,run.stderr);assert.match(run.stdout,/PASS staged idle/);
  console.log('Staged evidence: '+dir);
 });

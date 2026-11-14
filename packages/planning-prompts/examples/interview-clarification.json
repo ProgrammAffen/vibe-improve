@@ -14,7 +14,7 @@
   },
   "response": {
     "status": "ok",
-    "reply": "想先解决哪件具体工作？比如整理报表，或分析销售变化。",
+    "reply": "可以先从最近想解决的一件事说起，不需要先决定学哪门课。例如工作时整理资料太慢，或旅行时不敢开口问路。你最想先改善哪件事？",
     "result": {
       "questionId": "goal",
       "complete": false,
@@ -22,7 +22,7 @@
       "fields": {},
       "evidence": [],
       "unresolved": [
-        "希望独立完成什么任务？"
+        "你最想先改善哪件事？"
       ]
     },
     "missing": []

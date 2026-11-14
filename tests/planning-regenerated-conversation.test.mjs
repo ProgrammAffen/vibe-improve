@@ -7,7 +7,7 @@ import {build} from 'esbuild';
 import * as p from '../packages/domain/planning.mjs';
 
 const project='proj_12345678-1234-4234-8234-123456789abc';
-const fields={goal:{topic:'Python',outcome:'Produce a CSV report'},purpose:{context:'Weekly meeting',criteria:'Explain totals and trends'},baseline:{experience:'Know Python syntax'},time:{weekly:'Four hours',session:'Thirty minutes'},constraints:{scope:'Standard library',conditions:'Existing laptop'}};
+const fields={goal:{topic:'Python',outcome:'Produce a CSV report'},purpose:{context:'Weekly meeting',criteria:'Explain totals and trends'},baseline:{experience:'Know Python syntax'},time:{weekly:'Four hours',session:'Thirty minutes'}};
 const consistent={status:'consistent',issues:[]};
 const source=JSON.parse(await readFile('contracts/examples/route.valid.json','utf8'));
 function route(id){const value=p.upgradeRoute(structuredClone(source));value.id=id;for(const c of value.chapters)c.stageGoal='Apply the concepts independently.';return value}
@@ -17,24 +17,24 @@ function answer(state,id,suffix=''){
  state=p.applyInterview(state,{reply:'Please confirm.',summary:Object.values(fields[id]).join(' / '),updates:[{id,fields:fields[id],evidence:Object.keys(fields[id]).map(field=>({field,messageId:message,quote:fields[id][field]})),missing:[],complete:true}],consistency:consistent},request,state.revision);
  return p.acceptAnswer(state,id,state.questions.find(q=>q.id===id).answerProposal.messageId,state.revision);
 }
-function collected(){let state=p.createPlanning(project,'codebuddy','zh-CN');for(const id of p.QUESTION_IDS)state=answer(state,id);return state}
+function collected(){let state=p.createPlanning(project,'codebuddy','zh-CN');for(const id of p.DEFAULT_QUESTION_IDS)state=answer(state,id);return state}
 function discussion(state,suffix){const chapter=state.routeDraft.chapters[0],node=chapter.nodes[0],mentions=[{target:{chapterId:chapter.id,nodeId:node.id},token:'@1.1节'}];state=p.appendUser(state,'OLD_EDITOR_USER_'+suffix+' @1.1节','edit_user_'+suffix,'edit_'+suffix,state.revision,undefined,undefined,mentions);return p.applyEdit(state,{reply:'OLD_EDITOR_ASSISTANT_'+suffix},'edit_'+suffix,state.revision)}
 function previous(){
  let state=collected();state=p.startGeneration(state,'first',state.revision);state=p.applyGenerated(state,route('route_first'),'first',state.revision);
- state=discussion(state,'before');state=p.reopenIntake(state,state.revision);state=p.reanswerQuestion(state,'constraints',state.revision);state=answer(state,'constraints','_again');
+ state=discussion(state,'before');state=p.reopenIntake(state,state.revision);state=p.reanswerQuestion(state,'time',state.revision);state=answer(state,'time','_again');
  state=p.openEditor(state,state.revision);state=discussion(state,'after');state=p.appendUser(state,'OLD_EDITOR_UNANSWERED','unanswered_user','unanswered',state.revision);state=p.cancelPlanningRequest(state,'unanswered',state.revision);
  return p.reopenIntake(state,state.revision);
 }
 
 test('successful regeneration clears old editor exchanges, retains interview evidence and remaps question history',()=>{
- const before=previous(),old=structuredClone(before.routeDraft),questions=structuredClone(before.questions),facts=p.planningFactsHash(before),conversations=Object.fromEntries(p.QUESTION_IDS.map(id=>[id,p.questionMessages(before,id)]));
+ const before=previous(),old=structuredClone(before.routeDraft),questions=structuredClone(before.questions),facts=p.planningFactsHash(before),conversations=Object.fromEntries(p.DEFAULT_QUESTION_IDS.map(id=>[id,p.questionMessages(before,id)]));
  assert.ok(before.messages.some(m=>m.text.includes('OLD_EDITOR')));
  let state=p.startGeneration(before,'regenerate',before.revision,true);
  assert.deepEqual(state.messages,before.messages,'starting generation must not clear old conversation');
  state=p.applyGenerated(state,route('route_new'),'regenerate',state.revision);
  assert.equal(state.messages.filter(m=>!m.questionId).length,0);assert.equal(JSON.stringify(state.messages).includes('OLD_EDITOR'),false);
  assert.deepEqual(state.messages,before.messages.filter(m=>m.questionId));assert.equal(p.planningFactsHash(state),facts);
- for(const id of p.QUESTION_IDS){assert.deepEqual(p.questionMessages(state,id),conversations[id]);const q=state.questions.find(q=>q.id===id),oldQ=questions.find(q=>q.id===id);assert.deepEqual(q.acceptedSnapshot,oldQ.acceptedSnapshot)}
+ for(const id of p.DEFAULT_QUESTION_IDS){assert.deepEqual(p.questionMessages(state,id),conversations[id]);const q=state.questions.find(q=>q.id===id),oldQ=questions.find(q=>q.id===id);assert.deepEqual(q.acceptedSnapshot,oldQ.acceptedSnapshot)}
  assert.ok(state.questions.at(-1).conversationFrom<questions.at(-1).conversationFrom,'message offsets must be remapped');
  assert.deepEqual(state.history.past.at(-1),old);assert.equal(state.step,'editor');assert.equal(state.pending,undefined);
  const roundtrip=p.validatePlanning(JSON.parse(JSON.stringify(state)));assert.deepEqual(roundtrip,state);

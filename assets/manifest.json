@@ -1390,6 +1390,438 @@
       "approvedAt": "2026-11-01",
       "path": "assets/images/route-editor-scroll-cutout-v2.png",
       "sha256": "78433c10c6cf3c3d6b060b4ad351cd0806b4e1d2f904c6ea4add64c98828999c"
+    },
+    {
+      "id": "map-grassland-background-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-e5792634-a795-48c2-ab9a-de10ed6eb6bf.png; approved review copy tmp/review/four-map-themes-v5/grassland/background.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-e5792634-a795-48c2-ab9a-de10ed6eb6bf.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1672x941",
+        "transparency": "Opaque PNG",
+        "anchor": "Terrain canvas",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-grassland-background-v1.png",
+      "sha256": "0fc74af31f164856fc013722ccc76a908cafa2755794f49ae09d800c81b50e32"
+    },
+    {
+      "id": "map-grassland-landmark-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-acdf8547-5f43-448e-ae2d-c9a7efe803ca.png; approved review copy tmp/review/four-map-themes-v5/grassland/landmark.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-acdf8547-5f43-448e-ae2d-c9a7efe803ca.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1254x1254",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Ground contact at bottom center of visible bounds",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-grassland-landmark-v1.png",
+      "sha256": "6b7b4692360a3614945272cc0d001f2b0846dbf50f6295127eb8d1c8ad2fdc1a"
+    },
+    {
+      "id": "map-snow-background-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-9d906a90-9d76-494d-875d-a858cd34df3a.png; approved review copy tmp/review/four-map-themes-v5/snow/background.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-9d906a90-9d76-494d-875d-a858cd34df3a.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1672x941",
+        "transparency": "Opaque PNG",
+        "anchor": "Terrain canvas",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-snow-background-v1.png",
+      "sha256": "82c34570196bfa7c553c389a1d0abee932c6f62b99fb6a2fba553438aed77344"
+    },
+    {
+      "id": "map-snow-landmark-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-2d4e2845-2a57-495e-a61f-7777e7ff2404.png; approved review copy tmp/review/four-map-themes-v5/snow/landmark.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-2d4e2845-2a57-495e-a61f-7777e7ff2404.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1536x1024",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Ground contact at bottom center of visible bounds",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-snow-landmark-v1.png",
+      "sha256": "b5bc340af1419ddc158167e6ff758906f18589631b25baa81dddd9fd6c1f150c"
+    },
+    {
+      "id": "map-ocean-background-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-49874ea2-3224-4b89-ae4c-b05161d3c075.png; approved review copy tmp/review/four-map-themes-v5/ocean/background.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-49874ea2-3224-4b89-ae4c-b05161d3c075.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1672x941",
+        "transparency": "Opaque PNG",
+        "anchor": "Terrain canvas",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-ocean-background-v1.png",
+      "sha256": "b19dc26cc51262dac71d6cb96ae06459314cf20173d107d62c8608353404cf86"
+    },
+    {
+      "id": "map-ocean-landmark-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-4fdeda0a-acdf-4f49-96ed-1d9a59e7e217.png; approved review copy tmp/review/four-map-themes-v5/ocean/landmark.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-4fdeda0a-acdf-4f49-96ed-1d9a59e7e217.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1254x1254",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Ground contact at bottom center of visible bounds",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-ocean-landmark-v1.png",
+      "sha256": "66e49aa0b9257f4353a4f26e07784add87831db55c23e77afc0df2527e551bd5"
+    },
+    {
+      "id": "map-desert-background-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-49e1779a-8cc3-43e3-a779-2f7898672d50.png; approved review copy tmp/review/four-map-themes-v5/desert/background.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-49e1779a-8cc3-43e3-a779-2f7898672d50.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1672x941",
+        "transparency": "Opaque PNG",
+        "anchor": "Terrain canvas",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-desert-background-v1.png",
+      "sha256": "f0af3c5419770f9961fcb26326108febf52e88ee45951055bad1f5e3b5a9128a"
+    },
+    {
+      "id": "map-desert-landmark-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-a4aa2a1e-e717-4820-9327-fdd53f29d71d.png; approved review copy tmp/review/four-map-themes-v5/desert/landmark.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-a4aa2a1e-e717-4820-9327-fdd53f29d71d.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1536x1024",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Ground contact at bottom center of visible bounds",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-desert-landmark-v1.png",
+      "sha256": "f635a636629680882093f6e5c35773b7e8aad38d18d8e4f2fc75047935e7c606"
+    },
+    {
+      "id": "map-river-valley-background-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-2b822934-fdc5-457b-8c5b-e915e0d13a3c.png; approved review copy tmp/review/four-map-themes-v5/river-valley/background.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-2b822934-fdc5-457b-8c5b-e915e0d13a3c.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1671x941",
+        "transparency": "Opaque PNG",
+        "anchor": "Terrain canvas",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-river-valley-background-v1.png",
+      "sha256": "d65992bce1301fe266b8817e73e0591091ee5890a5479bc06aadf20513e2351b"
+    },
+    {
+      "id": "map-river-valley-landmark-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-f67773e7-28ea-4e8f-b592-5f58af8bd185.png; approved review copy tmp/review/four-map-themes-v5/river-valley/landmark-v2.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-f67773e7-28ea-4e8f-b592-5f58af8bd185.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1254x1254",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Ground contact at bottom center of visible bounds",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-river-valley-landmark-v1.png",
+      "sha256": "c23eacfeb922d5f5f2c5f7f9a97e1f6d9093362b233e42b6b7507eba90d92eb9"
+    },
+    {
+      "id": "map-volcanic-belt-background-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-dca70bf7-40b7-4f20-85c6-102540b2d894.png; approved review copy tmp/review/four-map-themes-v5/volcanic-belt/background.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-dca70bf7-40b7-4f20-85c6-102540b2d894.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1672x941",
+        "transparency": "Opaque PNG",
+        "anchor": "Terrain canvas",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-volcanic-belt-background-v1.png",
+      "sha256": "70554baf3a18aa1ccf12824fb9d6b7d99cf1f9c40f69976b07c52661bc3b8748"
+    },
+    {
+      "id": "map-volcanic-belt-landmark-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-e1f25295-7ca4-4073-ae0c-d6c07b2fd77f.png; approved review copy tmp/review/four-map-themes-v5/volcanic-belt/landmark.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-e1f25295-7ca4-4073-ae0c-d6c07b2fd77f.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1536x1024",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Ground contact at bottom center of visible bounds",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-volcanic-belt-landmark-v1.png",
+      "sha256": "b2717ec56964a31dd5ce2d52832b407289c4bcb920c27531a8adbc49291df08f"
+    },
+    {
+      "id": "map-forest-background-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-79eb82ee-3bec-410d-80d0-bec17e108b84.png; approved review copy tmp/review/four-map-themes-v5/forest/background.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-79eb82ee-3bec-410d-80d0-bec17e108b84.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1672x941",
+        "transparency": "Opaque PNG",
+        "anchor": "Terrain canvas",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-forest-background-v1.png",
+      "sha256": "75fec68029a07cce96721435129daae4a572a347cbe2108c2ed747f4161645c9"
+    },
+    {
+      "id": "map-forest-landmark-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-bb2799f8-6a1a-41f7-b8cf-4f7a7c05694e.png; approved review copy tmp/review/four-map-themes-v5/forest/landmark.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-bb2799f8-6a1a-41f7-b8cf-4f7a7c05694e.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1254x1254",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Ground contact at bottom center of visible bounds",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-forest-landmark-v1.png",
+      "sha256": "eb58805783291e9900f82f712fd8793dfc204bbb1c4bf46e1876a693e198a9d9"
+    },
+    {
+      "id": "map-yardang-background-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-e7d4119b-b7ad-4dfd-88a6-e12ef69d7ef4.png; approved review copy tmp/review/four-map-themes-v5/yardang/background.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-e7d4119b-b7ad-4dfd-88a6-e12ef69d7ef4.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1672x941",
+        "transparency": "Opaque PNG",
+        "anchor": "Terrain canvas",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-yardang-background-v1.png",
+      "sha256": "ce7702b068bcfc44b8225fc470467e59ae7e0c2981230b75a9c9070c32546f42"
+    },
+    {
+      "id": "map-yardang-landmark-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-0c21b7f0-ac1e-48f2-abc2-d82519e82cdb.png; approved review copy tmp/review/four-map-themes-v5/yardang/landmark-v2.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-0c21b7f0-ac1e-48f2-abc2-d82519e82cdb.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1484x1060",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Ground contact at bottom center of visible bounds",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-yardang-landmark-v1.png",
+      "sha256": "a634c70cfce5c09099a42801d4d3c049360f3faab1d8767c87500626cce31239"
+    },
+    {
+      "id": "map-cavern-background-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-c22659d1-f978-4f36-9987-5522c04b0e24.png; approved review copy tmp/review/four-map-themes-v5/cavern/background.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-c22659d1-f978-4f36-9987-5522c04b0e24.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1672x941",
+        "transparency": "Opaque PNG",
+        "anchor": "Terrain canvas",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-cavern-background-v1.png",
+      "sha256": "2477b20e7828cc912346e532cf5301a99db301ea894503c0bef78d1124f9f2e2"
+    },
+    {
+      "id": "map-cavern-landmark-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-def17aa6-b13e-4f82-bf2b-a3afb06dfb69.png; approved review copy tmp/review/four-map-themes-v5/cavern/landmark.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-def17aa6-b13e-4f82-bf2b-a3afb06dfb69.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1254x1254",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Ground contact at bottom center of visible bounds",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-cavern-landmark-v1.png",
+      "sha256": "38143272d23aabf297eb0a624c58796dbbce67398f61c785bda2dea91257a86b"
+    },
+    {
+      "id": "map-grassland-paw-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-08f38af8-448a-43a6-9744-067bfffa57a6.png; approved review copy tmp/review/four-map-themes-v5/grassland/paw.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-08f38af8-448a-43a6-9744-067bfffa57a6.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1254x1254",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Medallion centered on route node",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-grassland-paw-v1.png",
+      "sha256": "d2d7219a7cd24c2f15159afa68bb3bc9efcb77c05d29e00444383d939e6ac887"
+    },
+    {
+      "id": "map-snow-paw-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-4f43b0d9-59c1-4078-97e9-df9069ad8c83.png; approved review copy tmp/review/four-map-themes-v5/snow/paw.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-4f43b0d9-59c1-4078-97e9-df9069ad8c83.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1254x1254",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Medallion centered on route node",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-snow-paw-v1.png",
+      "sha256": "ab3ca0f5ab05d4aca89148cda8af8de972260837bd68f14538f883a069139cc9"
+    },
+    {
+      "id": "map-ocean-paw-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-749711df-ce56-4938-8e33-d1470a3218ca.png; approved review copy tmp/review/four-map-themes-v5/ocean/paw.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-749711df-ce56-4938-8e33-d1470a3218ca.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1254x1254",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Medallion centered on route node",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-ocean-paw-v1.png",
+      "sha256": "2ba251858167fb292cf80bea2bf4e180a0379b091a819dbc51d8864b0a0217a4"
+    },
+    {
+      "id": "map-desert-paw-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-2a12cc07-36ae-4cbb-8629-78010d24c132.png; approved review copy tmp/review/four-map-themes-v5/desert/paw.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-2a12cc07-36ae-4cbb-8629-78010d24c132.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1254x1254",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Medallion centered on route node",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-desert-paw-v1.png",
+      "sha256": "d38d8c9d6cde8e890869b7102bf64027174b2a62c8c6cc4ca2c61b2af29e4a31"
+    },
+    {
+      "id": "map-chapter-sign-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-c4ede355-a114-4a6e-9294-54a399545d69.png; approved review copy tmp/review/four-map-themes-v5/shared/chapter-sign-weathered.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-c4ede355-a114-4a6e-9294-54a399545d69.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1657x949",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Stake foot at bottom center of visible bounds",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-chapter-sign-v1.png",
+      "sha256": "30822cc528bc5e1f50a6e7ddc35f5a6493255ef3e9288d5d0162bba66ec6a05f"
+    },
+    {
+      "id": "map-ocean-sign-footing-v1",
+      "kind": "images",
+      "source": "Built-in image_gen in the map design conversation. Generation output exec-7ce767ab-4aaa-439e-95b0-c28917198251.png; approved review copy tmp/review/four-map-themes-v5/shared/ocean-sign-footing.png.",
+      "license": "AI-generated output; applicable OpenAI service terms apply.",
+      "licenseEvidence": "Byte-identical to built-in image_gen output exec-7ce767ab-4aaa-439e-95b0-c28917198251.png. Final placement and review notes: tmp/review/four-map-themes-v5/REVIEW.md.",
+      "approvedBy": "user",
+      "approvalRef": "用户审阅九区地图和浅棕单桩木牌后确认：“可以，请你把以上的背景和路线图应用到app中”。",
+      "approvedAt": "2026-11-11",
+      "metadata": {
+        "dimensions": "1859x846",
+        "transparency": "Generated alpha preserved",
+        "anchor": "Under the chapter sign stake on ocean terrain",
+        "coordinateSystem": "Pixels, x right, y down"
+      },
+      "path": "assets/images/map-ocean-sign-footing-v1.png",
+      "sha256": "2b9c69577ff6c63b51fe23b83225d8b11820590f42017c8ab299ffb2b1aa2a71"
     }
   ]
 }

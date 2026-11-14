@@ -1,6 +1,6 @@
 # Vibe Improve
 
-金丝熊魔法冒险学习 Skill。当前可运行增量包含动态主页、森林设置、独立账户、CloudBase 邮箱认证与设备 license，以及项目名称/目录、智能体选择、路线来源、本地路线导入、AI访谈与路线生成、章节编辑与确认和项目列表；地图、章节学习和同步后续接入。
+金丝熊魔法冒险学习 Skill。当前包含动态主页、森林设置、独立账户、CloudBase 邮箱认证与设备授权，以及项目管理、智能体选择、本地路线导入、AI 访谈、路线生成与编辑。确认路线后进入冒险地图，可查看章节、开始或跳过小节、自评完成并恢复本地学习进度。
 
 ## 运行与打包
 
@@ -22,7 +22,7 @@ npm run build
 node scripts/package-mac.mjs --arm64
 ```
 
-输出：`output/Vibe Improve.app`，无需解压，直接打开。同名旧版在构建和签名验证通过后覆盖，不生成压缩包。`--intel` 构建 Intel 版本。当前签名为 ad hoc，未公证。桌面始终加载安装包内的界面、动态视频与字体；CloudBase仅作后台，身份和授权操作需要联网。运行数据固定在 `~/Library/Application Support/Vibe Improve/`：偏好、`device.json`安装身份、项目索引、智能体配置/托管CLI、内部日志和加密会话/租约。移动或更新应用不改变数据位置。首次启动从旧应用同级运行目录原子复制，保留原目录；已有标准目录中的持久数据优先，身份与会话不跨来源混合。迁移失败不生成新设备身份。密码不保存；7天内按令牌有效期恢复登录，未到期不重复查询后台，令牌临期才刷新，主动退出或改密后清除会话。文件边界见 [architecture](harness/architecture.md)、[license](harness/license.md)。
+输出文件为 `output/Vibe Improve.app`，可直接打开。同名旧版在构建和签名验证通过后覆盖。`--intel` 构建 Intel 版本。当前签名为 ad hoc，未公证。桌面加载安装包内的界面、动态视频与字体。CloudBase 用于账号和授权后台。偏好、设备身份、项目、智能体配置、内部日志及加密会话保存在 `~/Library/Application Support/Vibe Improve/`。设备身份由 macOS 硬件标识派生。旧版登录封装升级和迁移到另一台机器时需重新登录。运行数据迁移与会话续期见 [架构](harness/architecture.md) 和 [授权](harness/license.md)。
 
 ## 项目草稿
 
@@ -30,7 +30,7 @@ node scripts/package-mac.mjs --arm64
 
 项目草稿保存在标准运行目录 `~/Library/Application Support/Vibe Improve/projects/`，支持分页、滚动、打开、从列表移除和原目录恢复；未提交表单自动保存。草稿阶段不创建目标项目文件夹，路线采用后再建立正式学习库；该阶段进度显示“待规划”。项目数据仅保存在本地。
 
-名称与目录确认后目录锁定，后续步骤不再提供修改目录；随后进入智能体选择页，首项“无智能体，手动创建”与六款工具同组单选。Codex、Claude Code与CodeBuddy检测可信CLI及认证，未登录时提供登录入口；CodeBuddy未安装时支持一键安装。首次进入自动检测，随后读取`agents/detection.json`缓存；设置可手动重新检测，默认与项目选择独立保存至运行目录`agents/choices.json`。下一步进入草原路线来源页；本地JSON可选择、校验、预览并保存草稿，在线路线尚未开放。路线准备保存在`projects/route-preparation/`，重开恢复；导入不修改源文件、不建立学习进度。AI创建进入图书馆对话与五项采集清单，必要项完整后生成路线；手动创建与导入直接进入棕色卷轴章节编辑。编辑器支持章节增删、移动、目标、可选验收与AI修改提案的采用/放弃/撤销。规划保存于`projects/planning/`，重开恢复原步骤，确认路线不创建虚构学习进度。
+名称与目录确认后目录锁定，随后进入智能体选择页，可选择手动创建或六款工具之一。Codex、Claude Code 与 CodeBuddy 检测可信 CLI 及认证，未登录时提供登录入口。CodeBuddy 可在应用内安装。初次进入自动检测，设置中可重新检测。路线来源页支持导入并校验本地 JSON。AI 创建通过学习方向、达标表现、已有基础和每周时间四项采集后生成草稿。手动创建与导入直接进入编辑器。编辑器支持章节增删、移动、学习目标、可选验收标准及 AI 修改提案。规划保存于 `projects/planning/`，学习进度保存于 `projects/learning/`。打开项目恢复相应步骤或已确认的路线地图。
 
 CodeBuddy使用官方独立npm CLI 2.177.0，需要Node.js 18.20.8以上版本及npm，安装、配置和缓存位于`agents/codebuddy/`。不依赖WorkBuddy桌面端，不全局安装；国内站登录支持跨进程复用。实测与限制见[CodeBuddy调研](research/agent-access/2026-10-27-codebuddy-code.md)。
 

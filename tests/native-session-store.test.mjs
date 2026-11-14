@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdir,mkdtemp,writeFile,readFile,stat,chmod,symlink,link,rm,readdir} from 'node:fs/promises';
+import {mkdir,mkdtemp,writeFile,readFile,stat,chmod,symlink,link,rm,readdir,cp} from 'node:fs/promises';
 import {spawnSync} from 'node:child_process';
 import {createCipheriv,createDecipheriv,randomBytes} from 'node:crypto';
 import {join} from 'node:path';
@@ -9,8 +9,9 @@ import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../',import.meta.url)),base=join(root,'tmp/checks/native-session-store');
 const env={...process.env,CLANG_MODULE_CACHE_PATH:join(root,'tmp/cache/clang'),SWIFT_MODULECACHE_PATH:join(root,'tmp/cache/swift')};
 const valid={schemaVersion:1,envId:'one-person-company-7dao3979fd72e',accessToken:'SYNTHETIC_ACCESS',refreshToken:'SYNTHETIC_REFRESH'};
-const aad=Buffer.from('vibe-improve.session.v1:one-person-company-7dao3979fd72e');
-const options={skip:process.platform!=='darwin',timeout:60_000};
+const deviceA='dev_hw_'+'a'.repeat(64),deviceB='dev_hw_'+'b'.repeat(64);
+const aad=Buffer.from('vibe-improve.session.v2:one-person-company-7dao3979fd72e:'+deviceA);
+const options={skip:process.platform!=='darwin',timeout:150_000};
 let compiled;
 async function binary() {
   if(!compiled)compiled=(async()=>{
@@ -18,7 +19,8 @@ async function binary() {
     await writeFile(main,`import Foundation
 let mode = CommandLine.arguments[1]
 let url = URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true)
-let store = SessionCredentialStore(runtimeRoot: url)
+let currentDevice = CommandLine.arguments.count > 3 ? CommandLine.arguments[3] : "dev_hw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+let store = SessionCredentialStore(runtimeRoot: url, deviceID: { currentDevice })
 let valid: [String: Any] = ["schemaVersion": 1, "envId": "one-person-company-7dao3979fd72e", "accessToken": "SYNTHETIC_ACCESS", "refreshToken": "SYNTHETIC_REFRESH"]
 do {
     if mode == "write" { try store.write(valid) }
@@ -37,19 +39,19 @@ do {
     if mode == "migrate" { try RuntimeDirectory(url: url).migratePreferences(from: url.deletingLastPathComponent().appendingPathComponent("legacy")) }
     print("OK")
 } catch {
-    print((error as? SessionStoreError) == .invalid || (error as? RuntimeFileError) == .invalid ? "INVALID" : "UNAVAILABLE")
+    print((error as? SessionStoreError) == .deviceChanged ? "DEVICE_CHANGED" : (error as? SessionStoreError) == .invalid || (error as? RuntimeFileError) == .invalid ? "INVALID" : "UNAVAILABLE")
     exit(3)
 }
 `);
-    const compile=spawnSync('/usr/bin/swiftc',['-module-cache-path',join(root,'tmp/cache/swift'),join(root,'apps/macos/RuntimeDirectory.swift'),join(root,'apps/macos/SessionCredentialStore.swift'),main,'-o',executable],{cwd:root,env,encoding:'utf8'});
+    const compile=spawnSync('/usr/bin/swiftc',['-module-cache-path',join(root,'tmp/cache/swift'),join(root,'apps/macos/RuntimeDirectory.swift'),join(root,'apps/macos/DeviceIdentity.swift'),join(root,'apps/macos/SessionCredentialStore.swift'),'-framework','IOKit',main,'-o',executable],{cwd:root,env,encoding:'utf8'});
     assert.equal(compile.status,0,compile.stderr);return executable;
   })();
   return compiled;
 }
 async function fixture() {
   const executable=await binary(),dir=await mkdtemp(join(base,'run-')),runtime=join(dir,'Vibe Improve Runtime');
-  const run=(mode,{failure=false}={})=>{
-    const result=spawnSync(executable,[mode,runtime],{cwd:root,env,encoding:'utf8'});
+  const run=(mode,{failure=false,device=deviceA}={})=>{
+    const result=spawnSync(executable,[mode,runtime,device],{cwd:root,env,encoding:'utf8'});
     assert.equal(result.status,failure?3:0,result.stderr+result.stdout);return result.stdout;
   };
   return {dir,runtime,auth:join(runtime,'auth'),run};
@@ -59,7 +61,7 @@ test('runtime files survive process restart, are encrypted, rotate nonces and cl
   const f=await fixture();assert.match(f.run('read'),/EMPTY/);f.run('write');
   const first=await readFile(join(f.auth,'session.json'),'utf8'),key=await readFile(join(f.auth,'session.key'));
   assert.ok(!first.includes('SYNTHETIC'));assert.equal(key.length,32);
-  const envelope=JSON.parse(first);assert.deepEqual(Object.keys(envelope).sort(),['algorithm','payload','schemaVersion']);
+  const envelope=JSON.parse(first);assert.deepEqual(Object.keys(envelope).sort(),['algorithm','deviceId','payload','schemaVersion']);
   const bytes=Buffer.from(envelope.payload,'base64'),decipher=createDecipheriv('aes-256-gcm',key,bytes.subarray(0,12));
   decipher.setAAD(aad);decipher.setAuthTag(bytes.subarray(-16));
   assert.deepEqual(JSON.parse(Buffer.concat([decipher.update(bytes.subarray(12,-16)),decipher.final()])),valid);
@@ -71,11 +73,11 @@ test('runtime files survive process restart, are encrypted, rotate nonces and cl
   for(const name of ['session.key','session.json'])await assert.rejects(stat(join(f.auth,name)),{code:'ENOENT'});
 });
 
-test('portable AES-GCM envelope interoperates and rejects altered, malformed and oversized data',options,async()=>{
+test('hardware-bound AES-GCM envelope interoperates and rejects altered, malformed and oversized data',options,async()=>{
   const f=await fixture();f.run('read');
   const key=randomBytes(32),nonce=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key,nonce);cipher.setAAD(aad);
   const bytes=Buffer.concat([nonce,cipher.update(JSON.stringify(valid)),cipher.final(),cipher.getAuthTag()]);
-  const encode=payload=>JSON.stringify({schemaVersion:1,algorithm:'AES-256-GCM',payload:payload.toString('base64')});
+  const encode=payload=>JSON.stringify({schemaVersion:2,deviceId:deviceA,algorithm:'AES-256-GCM',payload:payload.toString('base64')});
   await writeFile(join(f.auth,'session.key'),key,{mode:0o600});await writeFile(join(f.auth,'session.json'),encode(bytes),{mode:0o600});
   assert.match(f.run('read'),/PRESENT/);
   const altered=Buffer.from(bytes);altered[15]^=1;
@@ -84,6 +86,39 @@ test('portable AES-GCM envelope interoperates and rejects altered, malformed and
   }
   await writeFile(join(f.auth,'session.json'),encode(bytes));await rm(join(f.auth,'session.key'));assert.match(f.run('read',{failure:true}),/INVALID/);
   f.run('clear');f.run('write');assert.match(f.run('read'),/PRESENT/);
+});
+
+test('copying the entire runtime to different hardware cannot restore sign-in or license secrets',options,async()=>{
+  const original=await fixture();original.run('write');
+  await writeFile(join(original.runtime,'learning-data.txt'),'SYNTHETIC_PROJECTS');
+  const copied=await fixture();await cp(original.runtime,copied.runtime,{recursive:true});
+  assert.match(copied.run('read'),/PRESENT/);
+  assert.match(copied.run('read',{failure:true,device:deviceB}),/DEVICE_CHANGED/);
+  assert.match(original.run('read'),/PRESENT/);
+  const envelope=JSON.parse(await readFile(join(copied.auth,'session.json'),'utf8'));
+  envelope.deviceId=deviceB;
+  await writeFile(join(copied.auth,'session.json'),JSON.stringify(envelope));
+  assert.match(copied.run('read',{failure:true,device:deviceB}),/INVALID/);
+  copied.run('clear',{device:deviceB});copied.run('write',{device:deviceB});
+  assert.match(copied.run('read',{device:deviceB}),/PRESENT/);
+  assert.match(copied.run('read',{failure:true}),/DEVICE_CHANGED/);
+  assert.equal(await readFile(join(copied.runtime,'learning-data.txt'),'utf8'),'SYNTHETIC_PROJECTS');
+  assert.match(original.run('read'),/PRESENT/);
+});
+
+test('legacy unbound sessions require fresh authentication and unavailable hardware has no ID fallback',options,async()=>{
+  const f=await fixture();f.run('read');
+  const key=randomBytes(32),nonce=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key,nonce);
+  cipher.setAAD(Buffer.from('vibe-improve.session.v1:one-person-company-7dao3979fd72e'));
+  const bytes=Buffer.concat([nonce,cipher.update(JSON.stringify(valid)),cipher.final(),cipher.getAuthTag()]);
+  await writeFile(join(f.auth,'session.key'),key,{mode:0o600});
+  await writeFile(join(f.auth,'session.json'),JSON.stringify({schemaVersion:1,algorithm:'AES-256-GCM',payload:bytes.toString('base64')}),{mode:0o600});
+  assert.match(f.run('read',{failure:true}),/DEVICE_CHANGED/);
+  f.run('clear');f.run('write');assert.match(f.run('read'),/PRESENT/);
+  const before=await readFile(join(f.auth,'session.json'));
+  assert.match(f.run('read',{failure:true,device:'dev_old_random_installation_123'}),/UNAVAILABLE/);
+  assert.match(f.run('write',{failure:true,device:''}),/UNAVAILABLE/);
+  assert.deepEqual(await readFile(join(f.auth,'session.json')),before);
 });
 
 test('runtime bridge payload rejects extra identity fields, invalid tokens and foreign environments',options,async()=>{

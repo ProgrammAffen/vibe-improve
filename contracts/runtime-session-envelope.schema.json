@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vibe-improve.local/contracts/runtime-session-envelope.schema.json",
+  "title": "Hardware-bound encrypted native session",
+  "description": "AES-GCM combined nonce, ciphertext and tag. AAD is vibe-improve.session.v2:<envId>:<live hardware-derived deviceId>. Legacy v1 envelopes require new authentication.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "deviceId", "algorithm", "payload"],
+  "properties": {
+    "schemaVersion": {"const": 2},
+    "deviceId": {"type": "string", "pattern": "^dev_hw_[a-f0-9]{64}$"},
+    "algorithm": {"const": "AES-256-GCM"},
+    "payload": {"type": "string", "minLength": 40, "maxLength": 53372, "contentEncoding": "base64", "pattern": "^[A-Za-z0-9+/]+={0,2}$"}
+  }
+}

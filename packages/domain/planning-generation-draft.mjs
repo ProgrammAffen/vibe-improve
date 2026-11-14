@@ -2,7 +2,7 @@ import {validateRoute} from './route-validation.mjs';
 import {sha256} from './sha256.mjs';
 import manifest from '../planning-prompts/manifest.json' with {type:'json'};
 
-export const GENERATION_POLICY=manifest.version;
+export const GENERATION_POLICY=manifest.generationCheckpointVersion;
 const fail=()=>{throw new Error('PLANNING_GENERATION_INVALID')};
 const object=v=>v&&typeof v==='object'&&!Array.isArray(v);
 const keys=(v,n)=>object(v)&&Object.keys(v).length===n.length&&n.every(k=>Object.hasOwn(v,k));
@@ -18,10 +18,22 @@ export function validateGenerationDraft(d){
  for(const field of ['createdAt','updatedAt'])if(typeof d[field]!=='string'||!/^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(d[field])||!Number.isFinite(Date.parse(d[field])))fail();
  if(Date.parse(d.updatedAt)<Date.parse(d.createdAt))fail();
  const envelope=d.outline,result=envelope?.result;
- if(!keys(envelope,['status','reply','result','missing'])||envelope.status!=='ok'||!text(envelope.reply,8000)||!Array.isArray(envelope.missing)||envelope.missing.length||!keys(result,['title','chapters'])||!text(result.title,160)||!Array.isArray(result.chapters)||result.chapters.length<1||result.chapters.length>24)fail();
+ const outlineFields=['title','chapters'];
+ if(object(result)&&Object.hasOwn(result,'practiceRules'))outlineFields.push('practiceRules');
+ if(!keys(envelope,['status','reply','result','missing'])||envelope.status!=='ok'||!text(envelope.reply,8000)||!Array.isArray(envelope.missing)||envelope.missing.length||!keys(result,outlineFields)||!text(result.title,160)||!Array.isArray(result.chapters)||result.chapters.length<1||result.chapters.length>24)fail();
+ if(outlineFields.includes('practiceRules')){
+  const rules=result.practiceRules;
+  if(!Array.isArray(rules)||!rules.length||rules.length>8||new Set(rules).size!==rules.length||rules.some(rule=>!text(rule,400)))fail();
+ }
  const positions=new Map();let total=0;
  result.chapters.forEach((c,i)=>{
-  if(!keys(c,['title','stageGoal','lessons'])||!text(c.title,160)||!text(c.stageGoal,600)||!Array.isArray(c.lessons)||!c.lessons.length||c.lessons.length>64)fail();
+  const chapterFields=['title','stageGoal','lessons'];
+  if(object(c)&&Object.hasOwn(c,'prerequisiteChapters')){
+   chapterFields.push('prerequisiteChapters');
+   const prerequisites=c.prerequisiteChapters;
+   if(!Array.isArray(prerequisites)||new Set(prerequisites).size!==prerequisites.length||prerequisites.some(position=>!integer(position,1,i)))fail();
+  }
+  if(!keys(c,chapterFields)||!text(c.title,160)||!text(c.stageGoal,600)||!Array.isArray(c.lessons)||!c.lessons.length||c.lessons.length>64)fail();
   c.lessons.forEach((n,j)=>{if(!keys(n,['title','focus'])||!text(n.title,160)||!text(n.focus,300)||++total>512)fail();positions.set(`node_${i+1}_${j+1}`,positions.size)});
  });
  if(!Array.isArray(d.chapters)||d.chapters.length!==result.chapters.length)fail();

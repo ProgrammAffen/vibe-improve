@@ -24,7 +24,38 @@ check(plan.chapters.count==2 && plan.chapters[0].lessons.count==4)
 check(plan.chapters[0].id=="ch_1" && plan.chapters[1].lessons[0].id=="node_2_1")
 check(plan.chapters[1].lessons[0].ref=="L5" && plan.aliasToNodeID["L5"]=="node_2_1")
 check(plan.reply=="Please review the result.")
+var dependentOutline=outline,dependentChapter=second
+dependentChapter["prerequisiteChapters"]=[1]
+dependentOutline["chapters"]=[first,dependentChapter]
+let dependentPlan=try PlanningGeneration.plan(envelope(dependentOutline),locale:"zh-CN")
+check(dependentPlan.chapters[1].prerequisiteChapters==[0],"outline dependencies lost their chapter order")
+let savedChapter=(dependentPlan.envelope["result"] as! [String:Any])["chapters"] as! [[String:Any]]
+check(savedChapter[1]["prerequisiteChapters"] as? [Int]==[1],"checkpoint lost chapter dependencies")
+for invalid in [[0],[2],[1,1]]{
+ dependentChapter["prerequisiteChapters"]=invalid
+ dependentOutline["chapters"]=[first,dependentChapter]
+ rejected{_ = try PlanningGeneration.plan(envelope(dependentOutline),locale:"zh-CN")}
+}
 check(plan.id != (try PlanningGeneration.plan(envelope(outline),locale:"zh-CN")).id,"regeneration reused route identity")
+var codeLesson=lesson
+codeLesson["title"]="整理faq_set"
+var codeChapter=first
+codeChapter["lessons"]=[codeLesson]
+let oldOutline=envelope(["title":"客服智能体评测","chapters":[codeChapter]])
+do{
+ _ = try PlanningGeneration.plan(oldOutline,locale:"zh-CN")
+ fatalError("an implementation identifier was accepted as a generated lesson title")
+}catch let error as PlanningLearningLanguageError{check(error.paths==["result.chapters.0.lessons.0.title"])}
+codeChapter["stageGoal"]="能用 trace_id 还原一次请求"
+do{
+ _ = try PlanningGeneration.plan(envelope(["title":"客服智能体评测","chapters":[codeChapter]]),locale:"zh-CN")
+ fatalError("multiple wording violations were accepted")
+}catch let error as PlanningLearningLanguageError{
+ check(error.paths==["result.chapters.0.stageGoal","result.chapters.0.lessons.0.title"])
+ let corrected=PlanningRepair.prompt(try PlanningGeneration.outlinePrompt(context:context),candidate:"{}",issues:error.paths.map{["path":$0,"code":"learning_language"]})
+ check(corrected?.contains("result.chapters.0.lessons.0.title")==true,"outline lesson paths were filtered out of repair")
+}
+check(try PlanningGeneration.plan(oldOutline,locale:"zh-CN",learnerTitles:false).chapters[0].lessons[0].title=="整理faq_set")
 for mutation in ["extra","empty","manyChapters","manyLessons","manyNodes","emptyGoal","longGoal","extraLesson","emptyFocus","longFocus","longTitle"]{
  var value=outline
  if mutation=="extra"{value["route"]="SENSITIVE_EXTRA"}
@@ -97,7 +128,10 @@ rejected{_ = try plan.completeRoute([batch1])}
 let nextPrompt=try PlanningGeneration.chapterPrompt(context:context,plan:plan,index:0,completed:[batch1],range:3..<4),nextData=try promptData(nextPrompt)
 check((nextData["requestedLessons"] as! [[String:Any]]).map{$0["ref"] as! String}==["L4"])
 check((nextData["availablePrerequisites"] as! [[String:Any]]).map{$0["ref"] as! String}==["L1","L2","L3"])
-check(!nextPrompt.contains("Explain and perform the named operation"),"previous expanded node body leaked into prompt")
+let priorBatch=nextData["priorPractice"] as! [[String:Any]]
+check(priorBatch.map{$0["ref"] as! String}==["L1","L2","L3"])
+check(priorBatch[0]["activities"] as? [String]==firstNode["activities"] as? [String],"previous verified practice missing")
+check(!nextPrompt.contains("Explain and perform the named operation"),"unneeded objective body included")
 check(!nextPrompt.contains("node_1_") && !nextPrompt.contains(plan.id),"persistent IDs leaked into model wire")
 check(((nextData["outline"] as! [String:Any])["chapters"] as! [[String:Any]]).count==2,"later chapter omitted from context")
 check((nextData["requestedLessons"] as! [[String:Any]])[0]["focus"] as? String==plan.chapters[0].lessons[3].focus)
@@ -112,6 +146,7 @@ rejected{_ = try PlanningGeneration.chapter(payload(0,0..<4),plan:plan,index:0,r
 let plannedPrompt=try PlanningGeneration.chapterPrompt(context:context,plan:plan,index:1,completed:[],plannedPrerequisites:true),plannedData=try promptData(plannedPrompt)
 check((plannedData["availablePrerequisites"] as! [[String:Any]]).map{$0["ref"] as! String}==["L1","L2","L3","L4"],"planned earlier chapter prerequisites missing")
 check((plannedData["requestedLessons"] as! [[String:Any]]).map{$0["ref"] as! String}==["L5"])
+check(plannedData["priorPractice"]==nil,"planned references are not evidence of completed activities")
 let plannedNext=try promptData(PlanningGeneration.chapterPrompt(context:context,plan:plan,index:0,completed:[batch1],range:3..<4,plannedPrerequisites:true))
 check((plannedNext["availablePrerequisites"] as! [[String:Any]]).map{$0["ref"] as! String}==["L1","L2","L3"])
 rejected{_ = try PlanningGeneration.chapterPrompt(context:context,plan:plan,index:1,completed:[],plannedPrerequisites:false)}
@@ -149,12 +184,38 @@ for mutation in ["missing","extra","order","identity","title","hostID","objectiv
 let quantitative=mutatedNodes(payload(0,0..<1)){nodes in nodes[0]["assessment"]=["task":"Trace two named examples","passCriteria":["The dimensions match each operation"],"mode":"quantitative","evaluatorPrompt":NSNull()]}
 let quantitativeNode=(try PlanningGeneration.chapter(quantitative,plan:plan,index:0,range:0..<1)["nodes"] as! [[String:Any]])[0],qa=quantitativeNode["assessment"] as! [String:Any]
 check(qa["evaluatorPrompt"]==nil && qa["objectiveIds"] as! [String]==["node_1_1_o1","node_1_1_o2"])
+let independent=mutatedNodes(payload(0,0..<1)){nodes in nodes[0]["assessment"]=["task":"Compare with the specified baseline","passCriteria":["Report the correct direction and rate"],"mode":"quantitative","evaluatorPrompt":"Reference result: -1.05%."]}
+let independentChapter=try PlanningGeneration.chapter(independent,plan:plan,index:0,range:0..<1)
+let independentNode=(independentChapter["nodes"] as! [[String:Any]])[0]
+check((independentNode["assessment"] as! [String:Any])["evaluatorPrompt"] as? String=="Reference result: -1.05%.","grading guidance was lost")
+let publicPreview=PlanningGeneration.displayChapter(independentChapter,plan:plan,index:0,count:1)
+check(publicPreview.contains("Compare with the specified baseline") && publicPreview.contains("Report the correct direction and rate") && !publicPreview.contains("-1.05%"),"generation preview exposed the answer")
+let codeObjective=mutatedNodes(payload(0,0..<1)){nodes in nodes[0]["objectives"]=["能填写 question_id 与 standard_answer。"]}
+let objectiveChapter=try PlanningGeneration.chapter(codeObjective,plan:plan,index:0,range:0..<1)
+do{
+ _ = try PlanningGeneration.chapter(codeObjective,plan:plan,index:0,range:0..<1,revising:true)
+ fatalError("revision introduced an implementation identifier in a learning goal")
+}catch let error as PlanningLearningLanguageError{check(error.paths==["result.nodes.0.objectives.0"])}
+let explainedField=mutatedNodes(payload(0,0..<1)){nodes in nodes[0]["activities"]=["把结果放进一个样例字段（result_value）并检查输出。"]}
+let practiceChapter=try PlanningGeneration.chapter(explainedField,plan:plan,index:0,range:0..<1)
+let approved=envelope(["ready":true,"issues":[] as [[String:Any]]])
+let localReview=try PlanningGeneration.review(approved,plan:plan,chapters:[objectiveChapter,["nodes":[] as [[String:Any]]]])
+check(localReview.reason=="learning_language" && localReview.repairTargets?.first?.range==0..<1,"a passed model review missed a code identifier in a learning goal")
+check(try PlanningGeneration.review(approved,plan:plan,chapters:[practiceChapter,["nodes":[] as [[String:Any]]]]).reason==nil,"an identifier used only in an exercise triggered a blocker")
 let qualitative=mutatedNodes(payload(0,3..<4)){nodes in nodes[0]["assessment"]=["task":"Explain gradient correction","passCriteria":["Identify the cause and justify the correction"],"mode":"qualitative","evaluatorPrompt":"Inspect the attempted gradient and correction. Require the cause and corrected operation; request missing evidence."]}
 let batch2=try PlanningGeneration.chapter(qualitative,plan:plan,index:0,range:3..<4)
 var completeFirst=batch1;completeFirst["nodes"]=(batch1["nodes"] as! [[String:Any]])+(batch2["nodes"] as! [[String:Any]])
 _ = try PlanningGeneration.chapterPrompt(context:context,plan:plan,index:1,completed:[completeFirst])
 let secondPayload=mutatedNodes(payload(1,0..<1)){nodes in nodes[0]["prerequisites"]=["L1","L3","L4"]}
 let completeSecond=try PlanningGeneration.chapter(secondPayload,plan:plan,index:1)
+let inherited=try promptData(PlanningGeneration.chapterPrompt(context:context,plan:plan,index:1,completed:[],plannedPrerequisites:true,earlierChapters:[completeFirst,completeSecond]))
+let inheritedPractice=inherited["priorPractice"] as! [[String:Any]]
+check(inheritedPractice.map{$0["ref"] as! String}==["L1","L2","L3","L4"],"missing earlier practice or leaked requested lesson")
+check(inheritedPractice.last?["passCriteria"] as? [String]==["Identify the cause and justify the correction"])
+var largeChapter=completeFirst,largeNodes=largeChapter["nodes"] as! [[String:Any]]
+largeNodes[3]["activities"]=Array(repeating:String(repeating:"示",count:1800),count:5);largeChapter["nodes"]=largeNodes
+let boundedPractice=try promptData(PlanningGeneration.chapterPrompt(context:context,plan:plan,index:1,completed:[],plannedPrerequisites:true,earlierChapters:[largeChapter]))["priorPractice"] as! [[String:Any]]
+check(boundedPractice.map{$0["ref"] as! String}==["L1","L2","L3"],"oversized lesson displaced earlier usable practice")
 check((completeSecond["nodes"] as! [[String:Any]])[0]["prerequisites"] as! [String]==["node_1_1","node_1_3","node_1_4"],"earlier aliases resolved relative to batch instead of global outline")
 for dependency in ["L5","L6","node_1_1","L01"]{let bad=mutatedNodes(payload(1,0..<1)){nodes in nodes[0]["prerequisites"]=[dependency]};rejected{_ = try PlanningGeneration.chapter(bad,plan:plan,index:1)}}
 var parallelOutline=outline;parallelOutline["chapters"]=[second,first,second]
@@ -177,12 +238,52 @@ let final=try plan.completeRoute([completeFirst,completeSecond])
 check(final["locale"] as? String=="zh-CN" && final["sourceLanguage"] as? String=="zh-CN" && final["revision"] as? Int==1)
 check((final["chapters"] as! [[String:Any]])[0]["stageGoal"] as? String==first["stageGoal"] as? String)
 try JSONSerialization.data(withJSONObject:final).write(to:output)
+
+func exampleResponse(_ argument:Int)throws->[String:Any]{
+ let url=URL(fileURLWithPath:CommandLine.arguments[argument])
+ let example=try JSONSerialization.jsonObject(with:Data(contentsOf:url)) as! [String:Any]
+ return example["response"] as! [String:Any]
+}
+let implementationPlan=try PlanningGeneration.plan(exampleResponse(2),locale:"zh-CN")
+let sharedRules=implementationPlan.practiceRules
+check(sharedRules.count==3 && sharedRules[0].contains("call_id"),"outline lost shared practice rules")
+let implementationLessons=try exampleResponse(3)
+let implementationBatch=try PlanningGeneration.chapter(implementationLessons,plan:implementationPlan,index:1)
+let requirements="必须用 Python，状态需要保存在 SQLite。"
+var implementationContext=context
+let implementationQuestions:[[String:Any]]=[["id":"purpose","status":"complete","summary":requirements,"fields":["context":requirements]]]
+implementationContext["questions"]=implementationQuestions
+let implementationPrompt=try PlanningGeneration.chapterPrompt(context:implementationContext,plan:implementationPlan,index:1,completed:[],plannedPrerequisites:true)
+let implementationInput=try promptData(implementationPrompt)
+let implementationBackground=implementationInput["confirmedBackground"] as! [String:[String:Any]]
+check((implementationBackground["purpose"]?["fields"] as? [String:String])?["context"]==requirements)
+let passedOutline=(implementationInput["outline"] as! [String:Any])["chapters"] as! [[String:Any]]
+check(passedOutline[0]["stageGoal"] as? String==implementationPlan.chapters[0].stageGoal)
+check((implementationInput["outline"] as! [String:Any])["practiceRules"] as? [String]==sharedRules,"chapter generation did not receive shared practice rules")
+var savedImplementation=implementationPlan.progress(Array(repeating:nil,count:implementationPlan.chapters.count))
+savedImplementation["schemaVersion"]=1;savedImplementation["locale"]="zh-CN";savedImplementation["policyVersion"]=PlanningPromptPack.generationCheckpointVersion
+let (restoredImplementation,_)=try PlanningGeneration.restore(savedImplementation,locale:"zh-CN")
+check(restoredImplementation.practiceRules==sharedRules,"resume lost shared practice rules")
+let finalImplementation=try implementationPlan.completeRoute([
+ try PlanningGeneration.chapter(payload(0,0..<implementationPlan.chapters[0].lessons.count,for:implementationPlan),plan:implementationPlan,index:0),
+ implementationBatch,
+ try PlanningGeneration.chapter(payload(2,0..<implementationPlan.chapters[2].lessons.count,for:implementationPlan),plan:implementationPlan,index:2),
+])
+check(finalImplementation["practiceRules"]==nil,"planning metadata leaked into the saved route")
+let implementationChapters=finalImplementation["chapters"] as! [[String:Any]]
+check((implementationChapters[0]["stageGoal"] as! String).contains("Python"))
+let wireLessons=(implementationLessons["result"] as! [String:Any])["nodes"] as! [[String:Any]]
+let savedLessons=implementationChapters[1]["nodes"] as! [[String:Any]]
+for (wire,saved) in zip(wireLessons,savedLessons){
+ check((saved["objectives"] as! [[String:String]]).compactMap{$0["description"]}==wire["objectives"] as! [String])
+ check(saved["activities"] as! [String]==wire["activities"] as! [String])
+}
 print("PASS unified envelopes, host IDs, global task aliases, strict batches, outcomes and approved-only prompt data")
 `);
   const compile=spawnSync('/usr/bin/swiftc',['-module-cache-path','tmp/cache/swift','apps/macos/RuntimeDirectory.swift','apps/macos/AgentManager.swift','apps/macos/CodeBuddyAdapter.swift','apps/macos/PlanningAgent.swift','apps/macos/PlanningPromptPackResources.swift','apps/macos/PlanningPromptPack.swift','apps/macos/PlanningGeneration.swift',source,'-o',binary],{encoding:'utf8',timeout:150_000});
   await writeFile(join(dir,'compile.log'),compile.stdout+compile.stderr);
   assert.equal(compile.status,0,compile.stderr);
-  const output=join(dir,'route.json'),run=spawnSync(binary,[output],{encoding:'utf8',timeout:20_000});
+  const output=join(dir,'route.json'),run=spawnSync(binary,[output,resolve('packages/planning-prompts/examples/outline-build-agent.json'),resolve('packages/planning-prompts/examples/lessons-build-agent.json')],{encoding:'utf8',timeout:20_000});
   await writeFile(join(dir,'run.log'),run.stdout+run.stderr);
   assert.equal(run.status,0,run.stderr);assert.match(run.stdout,/PASS unified envelopes/);
   const route=JSON.parse(await readFile(output,'utf8'));assert.equal(validateRoute(route),route);assert.equal(route.chapters.length,2);assert.equal(route.chapters[0].nodes.length,4);assert.equal(route.chapters[1].nodes.length,1);

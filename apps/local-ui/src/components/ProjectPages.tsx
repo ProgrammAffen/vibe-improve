@@ -132,7 +132,7 @@ export function NewProjectSurface({language,name,directory,existing=false,fixedL
           <Failure error={error} language={language}/>
           {existing&&<span className="project-form-state">{t('路线待规划','Route not planned')}</span>}
         </div>
-        <div className="project-form-actions"><ProjectButton type="submit" disabled={busy||disabled}>{busy?t('保存中…','Saving…'):existing?t('下一步','Next'):t('保存草稿','Save draft')}</ProjectButton></div>
+        <div className="project-form-actions"><ProjectButton type="submit" disabled={busy||disabled}>{busy?t('保存中…','Saving…'):t('下一步','Next')}</ProjectButton></div>
       </form>
     </Panel>
   </ProjectWorld>;

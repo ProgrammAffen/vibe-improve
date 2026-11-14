@@ -20,7 +20,7 @@ test('agent route diagnostics identify structural, identity and dependency issue
   assert.deepEqual(agentRouteDiagnostics(state,state.routeDraft),{issues:[]});assert.ok(!JSON.stringify(structural).includes(state.routeDraft.title));
 });
 const answer='我想学Python，完成销售数据分析报告，用于周会，能解释趋势与异常。未用过Python，零基础。每周4小时，每次30分钟。不学模型训练，电脑与Python可用。';
-const allFields={goal:{topic:'Python',outcome:'完成销售数据分析报告'},purpose:{context:'用于周会',criteria:'能解释趋势与异常'},baseline:{experience:'未用过Python',support:'零基础'},time:{weekly:'每周4小时',session:'每次30分钟'},constraints:{scope:'不学模型训练',conditions:'电脑与Python可用'}};
+const allFields={goal:{topic:'Python',outcome:'完成销售数据分析报告'},purpose:{context:'用于周会',criteria:'能解释趋势与异常'},baseline:{experience:'未用过Python',support:'零基础'},time:{weekly:'每周4小时',session:'每次30分钟'}};
 const update=(id,fields,messageId='m1',quote=answer,missing=[],complete=true)=>({id,fields,evidence:Object.keys(fields).map(field=>({field,messageId,quote})),missing,complete});
 function approve(state,id=state.currentQuestion){return acceptAnswer(state,id,state.questions.find(q=>q.id===id).answerProposal.messageId,state.revision)}
 const consistent={status:'consistent',issues:[]};
@@ -31,13 +31,13 @@ test('each answer requires explicit adoption before checklist completion and adv
  assert.equal(state.currentQuestion,'goal');assert.equal(state.questions[0].status,'awaiting-confirmation');assert.equal(canGenerate(state),false);
  assert.equal(validatePlanning(JSON.parse(JSON.stringify(state))).questions[0].answerProposal.summary,'学习 Python，制作销售报告。');
  assert.throws(()=>acceptAnswer(state,'goal','wrong',state.revision),/CONFLICT/);state=approve(state);assert.equal(state.currentQuestion,'purpose');assert.equal(state.questions[0].status,'complete');
- assert.equal(canGenerate(completed()),true);assert.equal(completed().messages.length,10);
+ assert.equal(canGenerate(completed()),true);assert.equal(completed().messages.length,8);
 });
 test('incomplete decisions keep the current question and never enable answer adoption',()=>{
- let state=focusQuestion(initial(),'time',0);state=appendUser(state,'每周4小时','m1','r1',state.revision,now);
- state=applyInterview(state,{reply:'每次大概多久？',summary:'',updates:[update('time',{weekly:'每周4小时'},'m1','每周预算',['每次多久？'],false)]},'r1',state.revision,now);
- assert.equal(state.currentQuestion,'time');assert.equal(state.questions[3].status,'needs-detail');assert.equal(state.questions[3].answerProposal,undefined);assert.equal(canGenerate(state),false);
- assert.throws(()=>acceptAnswer(state,'time','assistant_r1',state.revision),/CONFLICT/);
+ let state=appendUser(initial(),'Python','m1','r1',0,now);
+ state=applyInterview(state,{reply:'你想用 Python 独立完成什么？',summary:'',updates:[update('goal',{topic:'Python'},'m1','Python',['想完成的任务'],false)]},'r1',state.revision,now);
+ assert.equal(state.currentQuestion,'goal');assert.equal(state.questions[0].status,'needs-detail');assert.equal(state.questions[0].answerProposal,undefined);assert.equal(canGenerate(state),false);
+ assert.throws(()=>acceptAnswer(state,'goal','assistant_r1',state.revision),/CONFLICT/);
 });
 test('AI summaries and normalized facts are reviewed without literal matching',()=>{
  let state=focusQuestion(initial(),'time',0);state=appendUser(state,'每周三小时，每次一刻钟','m1','r1',state.revision,now);

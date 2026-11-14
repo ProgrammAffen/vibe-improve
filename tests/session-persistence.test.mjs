@@ -71,6 +71,19 @@ test('app restart restores via CloudBase, rotates tokens and never saves passwor
   assert.ok(!next.logger.diagnostics.exportText().includes('SYNTHETIC_REFRESH'));
 });
 
+test('hardware migration purges copied credentials, requests sign-in and makes no authentication or licensing request',async()=>{
+  const store=vault();store.record={copied:'SYNTHETIC_PRIVATE_CREDENTIAL'};
+  store.read=async()=>{throw Error('SESSION_DEVICE_CHANGED');};
+  const f=fixture(store);await f.service.whenReady();
+  const state=await f.service.getSnapshot();
+  assert.equal(state.user,null);assert.equal(state.license,null);assert.equal(state.reauthRequired,true);
+  assert.match(state.error,/Device identity changed/);assert.equal(store.record,null);assert.equal(store.clears,1);
+  for(const count of Object.values(f.calls))assert.equal(count,0);
+  const logs=f.logger.diagnostics.getEntries();
+  assert.ok(logs.some(entry=>entry.stage==='auth.session.restore'&&entry.resultCode==='SESSION_DEVICE_CHANGED'));
+  assert.ok(!f.logger.diagnostics.exportText().includes('SYNTHETIC_PRIVATE'));
+});
+
 test('logout drains pending saves, clears runtime session files and rejects late SDK refresh events',async()=>{
   const store=vault(),f=fixture(store);await f.service.whenReady();await f.service.login('synthetic@example.invalid','SYNTHETIC_PASSWORD_123');
   const gate=store.writeGate=defer();f.emitRefresh();await turn();

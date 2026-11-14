@@ -21,7 +21,8 @@ enum PlanningPromptPack {
     private static let fieldsByQuestion:[String:Set<String>]=[
         "goal":["topic","outcome"],"purpose":["context","criteria","aids"],
         "baseline":["experience","support","strategy"],"time":["weekly","session","schedule","deadline","deadlineType"],
-        "constraints":["scope","conditions","strategy"]
+        "constraints":["scope","conditions","strategy"],
+        "deadline":["deadline","deadlineType","strategy"],"scope":["scope","strategy"]
     ]
     private static let systems=decode(taskSystemsJSON) as? [String:String] ?? [:]
     private static let repairSystems=decode(taskRepairSystemsJSON) as? [String:String] ?? [:]
@@ -53,7 +54,7 @@ enum PlanningPromptPack {
     }
 
     static func acceptedAnswers(_ context:[String:Any])throws->[String:Any] {
-        guard let questions=context["questions"] as? [[String:Any]],questions.count<=5 else{throw PlanningPromptPackError.invalid}
+        guard let questions=context["questions"] as? [[String:Any]],questions.count<=fieldsByQuestion.count else{throw PlanningPromptPackError.invalid}
         var result:[String:Any]=[:],seen=Set<String>()
         for question in questions {
             guard let id=question["id"] as? String,let allowed=fieldsByQuestion[id],seen.insert(id).inserted,
@@ -104,14 +105,16 @@ enum PlanningPromptPack {
         guard let questionID=result["questionId"] as? String,questionID==mapping.input["currentQuestion"] as? String,
               let fields=result["fields"] as? [String:String],let evidence=result["evidence"] as? [[String:Any]],
               let complete=result["complete"] as? Bool,let unresolved=result["unresolved"] as? [String],let summary=result["summary"] as? String else{throw PlanningPromptPackError.evidence}
+        guard !complete || result["consistency"] is [String:Any] else{throw PlanningPromptPackError.invalid}
         guard fields.keys.allSatisfy({field in evidence.filter{$0["field"] as? String==field}.count==1}),evidence.count==fields.count else{throw PlanningPromptPackError.evidence}
         var linked:[[String:Any]]=[]
         for item in evidence {
             guard let field=item["field"] as? String,fields[field] != nil,let reference=item["messageRef"] as? String,
                   let source=mapping.references[reference],source.role=="user",let quote=item["quote"] as? String else{throw PlanningPromptPackError.evidence}
             var converted:[String:Any]=["field":field,"messageId":source.id,"quote":quote]
+            if let earlier=source.earlierQuestionID{converted["reusedFrom"]=earlier}
             if let proposal=item["proposalRef"] as? String {
-                guard let suggestion=mapping.references[proposal],suggestion.role=="assistant",suggestion.index<source.index else{throw PlanningPromptPackError.evidence}
+                guard source.earlierQuestionID==nil,let suggestion=mapping.references[proposal],suggestion.role=="assistant",suggestion.index<source.index else{throw PlanningPromptPackError.evidence}
                 converted["proposalMessageId"]=suggestion.id
             }
             linked.append(converted)
@@ -120,7 +123,14 @@ enum PlanningPromptPack {
         if complete && fields.isEmpty && existing.isEmpty{throw PlanningPromptPackError.invalid}
         let update:[String:Any]=["id":questionID,"fields":fields,"evidence":linked,"missing":unresolved,"complete":complete]
         var output:[String:Any]=["reply":envelope["reply"]!,"summary":summary,"updates":[update]]
+        let prefill=mapping.input["prefill"] as? Bool == true
+        if let options=result["baselineOptions"] as? [String]{
+            guard prefill,questionID=="baseline",!complete,existing["experience"]==nil,fields["experience"]==nil,
+                  options.allSatisfy({$0.utf16.count<=80 && $0==$0.trimmingCharacters(in:.whitespacesAndNewlines) && $0.rangeOfCharacter(from:CharacterSet.newlines)==nil && !$0.contains("\t")}) else{throw PlanningPromptPackError.invalid}
+            output["baselineOptions"]=options
+        }
         if let assessment=result["consistency"] as? [String:Any] {
+            if prefill,assessment["status"] as? String != "consistent"{throw PlanningPromptPackError.invalid}
             var answers=try acceptedAnswers(context)
             var merged=existing;for (key,value) in fields{merged[key]=value}
             if !merged.isEmpty{answers[questionID]=["summary":summary,"fields":merged]}
@@ -129,10 +139,10 @@ enum PlanningPromptPack {
         return output
     }
 
-    private struct MessageReference {let id:String,role:String,index:Int}
+    private struct MessageReference {let id:String,role:String,index:Int;var earlierQuestionID:String?=nil}
     private static func interviewContext(_ context:[String:Any])throws->(input:[String:Any],references:[String:MessageReference]) {
         guard let locale=context["locale"] as? String,["zh-CN","en"].contains(locale),let questionID=context["currentQuestion"] as? String,fieldsByQuestion[questionID] != nil,
-              let questions=context["questions"] as? [[String:Any]],questions.count<=5,
+              let questions=context["questions"] as? [[String:Any]],questions.count<=fieldsByQuestion.count,
               let messages=context["messages"] as? [[String:Any]],messages.count<=128 else{throw PlanningPromptPackError.invalid}
         var questionIDs=Set<String>(),accepted:[String:Any]=[:],current:[String:Any]?
         for question in questions {
@@ -148,17 +158,47 @@ enum PlanningPromptPack {
         if let raw=current["conversationFrom"]{
             guard let value=integer(raw),value>=0,value<=messages.count else{throw PlanningPromptPackError.invalid};start=value
         }
+        let core=["goal","purpose","baseline","time"]
+        let earlierIDs=core.prefix(core.firstIndex(of:questionID) ?? 0)
+        var earlierStarts:[String:Int]=[:]
+        for question in questions {
+            guard let id=question["id"] as? String,earlierIDs.contains(id),question["status"] as? String=="complete" else{continue}
+            if let raw=question["conversationFrom"]{
+                guard let value=integer(raw),value>=0,value<=messages.count else{throw PlanningPromptPackError.invalid}
+                earlierStarts[id]=value
+            }else{earlierStarts[id]=0}
+        }
         var ids=Set<String>(),userCount=0,assistantCount=0,wire:[[String:Any]]=[],references:[String:MessageReference]=[:]
+        var earlier:[(id:String,index:Int,questionID:String,text:String)]=[]
         for (index,message) in messages.enumerated() {
             guard let id=message["id"] as? String,id.range(of:"^[A-Za-z0-9][A-Za-z0-9._-]{0,100}$",options:.regularExpression) != nil,ids.insert(id).inserted,
                   let role=message["role"] as? String,["user","assistant"].contains(role),let value=message["text"] as? String,text(value,maximum:8000) else{throw PlanningPromptPackError.invalid}
             if let raw=message["questionId"]{guard let id=raw as? String,fieldsByQuestion[id] != nil else{throw PlanningPromptPackError.invalid}}
+            if role=="user",let sourceQuestion=message["questionId"] as? String,let sourceStart=earlierStarts[sourceQuestion],index>=sourceStart{
+                earlier.append((id,index,sourceQuestion,value))
+            }
             guard index>=start,message["questionId"] as? String==questionID else{continue}
             let reference:String
             if role=="user"{userCount+=1;reference="U\(userCount)"}else{assistantCount+=1;reference="A\(assistantCount)"}
             wire.append(["ref":reference,"role":role,"text":value]);references[reference]=MessageReference(id:id,role:role,index:index)
         }
-        var input:[String:Any]=["locale":locale,"currentQuestion":questionID,"acceptedAnswers":accepted,"currentFields":current["fields"]!,"messages":wire]
+        var input:[String:Any]=["locale":locale,"currentQuestion":questionID,"questionIds":questions.compactMap{$0["id"] as? String},"acceptedAnswers":accepted,"currentFields":current["fields"]!,"messages":wire]
+        if !earlier.isEmpty {
+            var selected=Set(earlierIDs.compactMap{id in earlier.first(where:{$0.questionID==id})?.index})
+            for entry in earlier.reversed(){
+                if selected.count>=8{break}
+                selected.insert(entry.index)
+            }
+            input["earlierUserMessages"]=earlier.filter{selected.contains($0.index)}.enumerated().map{offset,entry -> [String:Any] in
+                let reference="B\(offset+1)"
+                references[reference]=MessageReference(id:entry.id,role:"user",index:entry.index,earlierQuestionID:entry.questionID)
+                return ["ref":reference,"questionId":entry.questionID,"text":entry.text]
+            }
+        }
+        if (context["pending"] as? [String:Any])?["prefill"] as? Bool == true{
+            guard !earlier.isEmpty,wire.isEmpty else{throw PlanningPromptPackError.invalid}
+            input["prefill"]=true
+        }
         if let adopted=accepted[questionID]{input["acceptedAnswer"]=adopted}
         if let consistency=context["consistency"] as? [String:Any],let anchor=consistency["anchorQuestionId"] as? String,accepted[anchor] != nil{input["anchorQuestionId"]=anchor}
         if let resources=context["resources"]{

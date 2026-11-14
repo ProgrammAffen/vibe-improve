@@ -1,0 +1,21 @@
+{
+  "name": "interview-prefill-purpose",
+  "task": "interview",
+  "input": {
+    "locale": "zh-CN", "currentQuestion": "purpose", "prefill": true,
+    "acceptedAnswers": {"goal": {"summary": "学习 SQL。", "fields": {"topic": "SQL"}}},
+    "messages": [],
+    "earlierUserMessages": [{"ref": "B1", "questionId": "goal", "text": "我想学 SQL，能独立从订单表做业务周报。每周可以学三小时。"}]
+  },
+  "response": {
+    "status": "ok",
+    "reply": "你前面提到想独立从订单表做业务周报。把这作为学成目标，可以吗？",
+    "result": {
+      "questionId": "purpose", "complete": true, "summary": "能独立用 SQL 从订单表做出业务周报。",
+      "fields": {"criteria": "独立用 SQL 从订单表做业务周报"},
+      "evidence": [{"field": "criteria", "messageRef": "B1", "proposalRef": null, "quote": "能独立从订单表做业务周报。"}],
+      "unresolved": [], "consistency": {"status": "consistent", "issues": []}
+    },
+    "missing": []
+  }
+}

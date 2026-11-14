@@ -85,8 +85,8 @@
 .route-editor .route-editor-proposal>summary>svg:last-child{order:initial}
 .route-editor-proposal[open]>summary{margin-bottom:.7em}
 .route-editor-proposal>p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}
-.route-editor-proposal>div{display:flex;gap:.7em;margin-top:.8em;padding-bottom:.3em}
-.route-editor-proposal .game-button.game-button{min-height:44px;flex:1;padding:.65em 1em;font-size:1em}
+.route-editor-proposal>div{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.7em;margin-top:.8em;padding-bottom:.3em}
+.route-editor-proposal .game-button.game-button{min-height:44px;flex:0 1 auto;min-inline-size:max-content;padding:.65em 1em;font-size:1em}
 .route-editor-footer{position:absolute;left:7.7%;right:7.1%;bottom:7.6%;display:flex;align-items:center;justify-content:flex-end;gap:1cqw;min-height:clamp(48px,4.7cqw,79px);padding-top:1cqw;border-top:1px solid var(--editor-line)}
 .route-editor-save-state{min-width:0;margin-inline-end:auto;font-size:.9em;color:var(--editor-muted);overflow-wrap:anywhere}
 .route-editor-footer>.game-button.game-button{min-width:clamp(135px,10.7cqw,180px);min-height:48px;font-size:1em;padding:.65em 1.2em}
@@ -162,6 +162,34 @@
 .route-editor-detail-heading small{display:block;font-size:.7em;font-weight:600;color:#7b8154;margin-bottom:.25em}
 .route-editor-detail-heading h2{font-size:clamp(21px,1.9cqw,32px);line-height:1.35;margin:0;overflow-wrap:anywhere}
 .route-editor-detail-heading>.route-editor-icon{margin-top:.5em;color:#8e5039}
+.route-outline-title>.route-outline-lock,
+.route-outline-lessons .route-outline-title>.route-outline-lock {
+  width: .9em;
+  height: .9em;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  color: #80613b;
+}
+.route-editor-locked,
+.route-editor-progress-status {
+  display: flex;
+  align-items: flex-start;
+  gap: .65em;
+  margin-block: 0 1em;
+  padding: .65em .8em;
+  border: 1px solid var(--editor-line);
+  border-radius: 6px;
+  background: #fff3d36b;
+  font-size: .85em;
+  line-height: 1.45;
+}
+.route-editor-locked>svg { width: 1.1em; height: 1.1em; flex: none; margin-block-start: .16em; color: #80613b; }
+.route-editor-locked p { margin: .25em 0 0; }
+.route-editor-progress-status { align-items: center; flex-wrap: wrap; }
+.route-editor-progress-status p { margin: 0; }
+.route-editor-progress-status [role='alert'], .route-editor-proposal .route-editor-proposal-warning { color: #873f2e; }
+.route-editor-detail :is(input,textarea)[readonly] { background-color: #e8d5ae8c; }
 .route-editor .route-editor-review{font-size:.8em;color:#9b5a29;padding:8px}
 .route-editor-issues{padding:0;margin:0;list-style:none;max-height:55dvh;overflow:auto}
 .route-editor-issues>li+li{border-top:1px solid #b99d7240}
@@ -206,5 +234,5 @@
 .route-move-row:focus-visible>strong{text-decoration:underline;text-underline-offset:4px}
 .route-move-destination{min-height:1.5em;flex:none;font-size:14px;color:#617447;margin:0}
 .route-move-dialog .confirmation-actions{flex:none;margin-top:0;padding:4px 2px;gap:12px}
-.route-move-dialog .confirmation-actions>.game-button.game-button{min-width:0;flex:1;font-size:17px;padding:10px 24px;white-space:nowrap}
+.route-move-dialog .confirmation-actions>.game-button.game-button{min-width:0;flex:0 1 220px;font-size:17px;padding:10px 24px;white-space:nowrap}
 @media(max-width:800px){.route-move-dialog>.stone-dialog-inner{margin-inline:32px;padding-inline:10px;gap:8px}.route-move-tree{max-height:42dvh}.route-move-row{gap:6px;padding-inline:6px;font-size:14px}.route-move-row.is-chapter{font-size:15px}.route-move-dialog .confirmation-actions>.game-button.game-button{font-size:14px;padding:9px 16px}}

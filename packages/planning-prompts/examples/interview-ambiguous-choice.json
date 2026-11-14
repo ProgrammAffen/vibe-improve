@@ -1,0 +1,24 @@
+{
+  "name": "interview-ambiguous-choice",
+  "task": "interview",
+  "input": {
+    "locale": "en", "currentQuestion": "goal", "acceptedAnswers": {},
+    "messages": [
+      {"ref": "U1", "role": "user", "text": "I want to learn something useful for work."},
+      {"ref": "A1", "role": "assistant", "text": "Do you want to start with analysing spreadsheets or leading meetings?"},
+      {"ref": "U2", "role": "user", "text": "Yes, sounds good."}
+    ]
+  },
+  "response": {
+    "status": "ok",
+    "reply": "Which would you like to start with, analysing spreadsheets or leading meetings?",
+    "result": {
+      "questionId": "goal", "complete": false, "summary": "",
+      "fields": {},
+      "evidence": [],
+      "unresolved": ["Which would you like to start with, analysing spreadsheets or leading meetings?"],
+      "consistency": {"status": "consistent", "issues": []}
+    },
+    "missing": []
+  }
+}

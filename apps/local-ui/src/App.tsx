@@ -10,8 +10,13 @@ import SettingsPage, {type SoundPreferences} from './components/SettingsPage';
 import AgentSelectionPage from './components/AgentSelectionPage';
 import RouteSourcePage from './components/RouteSourcePage';
 import {routeService} from './routes/service';
+import {confirmedRoute, learningService, prerequisiteMet, type LearningProgress} from './routes/learning';
+import {recordedNodes} from './routes/learning-record';
 import PlanningPage from './components/PlanningPage';
-import {planningService,type PlanningEntry} from './planning/service';
+import AdventureMap from './components/AdventureMap';
+import LessonPage from './components/LessonPage';
+import {planningError, planningService, type PlanningEntry} from './planning/service';
+import type {RouteDocument} from '../../../packages/domain/route-validation.mjs';
 import {Info, Mail, TriangleAlert} from 'lucide-react';
 import {dateLabel, readLanguage, translate, type Language} from './i18n';
 import {logEvent} from './logger';
@@ -20,7 +25,9 @@ import './styles.css';
 import './dialogs.css';
 
 type Snapshot = Awaited<ReturnType<typeof service.getSnapshot>>;
-type Page = 'home' | 'settings' | 'account' | 'projects' | 'new-project' | 'agents' | 'route-source' | 'planning';
+type Page = 'home' | 'settings' | 'account' | 'projects' | 'new-project' | 'agents' | 'route-source' | 'planning' | 'map' | 'lesson';
+type Adventure = {projectId: string; route: RouteDocument};
+type LearningReset = {adventure: Adventure; progress: LearningProgress; fromMap: boolean};
 type AuthMode = 'login' | 'register' | 'verify' | 'forgot' | 'reset' | 'change';
 type NativeBridge = {preferences?: Record<string, unknown>; setPreferences?: (value: Record<string, unknown>) => void; quit?: () => void};
 const ASSET = import.meta.env.BASE_URL + 'assets/';
@@ -44,7 +51,7 @@ function readSound(): SoundPreferences {
 
 function initialPage(): Page {
   const path = window.location.hash.replace(/^#\/?/, '');
-  return ['settings', 'account', 'projects', 'new-project', 'agents', 'route-source', 'planning'].includes(path) ? path as Page : 'home';
+  return ['settings', 'account', 'projects', 'new-project', 'agents', 'route-source', 'planning', 'map', 'lesson'].includes(path) ? path as Page : 'home';
 }
 
 function licenseStatus(license: any): string {
@@ -58,6 +65,19 @@ export default function App() {
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [page, setPage] = useState<Page>(initialPage);
   const [selectedProject, setSelectedProject] = useState<ProjectRecord | null>(null);
+  const [adventure, setAdventure] = useState<Adventure | null>(null);
+  const [lessonId, setLessonId] = useState<string>();
+  const [learningProgress, setLearningProgress] = useState<LearningProgress | null>(null);
+  const [learningError, setLearningError] = useState(false);
+  const [learningBusy, setLearningBusy] = useState(false);
+  const [learningReadAttempt, setLearningReadAttempt] = useState(0);
+  const [learningRefresh, setLearningRefresh] = useState(0);
+  const [learningReset, setLearningReset] = useState<LearningReset | null>(null);
+  const [resetError, setResetError] = useState('');
+  const projectRequest = useRef(0);
+  const changingProgress = useRef(false);
+  const adventureRef = useRef(adventure);
+  adventureRef.current = adventure;
   const [planningEntry,setPlanningEntry]=useState<PlanningEntry|'resume'>('resume');
   const [agentOrigin,setAgentOrigin]=useState<'settings'|'project'>('settings');
   const [settingsTab, setSettingsTab] = useState('general');
@@ -135,8 +155,24 @@ export default function App() {
   useEffect(() => {setRedeemOpen(false); setActivationCode('');}, [user?.id]);
 
   useEffect(() => {
+    if (learningReset && !changingProgress.current
+        && (selectedProject?.id !== learningReset.adventure.projectId
+          || page !== (learningReset.fromMap ? 'map' : 'planning'))) setLearningReset(null);
+  }, [learningReset, page, selectedProject?.id]);
+
+  useEffect(() => {
+    if (!adventure) return;
+    let active = true;
+    void learningService.read(adventure.projectId, adventure.route).then(
+      progress => {if (active) setLearningProgress(progress);},
+      () => {if (active) setLearningError(true);},
+    );
+    return () => {active = false;};
+  }, [adventure, learningReadAttempt]);
+
+  useEffect(() => {
     const resize = () => setScale(Math.min(window.innerWidth / BASE.width, window.innerHeight / BASE.height));
-    const route = () => setPage(initialPage());
+    const route = () => {projectRequest.current++; setPage(initialPage());};
     window.addEventListener('resize', resize);
     window.addEventListener('hashchange', route);
     return () => {window.removeEventListener('resize', resize); window.removeEventListener('hashchange', route);};
@@ -197,6 +233,7 @@ export default function App() {
   }
 
   function navigate(next: Page) {
+    projectRequest.current++;
     setPage(next);
     setError('');
     setSuccess('');
@@ -205,13 +242,204 @@ export default function App() {
   }
 
   function openProject(record: ProjectRecord) {
+    const request = ++projectRequest.current;
     setSelectedProject(record);
     setAgentOrigin('project');
     const resume = projectResumePage(record);
     if (resume === 'new-project') {navigate(resume); return;}
-    void Promise.all([planningService.read(record.id),routeService.read(record.id)])
-      .then(([planning,saved]) => {if(planning&&saved.source!==null){setPlanningEntry('resume');navigate('planning')}else if(saved.source==='import'&&saved.routeDraft){setPlanningEntry('import');navigate('planning')}else navigate(saved.agentConfirmed ? 'route-source' : resume)})
-      .catch(() => navigate('route-source'));
+    void Promise.all([planningService.read(record.id), routeService.read(record.id)])
+      .then(([planning, saved]) => {
+        if (request !== projectRequest.current) return;
+        const route = confirmedRoute(planning);
+        if (route) openMap(record.id, route);
+        else if (planning && (saved.source !== null || planning.routeDraft?.chapters.length)) {setPlanningEntry('resume'); navigate('planning');}
+        else if (saved.source === 'import' && saved.routeDraft) {setPlanningEntry('import'); navigate('planning');}
+        else navigate(saved.agentConfirmed ? 'route-source' : resume);
+      })
+      .catch(() => {if (request === projectRequest.current) navigate('route-source');});
+  }
+
+  function openMap(projectId: string, route: RouteDocument) {
+    setAdventure({projectId, route});
+    setLearningProgress(null);
+    setLearningError(false);
+    setLessonId(undefined);
+    navigate('map');
+  }
+
+  async function startLesson(nodeId: string) {
+    const session = adventure;
+    if (!session || changingProgress.current) return;
+    const node = session.route.chapters.flatMap(chapter => chapter.nodes).find(item => item.id === nodeId);
+    if (!node || !learningProgress || (!learningProgress.completedNodeIds.has(nodeId)
+      && node.prerequisites.some(id => !prerequisiteMet(learningProgress, id)))) return;
+    const saved = await updateLearning(session, () => learningService.start(session.projectId, session.route, nodeId, learningProgress.progressRevision));
+    if (session !== adventureRef.current || initialPage() !== 'map') return;
+    if (!saved) {setLearningError(true); return;}
+    setLessonId(nodeId);
+    navigate('lesson');
+  }
+
+  async function updateLearning(session: Adventure, operation: () => Promise<LearningProgress>) {
+    if (changingProgress.current) return false;
+    changingProgress.current = true;
+    setLearningBusy(true);
+    setLearningError(false);
+    try {
+      const progress = await operation();
+      if (session === adventureRef.current) setLearningProgress(progress);
+      return true;
+    } catch (cause) {
+      if (session === adventureRef.current && planningError(cause) === 'PLANNING_CONFLICT') {
+        setLearningReadAttempt(value => value + 1);
+        if (initialPage() === 'lesson') {setLessonId(undefined); navigate('map');}
+      }
+      return false;
+    } finally {
+      changingProgress.current = false;
+      setLearningBusy(false);
+    }
+  }
+
+  async function completeLesson() {
+    if (!adventure || !lessonId || !learningProgress || changingProgress.current) return;
+    const session = adventure;
+    const saved = await updateLearning(session, () => learningService.complete(session.projectId, session.route, lessonId, learningProgress.progressRevision));
+    if (!saved && session === adventureRef.current && initialPage() === 'lesson') setLearningError(true);
+  }
+
+  async function skipLesson(nodeId: string, reason: string) {
+    const session = adventure;
+    return session && learningProgress
+      ? updateLearning(session, () => learningService.skip(session.projectId, session.route, nodeId, reason, learningProgress.progressRevision))
+      : false;
+  }
+
+  function editRoute() {
+    setAdventure(null);
+    setPlanningEntry('resume');
+    navigate('planning');
+  }
+
+  function requestLearningReset(session: Adventure, progress: LearningProgress, fromMap: boolean) {
+    if (changingProgress.current || progress.recordedNodeCount === 0) return;
+    setResetError('');
+    setLearningReset({adventure: session, progress, fromMap});
+  }
+
+  async function confirmLearningReset() {
+    if (!learningReset || changingProgress.current) return;
+    const {adventure: session, progress, fromMap} = learningReset;
+    if (selectedProject?.id !== session.projectId || page !== (fromMap ? 'map' : 'planning')) return;
+    changingProgress.current = true;
+    setLearningBusy(true);
+    setResetError('');
+    try {
+      const result = await learningService.reset(session.projectId, session.route, progress.progressRevision);
+      if (adventureRef.current === session) setLearningProgress(result);
+      setLearningReset(null);
+      setLearningRefresh(value => value + 1);
+      if (fromMap && adventureRef.current === session && initialPage() === 'map') editRoute();
+    } catch (cause) {
+      const conflict = ['PLANNING_CONFLICT', 'PLANNING_BUSY'].includes(planningError(cause));
+      setResetError(conflict
+        ? t('路线或学习记录已更新。请关闭此窗口并重新读取。', 'The route or progress changed. Close this dialog and reload.')
+        : t('无法清空学习记录，请重试。', 'Could not clear learning records. Try again.'));
+      if (conflict) {
+        setLearningReadAttempt(value => value + 1);
+        setLearningRefresh(value => value + 1);
+      }
+    } finally {
+      changingProgress.current = false;
+      setLearningBusy(false);
+    }
+  }
+
+  function renderLearningReset() {
+    if (!learningReset) return null;
+    const {adventure: session, progress} = learningReset;
+    const affected = recordedNodes(progress);
+    const lessons = session.route.chapters.flatMap(chapter => chapter.nodes
+      .filter(node => affected.has(node.id)).map(node => ({id: node.id, title: node.title, chapter: chapter.title})));
+    const archived = progress.recordedNodeCount - lessons.length;
+    const routeTitle = session.route.title || selectedProject?.name || t('当前路线', 'Current route');
+    const close = () => {if (!changingProgress.current) setLearningReset(null);};
+    return <Modal title={t('清空整条路线的学习记录', 'Clear all learning records')} closeLabel={t('关闭', 'Close')} onClose={close}
+      busy={learningBusy} className="confirmation-dialog learning-reset-dialog">
+      <div className="confirmation-message">
+        <TriangleAlert className="notice-icon warning-icon" aria-hidden="true" focusable="false"/>
+        <p className="confirmation-copy">{t(
+          `「${routeTitle}」中 ${progress.recordedNodeCount} 个小节的学习记录将永久清除，进度归零，原路线可重新编辑。`,
+          `Learning records for ${progress.recordedNodeCount} lessons in “${routeTitle}” will be cleared permanently. Progress will reset, and you can edit the route.`,
+        )}</p>
+      </div>
+      <ul className="learning-reset-counts">
+        <li>{t(`已开始（含已完成）${progress.startedNodeIds.size} 节`, `${progress.startedNodeIds.size} started (including completed)`)}</li>
+        <li>{t(`已自评完成 ${progress.completedNodeIds.size} 节`, `${progress.completedNodeIds.size} self-assessed as complete`)}</li>
+        <li>{t(`已跳过及原因 ${progress.skippedReasons.size} 节`, `${progress.skippedReasons.size} skipped, including reasons`)}</li>
+        {archived > 0 && <li>{t(`已从路线移除的历史小节 ${archived} 节`, `${archived} previously removed lessons`)}</li>}
+      </ul>
+      {lessons.length > 0 && <details className="learning-reset-lessons">
+        <summary>{t('查看受影响的小节', 'View affected lessons')}</summary>
+        <ul>{lessons.map(lesson => <li key={lesson.id}>{lesson.chapter} · {lesson.title}</li>)}</ul>
+      </details>}
+      {resetError && <p className="form-message is-error" role="alert">{resetError}</p>}
+      <div className="confirmation-actions">
+        <GameButton variant="secondary" onClick={close} disabled={learningBusy}>{t('取消', 'Cancel')}</GameButton>
+        <GameButton variant="danger" onClick={() => void confirmLearningReset()} disabled={learningBusy}>{t('确认清空', 'Clear records')}</GameButton>
+      </div>
+    </Modal>;
+  }
+
+  function renderProjectFlow() {
+    const list = <ProjectListPage language={language} onBack={() => navigate('home')} onNew={() => {
+      setSelectedProject(null);
+      navigate('new-project');
+    }} onOpen={openProject}/>;
+    const project = selectedProject;
+    if (page === 'projects') return list;
+    if (page === 'new-project') return <NewProjectPage key={project?.id ?? 'new'} language={language} record={project} onBack={() => navigate('home')} onSaved={record => {
+      setSelectedProject(record);
+      setAgentOrigin('project');
+      navigate('agents');
+    }}/>;
+    if (page === 'agents') return <AgentSelectionPage key={agentOrigin === 'project' ? project?.id : 'settings'} language={language}
+      project={agentOrigin === 'project' ? project : null} settings={agentOrigin === 'settings'}
+      onPrevious={() => navigate(agentOrigin === 'settings' ? 'settings' : 'home')} onHome={() => navigate('home')}
+      onDone={() => navigate(agentOrigin === 'settings' ? 'settings' : 'route-source')}/>;
+    if (!project) return list;
+    if (page === 'route-source') return <RouteSourcePage key={project.id} language={language} project={project} onPrevious={() => {
+      setAgentOrigin('project');
+      navigate('agents');
+    }} onHome={() => navigate('home')} onPlanning={mode => {
+      setPlanningEntry(mode);
+      navigate('planning');
+    }}/>;
+    if (page === 'planning') return <PlanningPage key={project.id + planningEntry} language={language} project={project} entryMode={planningEntry}
+      onPrevious={() => navigate('route-source')} onHome={() => navigate('home')} onConfirmed={route => openMap(project.id, route)}
+      learningRefresh={learningRefresh} onResetLearning={(route, progress) => requestLearningReset({projectId: project.id, route}, progress, false)}/>;
+    if (!adventure || adventure.projectId !== project.id) return list;
+    const {route} = adventure;
+    if (page === 'lesson' && lessonId && learningProgress) {
+      const chapter = route.chapters.find(item => item.nodes.some(node => node.id === lessonId));
+      const node = chapter?.nodes.find(item => item.id === lessonId);
+      if (chapter && node) return <LessonPage chapter={chapter} node={node} language={language} completed={learningProgress.completedNodeIds.has(node.id)}
+        busy={learningBusy} error={learningError ? t('保存失败，请重试。', 'Could not save progress. Try again.') : ''}
+        onComplete={() => void completeLesson()} onMap={() => navigate('map')} onHome={() => navigate('home')}/>;
+    }
+    if (!learningProgress) return <section className="lesson-page">
+      <nav className="lesson-navigation"><BackHomeButton language={language} onClick={() => navigate('home')}/></nav>
+      <div className="lesson-sheet">
+        <h1>{t('冒险地图', 'Adventure map')}</h1>
+        <p role={learningError ? 'alert' : 'status'}>{learningError ? t('无法读取学习进度。', 'Could not load your progress.') : t('正在读取学习进度…', 'Loading your progress…')}</p>
+        {learningError && <GameButton onClick={() => {setLearningError(false); setLearningReadAttempt(attempt => attempt + 1);}}>{t('重试', 'Retry')}</GameButton>}
+      </div>
+    </section>;
+    return <AdventureMap key={project.id + ':' + route.id} route={route} language={language} initialNodeId={lessonId}
+      completedNodeIds={learningProgress.completedNodeIds} skippedReasons={learningProgress.skippedReasons}
+      onStartLesson={startLesson} startPending={learningBusy} startError={learningError ? t('无法记录开始学习，请重试。', 'Could not start the lesson. Try again.') : ''}
+      onSkipLesson={skipLesson} onBack={() => navigate('home')} onEdit={editRoute}
+      onResetLearning={learningProgress.recordedNodeCount > 0 ? () => requestLearningReset(adventure, learningProgress, true) : undefined}/>;
   }
 
   async function run(action: () => Promise<unknown>, completed?: () => void) {
@@ -351,7 +579,7 @@ export default function App() {
   }
 
   return <main className={`app lang-${language}`} aria-busy={busy} onInvalidCapture={event => {if (event.target instanceof HTMLInputElement && event.target.type === 'email') logEvent('operation.failed', {operation: auth === 'register' ? 'auth.registration.send' : auth === 'forgot' ? 'auth.password.reset.send' : 'auth.login', stage: 'client.validation', resultCode: 'AUTH_EMAIL_INVALID', reason: 'email_invalid'});}} onClickCapture={playClick}>
-    {page === 'home' ? renderHome() : page === 'settings' ? renderSettings() : page === 'projects' ? <ProjectListPage language={language} onBack={() => navigate('home')} onNew={() => {setSelectedProject(null); navigate('new-project');}} onOpen={openProject} /> : page === 'new-project' ? <NewProjectPage key={selectedProject?.id ?? 'new'} language={language} record={selectedProject} onBack={() => navigate('home')} onSaved={record => {setSelectedProject(record);setAgentOrigin('project');navigate('agents');}} /> : page === 'agents' ? <AgentSelectionPage key={agentOrigin==='project'?selectedProject?.id:'settings'} language={language} project={agentOrigin==='project'?selectedProject:null} settings={agentOrigin==='settings'} onPrevious={()=>navigate(agentOrigin==='settings'?'settings':'home')} onHome={()=>navigate('home')} onDone={()=>{navigate(agentOrigin==='settings'?'settings':'route-source');}} /> : page === 'route-source' && selectedProject ? <RouteSourcePage key={selectedProject.id} language={language} project={selectedProject} onPrevious={()=>{setAgentOrigin('project');navigate('agents')}} onHome={()=>navigate('home')} onPlanning={mode=>{setPlanningEntry(mode);navigate('planning')}}/> : page === 'planning' && selectedProject ? <PlanningPage key={selectedProject.id+planningEntry} language={language} project={selectedProject} entryMode={planningEntry} onPrevious={()=>navigate('route-source')} onHome={()=>navigate('home')}/> : page === 'route-source' || page === 'planning' ? <ProjectListPage language={language} onBack={()=>navigate('home')} onNew={()=>{setSelectedProject(null);navigate('new-project')}} onOpen={openProject}/> : renderAccount()}
+    {page === 'home' ? renderHome() : page === 'settings' ? renderSettings() : page === 'account' ? renderAccount() : renderProjectFlow()}
     {auth && <Modal title={authTitle} onClose={closeAuth} closeLabel={t('关闭', 'Close')} busy={busy} className={`auth-dialog auth-${auth}`}>
       <form className="auth-form" onSubmit={submitAuth}>
         {auth === 'register' && <Field label={t('昵称', 'Nickname')} value={nickname} onChange={event => setNickname(event.target.value)} autoComplete="nickname" maxLength={64} disabled={busy} required />}
@@ -378,6 +606,7 @@ export default function App() {
     {snapshot?.bindingPrompt && user && !auth && !removeDevice && !redeemOpen && <Modal title={t('绑定当前设备', 'Link this device')} closeLabel={t('关闭', 'Close')} onClose={() => service.dismissDeviceBinding()} busy={busy} className="device-binding-dialog"><div className="confirmation-message"><Info className="notice-icon info-icon" aria-hidden="true" focusable="false" /><p className="confirmation-copy">{t('是否将当前设备绑定到此账户？', 'Link this device to your account?')}</p></div><p className="binding-capacity">{t('已绑定设备', 'Linked devices')} {snapshot.bindingPrompt.used} / {snapshot.bindingPrompt.maximum}</p>{warning && <p className="form-message is-error" role="alert">{warning}</p>}<div className="confirmation-actions"><GameButton variant="secondary" onClick={() => service.dismissDeviceBinding()} disabled={busy}>{t('暂不绑定', 'Not now')}</GameButton><GameButton onClick={() => run(() => service.bindDevice())} disabled={busy}>{t('确认绑定', 'Link device')}</GameButton></div></Modal>}
     {removeDevice && <Modal title={t('移除设备', 'Remove device')} closeLabel={t('关闭', 'Close')} onClose={() => setRemoveDevice(null)} busy={busy}><div className="confirmation-message"><TriangleAlert className="notice-icon warning-icon" aria-hidden="true" focusable="false" /><p className="confirmation-copy">{t('移除后，该设备将失去授权。学习数据仍保留。', 'This device will lose access to the license. Learning data stays intact.')}</p></div>{warning && <p className="form-message is-error" role="alert">{warning}</p>}<div className="confirmation-actions"><GameButton variant="secondary" onClick={() => setRemoveDevice(null)} disabled={busy}>{t('取消', 'Cancel')}</GameButton><GameButton variant="danger" onClick={() => run(() => service.revokeDevice(removeDevice!), () => setRemoveDevice(null))} disabled={busy}>{t('确认移除', 'Remove device')}</GameButton></div></Modal>}
     {featureNotice && <Modal title={featureNotice === 'new' ? t('开始新项目', 'New Quest') : featureNotice === 'load' ? t('加载项目', 'Load Quest') : t('退出', 'Exit')} closeLabel={t('关闭', 'Close')} onClose={() => setFeatureNotice(null)}><div className="confirmation-message">{featureNotice !== 'exit' && <Info className="notice-icon info-icon" aria-hidden="true" focusable="false" />}<p className="confirmation-copy">{featureNotice === 'exit' ? t('退出 Vibe Improve？', 'Exit Vibe Improve?') : t('此功能尚未接入。', 'This feature is not connected yet.')}</p></div><div className="confirmation-actions">{featureNotice === 'exit' ? <><GameButton variant="secondary" onClick={() => setFeatureNotice(null)}>{t('取消', 'Cancel')}</GameButton><GameButton variant="danger" onClick={() => {const native = nativeBridge(); if (native?.quit) native.quit(); else window.close(); setFeatureNotice(null);}}>{t('退出', 'Exit')}</GameButton></> : <GameButton variant="secondary" onClick={() => setFeatureNotice(null)}>{t('返回', 'Back')}</GameButton>}</div></Modal>}
+    {renderLearningReset()}
   </main>;
 }
 

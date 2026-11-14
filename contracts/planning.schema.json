@@ -63,11 +63,25 @@
     },
     "questions": {
       "type": "array",
-      "minItems": 5,
-      "maxItems": 5,
+      "minItems": 4,
+      "maxItems": 7,
       "items": {
         "$ref": "#/$defs/question"
-      }
+      },
+      "anyOf": [
+        {
+          "minItems": 4,
+          "maxItems": 4
+        },
+        {
+          "minItems": 5,
+          "maxItems": 5
+        },
+        {
+          "minItems": 7,
+          "maxItems": 7
+        }
+      ]
     },
     "messages": {
       "type": "array",
@@ -134,8 +148,17 @@
         },
         "factsHash": {
           "$ref": "#/$defs/factsHash"
+        },
+        "prefill": {
+          "const": true
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["prefill"] },
+          "then": { "properties": { "kind": { "const": "interview" } } }
+        }
+      ]
     },
     "proposal": {
       "type": "object",
@@ -259,6 +282,8 @@
         "purpose",
         "baseline",
         "time",
+        "deadline",
+        "scope",
         "constraints"
       ]
     },
@@ -363,6 +388,18 @@
           "minimum": 0,
           "maximum": 128
         },
+        "baselineOptions": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "\\S"
+          }
+        },
         "answerProposal": {
           "type": "object",
           "additionalProperties": false,
@@ -389,6 +426,16 @@
         }
       },
       "allOf": [
+        {
+          "if": { "required": ["baselineOptions"] },
+          "then": {
+            "properties": {
+              "id": { "const": "baseline" },
+              "status": { "const": "needs-detail" },
+              "fields": { "not": { "required": ["experience"] } }
+            }
+          }
+        },
         {
           "if": {
             "properties": {
@@ -525,8 +572,12 @@
         },
         "proposalMessageId": {
           "$ref": "#/$defs/token"
+        },
+        "reusedFrom": {
+          "enum": ["goal", "purpose", "baseline", "time"]
         }
-      }
+      },
+      "not": { "required": ["proposalMessageId", "reusedFrom"] }
     },
     "acceptanceEvidence": {
       "type": "object",
@@ -684,7 +735,7 @@
         },
         "issues": {
           "type": "array",
-          "maxItems": 5,
+          "maxItems": 7,
           "items": {
             "$ref": "#/$defs/consistencyIssue"
           }
@@ -751,7 +802,8 @@
         "assessment": {
           "$ref": "#/$defs/consistencyAssessment"
         }
-      }
+      },
+      "description": "Assessment of adopting the current unconfirmed answer, bound to the accepted background epoch and candidate facts hash. The current-question confirmation can atomically apply explicitly displayed complete corrections to earlier adopted answers. Ambiguous, incomplete or stale assessments cannot be adopted. Corrected joint facts require a fresh consistency assessment."
     },
     "storedConsistencyIssue": {
       "type": "object",
@@ -859,7 +911,7 @@
         },
         "issues": {
           "type": "array",
-          "maxItems": 5,
+          "maxItems": 7,
           "items": {
             "$ref": "#/$defs/storedConsistencyIssue"
           }
@@ -961,7 +1013,8 @@
         "issueId": {
           "$ref": "#/$defs/token"
         }
-      }
+      },
+      "description": "An explicit user confirmation of an answer correction. A single current-answer confirmation can create one event per earlier corrected answer in the same atomic state revision and background epoch. Existing review-only adoption events remain readable."
     },
     "generationDraft": {
       "type": "object",
@@ -1060,6 +1113,18 @@
                   "minLength": 1,
                   "maxLength": 160
                 },
+                "practiceRules": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 400,
+                    "pattern": "\\S"
+                  },
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "uniqueItems": true
+                },
                 "chapters": {
                   "type": "array",
                   "minItems": 1,
@@ -1082,6 +1147,16 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 600
+                      },
+                      "prerequisiteChapters": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 23
+                        },
+                        "maxItems": 23,
+                        "uniqueItems": true
                       },
                       "lessons": {
                         "type": "array",

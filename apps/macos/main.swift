@@ -25,13 +25,12 @@ let runtimeRoot = runtimeFiles.url
 let diagnosticLog = DiagnosticLog(runtimeRoot: runtimeRoot)
 
 var savedState = (try? runtimeFiles.read("preferences.json", maximumBytes: 65_536)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
-let savedDevice = savedState["deviceId"] as? String ?? ""
 let deviceId: String = {
-    do { return try DeviceIdentity.load(from: runtimeFiles, legacyDeviceID: savedDevice) }
+    do { return try DeviceIdentity.load(from: runtimeFiles) }
     catch {
         let alert = NSAlert()
         alert.messageText = "设备标识不可用 / Device identity unavailable"
-        alert.informativeText = "请检查运行时目录中的 device.json；不要删除设备标识后重复激活。 / Check device.json in the runtime folder; restore the identity before retrying."
+        alert.informativeText = "无法读取本机硬件标识或设备记录。请检查系统与运行时目录后重试。 / Cannot read this Mac's hardware identity or device record. Check the system and runtime folder, then retry."
         alert.runModal()
         exit(1)
     }
@@ -251,7 +250,7 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 let response = result
                 DispatchQueue.main.async { replyHandler(response, nil) }
             } catch {
-                let code = error is LicenseClockError ? "LICENSE_CLOCK_UNTRUSTED" : (error as? SessionStoreError) == .invalid || (error as? RuntimeFileError) == .invalid ? "SESSION_STORAGE_INVALID" : "SESSION_STORAGE_UNAVAILABLE"
+                let code = error is LicenseClockError ? "LICENSE_CLOCK_UNTRUSTED" : (error as? SessionStoreError) == .deviceChanged ? "SESSION_DEVICE_CHANGED" : (error as? SessionStoreError) == .invalid || (error as? RuntimeFileError) == .invalid ? "SESSION_STORAGE_INVALID" : "SESSION_STORAGE_UNAVAILABLE"
                 DispatchQueue.main.async { replyHandler(nil, code) }
             }
         }
@@ -340,6 +339,7 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             }
             return
         }
+        let planning = action == "route.import.save" ? planningStore : nil
         projectQueue.async{
             do{
                 let result:Any
@@ -354,12 +354,15 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 case "route.import.save":
                     guard Set(value.keys)==["projectId","importId","expectedRevision"],let token=value["importId"] as? String,
                           let revision=value["expectedRevision"] as? NSNumber,CFGetTypeID(revision) != CFBooleanGetTypeID(),revision.doubleValue==Double(revision.intValue) else{throw RoutePreparationError.invalid}
-                    result=try store.saveImport(projectID:id,importID:token,expectedRevision:revision.intValue)
+                    guard let planning else { throw PlanningError.storage }
+                    result = try planning.withRouteReplacementGuard(projectID: id) {
+                        try store.saveImport(projectID:id,importID:token,expectedRevision:revision.intValue)
+                    }
                 case "route.import.cancel":guard Set(value.keys)==["projectId","importId"],let token=value["importId"] as? String else{throw RoutePreparationError.invalid};try store.cancelImport(projectID:id,importID:token);result=NSNull()
                 default:throw RoutePreparationError.invalid
                 }
                 DispatchQueue.main.async{replyHandler(result,nil)}
-            }catch{let code=(error as? RoutePreparationError)?.rawValue ?? RoutePreparationError.storage.rawValue;DispatchQueue.main.async{replyHandler(nil,code)}}
+            }catch{let code=(error as? PlanningError)?.rawValue ?? (error as? RoutePreparationError)?.rawValue ?? RoutePreparationError.storage.rawValue;DispatchQueue.main.async{replyHandler(nil,code)}}
         }
     }
     private func handleAgentMessage(_ message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {

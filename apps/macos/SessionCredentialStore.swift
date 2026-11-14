@@ -1,13 +1,24 @@
 import Foundation
 import CryptoKit
 
-enum SessionStoreError: Error { case unavailable, invalid }
+enum SessionStoreError: Error { case unavailable, invalid, deviceChanged }
 
 final class SessionCredentialStore {
     private let runtimeRoot: URL
+    private let deviceID: () throws -> String
     private static let envId = "one-person-company-7dao3979fd72e"
-    private static let context = Data("vibe-improve.session.v1:one-person-company-7dao3979fd72e".utf8)
-    init(runtimeRoot: URL) { self.runtimeRoot = runtimeRoot }
+    init(runtimeRoot: URL, deviceID: @escaping () throws -> String = { try DeviceIdentity.current() }) {
+        self.runtimeRoot = runtimeRoot
+        self.deviceID = deviceID
+    }
+    private func currentDeviceID() throws -> String {
+        let value = try deviceID()
+        guard DeviceIdentity.hardwareBound(value) else { throw SessionStoreError.unavailable }
+        return value
+    }
+    private static func context(_ deviceID: String) -> Data {
+        Data(("vibe-improve.session.v2:" + envId + ":" + deviceID).utf8)
+    }
     static func sanitize(_ value: Any) throws -> [String: Any] {
         guard let record = value as? [String: Any],
               let version = record["schemaVersion"] as? NSNumber, CFGetTypeID(version) != CFBooleanGetTypeID(), [1.0, 2.0].contains(version.doubleValue),
@@ -99,19 +110,25 @@ final class SessionCredentialStore {
         let directory = try directory()
         return try directory.locked {
             guard let data = try directory.read("session.json", maximumBytes: 60_000) else { return nil }
-            guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any], envelope.count == 3,
-                  let version = envelope["schemaVersion"] as? NSNumber, CFGetTypeID(version) != CFBooleanGetTypeID(), version.doubleValue == 1,
+            guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let version = envelope["schemaVersion"] as? NSNumber, CFGetTypeID(version) != CFBooleanGetTypeID(), [1.0, 2.0].contains(version.doubleValue),
+                  envelope.count == (version.intValue == 1 ? 3 : 4),
                   envelope["algorithm"] as? String == "AES-256-GCM",
                   let payload = envelope["payload"] as? String, let combined = Data(base64Encoded: payload),
                   combined.count >= 28, combined.count <= 40_028, combined.base64EncodedString() == payload,
                   let key = try directory.read("session.key", maximumBytes: 32), key.count == 32 else { throw SessionStoreError.invalid }
+            guard version.intValue == 2 else { throw SessionStoreError.deviceChanged }
+            guard let savedID = envelope["deviceId"] as? String, DeviceIdentity.hardwareBound(savedID) else { throw SessionStoreError.invalid }
+            let currentID = try currentDeviceID()
+            guard savedID == currentID else { throw SessionStoreError.deviceChanged }
             guard let box = try? AES.GCM.SealedBox(combined: combined),
-                  let plain = try? AES.GCM.open(box, using: SymmetricKey(data: key), authenticating: Self.context),
+                  let plain = try? AES.GCM.open(box, using: SymmetricKey(data: key), authenticating: Self.context(currentID)),
                   let record = try? JSONSerialization.jsonObject(with: plain) else { throw SessionStoreError.invalid }
             return try Self.sanitize(record)
         }
     }
     func write(_ value: Any) throws {
+        let currentID = try currentDeviceID()
         let data = try JSONSerialization.data(withJSONObject: Self.sanitize(value), options: [.sortedKeys])
         guard data.count <= 40_000 else { throw SessionStoreError.invalid }
         let directory = try directory()
@@ -125,9 +142,9 @@ final class SessionCredentialStore {
                 key = SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }
                 try directory.write("session.key", data: key)
             }
-            let box = try AES.GCM.seal(data, using: SymmetricKey(data: key), authenticating: Self.context)
+            let box = try AES.GCM.seal(data, using: SymmetricKey(data: key), authenticating: Self.context(currentID))
             guard let combined = box.combined else { throw SessionStoreError.unavailable }
-            let envelope: [String: Any] = ["schemaVersion": 1, "algorithm": "AES-256-GCM", "payload": combined.base64EncodedString()]
+            let envelope: [String: Any] = ["schemaVersion": 2, "deviceId": currentID, "algorithm": "AES-256-GCM", "payload": combined.base64EncodedString()]
             try directory.write("session.json", data: JSONSerialization.data(withJSONObject: envelope, options: [.sortedKeys]))
         }
     }

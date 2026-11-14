@@ -184,7 +184,8 @@ function sessionTask<T>(kind: 'restore' | 'persist' | 'clear', action: () => Pro
     const span = diagnosticSpan(`auth.session.${kind}`, 'operation', undefined, {stage: `auth.session.${kind}`});
     try {const value = await action(); span.succeed(); return value;}
     catch (cause: any) {
-      const code = cause?.code === 'SESSION_STORAGE_INVALID' || cause?.message === 'SESSION_STORAGE_INVALID' ? 'SESSION_STORAGE_INVALID' : 'SESSION_STORAGE_UNAVAILABLE';
+      const received = cause?.code ?? cause?.message;
+      const code = ['SESSION_DEVICE_CHANGED', 'SESSION_STORAGE_INVALID'].includes(received) ? received : 'SESSION_STORAGE_UNAVAILABLE';
       span.fail({code}); throw {code};
     }
   });
@@ -370,6 +371,7 @@ function message(cause: unknown): string {
     AUTH_REQUIRED: ['请重新登录。', 'Please sign in again.'],
     SESSION_STORAGE_UNAVAILABLE: ['无法保存或读取登录信息，请检查运行时文件夹的读写权限。', 'Cannot save or read sign-in information. Check runtime folder permissions.'],
     SESSION_STORAGE_INVALID: ['保存的登录信息不可用，请重新登录。', 'Saved sign-in information is invalid. Please sign in again.'],
+    SESSION_DEVICE_CHANGED: ['设备身份已更新，请重新登录并确认绑定本机。', 'Device identity changed. Sign in again and confirm binding this device.'],
     LICENSE_CLOCK_UNTRUSTED: ['需要联网校验授权。', 'Connect to verify your license.'],
     AUTH_CONTEXT_UNSUPPORTED: ['登录身份尚未通过服务端验证。', 'The server could not verify this sign-in.'],
     ACTIVATION_CODE_UNAVAILABLE: ['激活码无效或已被使用。', 'This activation code is invalid or already used.'],
@@ -968,10 +970,10 @@ async function restoreSession() {
     await afterLogin(data.session, true);
   } catch (cause) {
     const code = diagnoseError(cause).resultCode;
-    if (['SESSION_INVALID', 'AUTH_REQUIRED', 'INVALID_CREDENTIALS', 'SESSION_STORAGE_INVALID', 'AUTH_USER_NOT_FOUND', 'AUTH_USER_BLOCKED'].includes(code)) {
+    if (['SESSION_DEVICE_CHANGED', 'SESSION_INVALID', 'AUTH_REQUIRED', 'INVALID_CREDENTIALS', 'SESSION_STORAGE_INVALID', 'AUTH_USER_NOT_FOUND', 'AUTH_USER_BLOCKED'].includes(code)) {
       try {await forgetSession();} catch {}
     }
-    memory.clear(); clearAuthorization(); publish({user: null, error: message(cause)});
+    memory.clear(); clearAuthorization(); publish({user: null, reauthRequired: code === 'SESSION_DEVICE_CHANGED', error: message(cause)});
   } finally {publish({busy: false, restoring: false});}
 }
 if (nativeSession && typeof auth.onAuthStateChange === 'function') auth.onAuthStateChange((event, session) => {

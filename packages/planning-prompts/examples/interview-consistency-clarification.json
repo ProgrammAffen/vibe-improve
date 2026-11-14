@@ -1,0 +1,43 @@
+{
+  "name": "interview-consistency-clarification",
+  "task": "interview",
+  "input": {
+    "locale": "zh-CN",
+    "currentQuestion": "purpose",
+    "acceptedAnswers": {
+      "goal": {
+        "summary": "先读懂市场行情，暂不练习交易。",
+        "fields": {
+          "topic": "股票市场基础",
+          "outcome": "先读懂市场行情，暂不练习交易"
+        }
+      }
+    },
+    "messages": [
+      {
+        "ref": "U1",
+        "role": "user",
+        "text": "做到能在模拟账户独立查看行情、提交委托并检查委托状态。"
+      }
+    ]
+  },
+  "response": {
+    "status": "ok",
+    "reply": "前面先选了只读懂行情、暂不练习交易，这次提到了模拟下单。你想把目标扩展为先读懂行情，再练习模拟下单吗？",
+    "result": {
+      "questionId": "purpose",
+      "complete": false,
+      "summary": "",
+      "fields": {},
+      "evidence": [],
+      "unresolved": [
+        "你想把目标扩展为先读懂行情，再练习模拟下单吗？"
+      ],
+      "consistency": {
+        "status": "consistent",
+        "issues": []
+      }
+    },
+    "missing": []
+  }
+}
