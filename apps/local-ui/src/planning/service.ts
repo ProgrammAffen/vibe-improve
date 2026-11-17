@@ -1,6 +1,7 @@
-import {assertStudiedRouteUnchanged,restartIntake,setResources,resetEditor,acceptAnswer,acceptConsistencySuggestion,cancelAnswerDraft,restartIntakeFrom,reopenIntake,setAgentOptions,type GenerationMode,type AgentOptions,type PlanningTarget,type PlanningMention,removeImportedRoute,createPlanning,validatePlanning,focusQuestion,openEditor,saveEditor,confirmRoute,canGenerate,applyProposal,discardProposal,undoEditor,redoEditor,importRoute,type PlanningState,type QuestionId} from '../../../../packages/domain/planning.mjs';
+import {assertStudiedRouteUnchanged,restartIntake,setResources,resetEditor,acceptAnswer,acceptConsistencySuggestion,cancelAnswerDraft,restartIntakeFrom,reopenIntake,setAgentOptions,type GenerationMode,type ResourceSelection,type AgentOptions,type PlanningTarget,type PlanningMention,type PlanningAttachment,validPlanningAttachments,removeImportedRoute,createPlanning,validatePlanning,focusQuestion,openEditor,saveEditor,confirmRoute,canGenerate,applyProposal,discardProposal,undoEditor,redoEditor,importRoute,type PlanningState,type QuestionId} from '../../../../packages/domain/planning.mjs';
 import type {RouteDocument} from '../../../../packages/domain/route-validation.mjs';
 import type {Language} from '../i18n';
+import type {ProviderId} from '../agents/domain';
 import {routeService} from '../routes/service';
 import {browserProjectTransaction,browserRead,withProjectLock} from './browser-store';
 import type {LearningProgress} from '../routes/learning-record';
@@ -31,7 +32,9 @@ const qualityReasons={
  unsupported_fact:['有些练习依赖尚未核实的关键规则或数据。','Some exercises rely on key rules or data that could not be verified.'],
 } satisfies Record<string,[string,string]>;
 export type PlanningQualityReason=keyof typeof qualityReasons;
-export type PlanningJob={id:string;projectId:string;intent:PlanningIntent;state:'pending'|'completed'|'failed'|'cancelled';result?:PlanningState;errorCode?:string;userReply?:string;partialReply?:string;qualityReason?:PlanningQualityReason;qualitySummary?:{text:string;locale:Language};restartGeneration?:true;generationOutput?:GenerationOutput[];activity?:PlanningActivity;diagnostic?:{promptVersion?:string;stage:string;durationMs:number;receivedCharacters:number;completedChapters?:number;chapterCount?:number}};
+const routeGenerationPhases=['prepare','outline','lessons','review','revision','finalize','saving','complete'] as const;
+export type RouteGenerationPhase=typeof routeGenerationPhases[number];
+export type PlanningJob={id:string;projectId:string;intent:PlanningIntent;state:'pending'|'completed'|'failed'|'cancelled';result?:PlanningState;errorCode?:string;userReply?:string;partialReply?:string;qualityReason?:PlanningQualityReason;qualitySummary?:{text:string;locale:Language};generationPhase?:RouteGenerationPhase;generationOutput?:GenerationOutput[];activity?:PlanningActivity;diagnostic?:{promptVersion?:string;stage:string;durationMs:number;receivedCharacters:number;completedChapters?:number;chapterCount?:number;completedLessons?:number;lessonCount?:number}};
 export function planningProgress(job:PlanningJob,language:Language){
  const labels:Record<string,[string,string]>={preparing:['准备中…','Preparing…'],connecting:['连接智能体…','Connecting…'],waiting:['等待智能体响应…','Waiting for the agent…'],thinking:['智能体正在思考…','Agent is thinking…'],generating:['正在生成内容…','Generating…'],receiving:['正在接收结果…','Receiving…'],finishing:['正在完成请求…','Finishing…'],parsing:['正在检查结果…','Checking the result…'],validating:['正在校验路线…','Validating…'],reviewing:['正在复核路线内容…','Reviewing route content…'],revising:['正在修正章节…','Revising lessons…']};
  const output=job.generationOutput?.at(-1),stage=job.diagnostic?.stage??'';
@@ -39,12 +42,17 @@ export function planningProgress(job:PlanningJob,language:Language){
  const item=labels[qualityStage??stage];if(!item)return job.intent==='consistency'?(language==='en'?'Checking answers…':'正在检查回答…'):undefined;
  const duration=job.diagnostic?.durationMs??0;
  const seconds=Number.isSafeInteger(duration)&&duration>=0?Math.floor(duration/10_000)*10:0;
- const {completedChapters,chapterCount}=job.diagnostic??{};
- const chapter=Number.isInteger(completedChapters)&&Number.isInteger(chapterCount)&&completedChapters!>=0&&chapterCount!>=1&&chapterCount!<=24&&completedChapters!<=chapterCount!?(language==='en'?`${completedChapters}/${chapterCount} chapters ready · `:`已完成 ${completedChapters}/${chapterCount} 章 · `):'';
- return (job.intent==='consistency'?(language==='en'?'Checking answers · ':'检查回答 · '):'')+chapter+item[language==='en'?1:0]+(seconds>=10?` · ${seconds}s`:'');
+ const {completedChapters,chapterCount,completedLessons,lessonCount}=job.diagnostic??{};
+ let progress='';
+ if(typeof completedLessons==='number'&&typeof lessonCount==='number'&&Number.isInteger(completedLessons)&&Number.isInteger(lessonCount)&&completedLessons>=0&&completedLessons<=lessonCount&&lessonCount>=1&&lessonCount<=512){
+  progress=language==='en'?`${completedLessons} / ${lessonCount} lesson drafts saved · `:`已保存 ${completedLessons} / ${lessonCount} 节草稿 · `;
+ }else if(Number.isInteger(completedChapters)&&Number.isInteger(chapterCount)&&completedChapters!>=0&&chapterCount!>=1&&chapterCount!<=24&&completedChapters!<=chapterCount!){
+  progress=language==='en'?`${completedChapters}/${chapterCount} chapters ready · `:`已完成 ${completedChapters}/${chapterCount} 章 · `;
+ }
+ return (job.intent==='consistency'?(language==='en'?'Checking answers · ':'检查回答 · '):'')+progress+item[language==='en'?1:0]+(seconds>=10?` · ${seconds}s`:'');
 }
 export type PlanningEntry='ai'|'manual'|'import';
-const errors=['PLANNING_STUDIED_LESSON_LOCKED','PLANNING_GENERATION_INVALID','PLANNING_GENERATION_STALE','PLANNING_GENERATION_EXISTS','PLANNING_NEEDS_INPUT','PLANNING_CANNOT_COMPLETE','PLANNING_REPLACE_REQUIRED','PLANNING_TARGET_UNAVAILABLE','PLANNING_AGENT_OPTIONS','PLANNING_AGENT_AUTH_REQUIRED','PLANNING_AGENT_BUSY','PLANNING_AGENT_CANCELLED','PLANNING_AGENT_FAILED','PLANNING_AGENT_INVALID','PLANNING_AGENT_NETWORK','PLANNING_AGENT_OUTPUT_TOO_LARGE','PLANNING_AGENT_PERMISSION_REQUIRED','PLANNING_AGENT_PROTOCOL','PLANNING_AGENT_QUALITY_REVIEW','PLANNING_AGENT_QUOTA','PLANNING_AGENT_RESULT_REJECTED','PLANNING_AGENT_ROUTE_MISSING','PLANNING_AGENT_ROUTE_ENCODING','PLANNING_AGENT_TIMEOUT','PLANNING_AGENT_UNAVAILABLE','PLANNING_AGENT_UNSUPPORTED','PLANNING_PROJECT_UNAVAILABLE','PLANNING_TOO_LARGE','PLANNING_ROUTE_INVALID','PLANNING_EVIDENCE_INVALID','PLANNING_INVALID','PLANNING_CONFLICT','PLANNING_STORAGE_UNAVAILABLE','PLANNING_INCOMPLETE','PLANNING_LIMIT','PLANNING_CANCELLED','PLANNING_RESPONSE_INVALID','PLANNING_TIMEOUT','PLANNING_BUSY','AGENT_DESKTOP_REQUIRED','AGENT_AUTH_REQUIRED','AGENT_UNAVAILABLE','AGENT_TIMEOUT','AGENT_INVALID','AGENT_BUSY','AGENT_PROJECT_UNAVAILABLE','AGENT_PERMISSION_REQUIRED','AGENT_CANCELLED','ROUTE_INVALID','ROUTE_VERSION_UNSUPPORTED','ROUTE_TOO_MANY_NODES','ROUTE_CONFLICT'] as const;
+const errors=['PLANNING_ATTACHMENT_UNAVAILABLE','PLANNING_AGENT_IMAGE_UNSUPPORTED','PLANNING_AGENT_INPUT_LIMIT','PLANNING_STUDIED_LESSON_LOCKED','PLANNING_GENERATION_INVALID','PLANNING_GENERATION_STALE','PLANNING_GENERATION_EXISTS','PLANNING_NEEDS_INPUT','PLANNING_CANNOT_COMPLETE','PLANNING_REPLACE_REQUIRED','PLANNING_TARGET_UNAVAILABLE','PLANNING_AGENT_OPTIONS','PLANNING_AGENT_AUTH_REQUIRED','PLANNING_AGENT_BUSY','PLANNING_AGENT_CANCELLED','PLANNING_AGENT_FAILED','PLANNING_AGENT_INVALID','PLANNING_AGENT_NETWORK','PLANNING_AGENT_OUTPUT_TOO_LARGE','PLANNING_AGENT_PERMISSION_REQUIRED','PLANNING_AGENT_PROTOCOL','PLANNING_AGENT_QUALITY_REVIEW','PLANNING_AGENT_QUOTA','PLANNING_AGENT_RESULT_REJECTED','PLANNING_AGENT_ROUTE_MISSING','PLANNING_AGENT_ROUTE_ENCODING','PLANNING_AGENT_TIMEOUT','PLANNING_AGENT_UNAVAILABLE','PLANNING_AGENT_UNSUPPORTED','PLANNING_PROJECT_UNAVAILABLE','PLANNING_TOO_LARGE','PLANNING_ROUTE_INVALID','PLANNING_EVIDENCE_INVALID','PLANNING_INVALID','PLANNING_CONFLICT','PLANNING_STORAGE_UNAVAILABLE','PLANNING_INCOMPLETE','PLANNING_LIMIT','PLANNING_CANCELLED','PLANNING_RESPONSE_INVALID','PLANNING_TIMEOUT','PLANNING_BUSY','AGENT_DESKTOP_REQUIRED','AGENT_AUTH_REQUIRED','AGENT_UNAVAILABLE','AGENT_TIMEOUT','AGENT_INVALID','AGENT_BUSY','AGENT_PROJECT_UNAVAILABLE','AGENT_PERMISSION_REQUIRED','AGENT_CANCELLED','ROUTE_INVALID','ROUTE_VERSION_UNSUPPORTED','ROUTE_TOO_MANY_NODES','ROUTE_CONFLICT'] as const;
 export function planningError(cause:unknown){const message=cause instanceof Error?cause.message:String(cause);return errors.find(code=>message.includes(code))??'PLANNING_STORAGE_UNAVAILABLE'}
 const qualityReviewFailure='PLANNING_AGENT_QUALITY_REVIEW';
 function canShowTaskReply(code?:string){return code==='PLANNING_NEEDS_INPUT'||code==='PLANNING_CANNOT_COMPLETE'}
@@ -67,6 +75,9 @@ export function planningMessage(cause:unknown,language:Language){
  if(detail.includes('PLANNING_AGENT_TIMEOUT:idle_timeout'))return language==='en'?'Stopped after 3 minutes without agent output. Your route and saved progress were kept.':'智能体连续 3 分钟没有输出，本次请求已停止。原路线和已保存的进度已保留。';
  if(detail.includes('PLANNING_AGENT_TIMEOUT:handshake_timeout'))return language==='en'?'Connecting to the agent timed out. Your route and saved progress were kept.':'连接智能体超时，原路线和已保存的进度已保留。';
  const messages:Record<typeof errors[number],[string,string]>={
+  PLANNING_AGENT_INPUT_LIMIT:['当前智能体或模型返回了输入超限。请减少附件或缩短消息后重试。','The agent or model reported an input limit. Try fewer attachments or a shorter message.'],
+  PLANNING_ATTACHMENT_UNAVAILABLE:['无法读取该附件，请重新添加后发送。','Could not read the attachment. Add it again to send.'],
+  PLANNING_AGENT_IMAGE_UNSUPPORTED:['当前模型无法接收图片，请切换支持图片的模型或移除图片后重试。','This model cannot accept images. Switch to a model that accepts images or remove the image and try again.'],
   PLANNING_GENERATION_INVALID:['保存的生成草稿未通过校验，请重新生成。原路线已保留。','The saved generation draft is invalid. Start again. Your route was kept.'],
   PLANNING_GENERATION_STALE:['生成条件已变化，请重新生成。','Generation conditions have changed. Start again.'],
   PLANNING_GENERATION_EXISTS:['有未完成的生成草稿，请选择继续或重新生成。','An unfinished generation draft exists. Resume it or start again.'],
@@ -143,7 +154,7 @@ function job(value:unknown,id:string):PlanningJob{
  if(x.userReply!==undefined&&(typeof x.userReply!=='string'||!x.userReply.trim()||x.userReply.length>8000||x.state!=='failed'||!canShowTaskReply(x.errorCode)||x.userReply.includes('\0')))throw new Error('PLANNING_RESPONSE_INVALID');
  if(x.qualityReason!==undefined&&(x.intent!=='generate'||x.state!=='failed'||x.errorCode!==qualityReviewFailure||typeof x.qualityReason!=='string'||!Object.hasOwn(qualityReasons,x.qualityReason)))throw new Error('PLANNING_RESPONSE_INVALID');
  if(x.qualitySummary!==undefined&&(!x.qualityReason||!validQualitySummary(x.qualitySummary)))throw new Error('PLANNING_RESPONSE_INVALID');
- if(x.restartGeneration!==undefined&&(x.restartGeneration!==true||!x.qualityReason))throw new Error('PLANNING_RESPONSE_INVALID');
+ if(x.generationPhase!==undefined&&(x.intent!=='generate'||!routeGenerationPhases.includes(x.generationPhase)||(x.generationPhase==='complete'&&x.state!=='completed')))throw new Error('PLANNING_RESPONSE_INVALID');
  return{...x,generationOutput:parseGenerationOutput(x.generationOutput),activity:parsePlanningActivity(x.activity),...(x.result?{result:validatePlanning(x.result)}:{})}
 }
 function validQualitySummary(summary:NonNullable<PlanningJob['qualitySummary']>){
@@ -165,6 +176,10 @@ export type PlanningModel={id:string;name:string;isDefault:boolean;efforts:strin
 export type ModelCatalog={provider:string;models:PlanningModel[]};
 export const planningService={
  models:async(id:string,refresh=false):Promise<ModelCatalog>=>{projectID(id);if(!native())return {provider:'',models:[]};const data=await request<ModelCatalog>('planning.models',{projectId:id,...(refresh?{refresh:true}:{})});if(!data||typeof data.provider!=='string'||!Array.isArray(data.models)||data.models.length>300||data.models.some(m=>!m||typeof m.id!=='string'||typeof m.name!=='string'||!Array.isArray(m.efforts)))throw new Error('PLANNING_RESPONSE_INVALID');return data},
+ provider:async(state:PlanningState,provider:ProviderId):Promise<PlanningState>=>{
+  if(!native())throw new Error('AGENT_DESKTOP_REQUIRED');
+  return validatePlanning(await request('planning.provider',{projectId:state.projectId,provider,expectedRevision:state.revision}));
+ },
  options:async(state:PlanningState,options:AgentOptions)=>native()?validatePlanning(await request('planning.options',{projectId:state.projectId,options,expectedRevision:state.revision})):browserMutate(state.projectId,s=>setAgentOptions(required(s),options,state.revision)),
  removeImport:async(id:string,expectedPlanningRevision:number|null,expectedRouteRevision:number):Promise<PlanningState|null>=>{
   projectID(id);if(native()){const result=await request<unknown>('planning.import.remove',{projectId:id,expectedPlanningRevision,expectedRouteRevision});return result===null?null:validatePlanning(result)}
@@ -213,7 +228,15 @@ export const planningService={
  openEditor:async(state:PlanningState)=>native()?validatePlanning(await request('planning.open-editor',{projectId:state.projectId,expectedRevision:state.revision})):browserMutate(state.projectId,s=>openEditor(required(s),state.revision)),
  save:async(state:PlanningState,route:RouteDocument)=>native()?validatePlanning(await request('planning.save',{projectId:state.projectId,route,expectedRevision:state.revision})):browserMutate(state.projectId,s=>saveEditor(required(s),route,state.revision)),
  confirm:async(state:PlanningState)=>native()?validatePlanning(await request('planning.confirm',{projectId:state.projectId,expectedRevision:state.revision})):browserMutate(state.projectId,s=>confirmRoute(required(s),state.revision)),
- begin:async(state:PlanningState,intent:PlanningIntent,text?:string,mentions?:PlanningMention[],target?:PlanningTarget,replaceExisting=false,generationMode:GenerationMode='new')=>{if(!native())throw new Error('AGENT_DESKTOP_REQUIRED');if(intent==='generate'&&!canGenerate(state))throw new Error('PLANNING_INCOMPLETE');return job(await request('planning.begin',{projectId:state.projectId,intent,expectedRevision:state.revision,...(intent==='generate'?{generationMode}:{}),...(replaceExisting?{replaceExisting:true}:{}),...(text!==undefined?{text}:{}),...(mentions?.length?{mentions}:target?{target}:{})}),state.projectId)},
+ chooseChatFiles:async(projectId:string,retaining:string[])=>{
+  if(!native())throw new Error('AGENT_DESKTOP_REQUIRED');
+  const result=await request<{attachments:PlanningAttachment[];skipped:number}|null>('resources.chooseChatFiles',{projectId,retaining});
+  if(result===null)return null;
+  if(!Array.isArray(result.attachments)||(result.attachments.length>0&&!validPlanningAttachments(result.attachments))||
+      !Number.isSafeInteger(result.skipped)||result.skipped<0)throw new Error('PLANNING_RESPONSE_INVALID');
+  return result;
+ },
+ begin:async(state:PlanningState,intent:PlanningIntent,text?:string,mentions?:PlanningMention[],target?:PlanningTarget,replaceExisting=false,generationMode:GenerationMode='new',resourceSelection:ResourceSelection[]=[],attachments:PlanningAttachment[]=[])=>{if(!native())throw new Error('AGENT_DESKTOP_REQUIRED');if(intent==='generate'&&!canGenerate(state))throw new Error('PLANNING_INCOMPLETE');return job(await request('planning.begin',{projectId:state.projectId,intent,expectedRevision:state.revision,...(intent==='generate'?{generationMode,...(resourceSelection.length?{resourceSelection}:{})}:{}),...(replaceExisting?{replaceExisting:true}:{}),...(text!==undefined?{text}:{}),...(mentions?.length?{mentions}:target?{target}:{}),...(attachments.length?{attachmentIds:attachments.map(file=>file.id)}:{})}),state.projectId)},
  job:async(id:string,jobId:string)=>job(await request('planning.state',{projectId:id,jobId}),id),
  cancel:async(id:string,jobId:string)=>job(await request('planning.cancel',{projectId:id,jobId}),id),
  applyProposal:async(state:PlanningState)=>native()?validatePlanning(await request('planning.proposal.apply',{projectId:state.projectId,expectedRevision:state.revision})):browserMutate(state.projectId,s=>applyProposal(required(s),state.revision)),

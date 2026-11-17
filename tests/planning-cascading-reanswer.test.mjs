@@ -62,4 +62,8 @@ test('returned questions offer an explicit reanswer action and request the casca
  const html=renderToStaticMarkup(createElement(PlanningIntakeSurface,props));assert.match(html,/>Answer again</);assert.match(html,/Python basics/);assert.match(html,/4 \/ 4/);
  const calls=[];globalThis.window={vibeNative:{projects:{request:async(action,value)=>{calls.push({action,value});return source=restartIntakeFrom(source,value.questionId,value.expectedRevision)}}}};
  const reset=await planningService.reanswer(source,'baseline');assert.equal(calls[0].action,'planning.answer.reset');assert.equal(calls[0].value.questionId,'baseline');assert.equal(reset.questions.filter(q=>q.status==='complete').length,2);assert.equal(reset.currentQuestion,'baseline');delete globalThis.window;
+ const reopened=renderToStaticMarkup(createElement(PlanningIntakeSurface,{...props,state:reset}));
+ const input=reopened.match(/<textarea\b[^>]*>/)?.[0];
+ assert.ok(input);
+ assert.doesNotMatch(input,/\bdisabled=/);
 });

@@ -130,18 +130,53 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         guard let store=self?.projectStore else{throw ProjectError.storage}
         return try store.projectWorkspace(for:id)
     })
-    lazy var agentManager = try? AgentManager(runtime: runtimeFiles, projectWorkspace: { [weak self] id in
-        guard let store = self?.projectStore else { throw ProjectError.storage }
-        return try store.projectWorkspace(for: id)
-    })
+    lazy var agentManager:AgentManager? = {
+        let planning=planningStore
+        return try? AgentManager(runtime:runtimeFiles,projectWorkspace:{[weak self] id in
+            guard let store=self?.projectStore else{throw ProjectError.storage}
+            return try store.projectWorkspace(for:id)
+        },projectChoice:{id in
+            try planning?.read(projectID:id)?["agentChoice"] as? String
+        })
+    }()
     lazy var planningStore = try? PlanningStore(runtime: runtimeFiles, workspace: { [weak self] id in
         guard let store=self?.projectStore else{throw ProjectError.storage}
         return try store.projectWorkspace(for:id)
     })
     lazy var planningAgent:PlanningAgentManager? = agentManager.map{PlanningAgentManager(agents:$0)}
+    lazy var chatAttachments = try? PlanningChatAttachmentStore(runtime: runtimeFiles)
+    lazy var resourceLibrary = try? ResourceLibrary(runtime: runtimeFiles, project: { [weak self] id in
+        guard let store = self?.projectStore else { throw ResourceError.storage }
+        _ = try store.projectWorkspace(for: id)
+    }, log: { job, phase, format, code, duration in
+        diagnosticLog.record("native.resource.finished", level: phase == "failed" || phase == "needsAttention" ? "warn" : "info",
+                             resultCode: code, diagnostic: ["traceId": job, "resourceType": format, "stage": phase, "durationMs": duration])
+    })
     lazy var planningCoordinator:PlanningCoordinator? = {
         guard let store=planningStore,let routes=routeStore,let agents=agentManager,let runner=planningAgent else{return nil}
-        return PlanningCoordinator(store:store,routes:routes,agents:agents,runner:runner,log:{event,code,details in diagnosticLog.record(event,level:event.hasSuffix("failed") ? "warn":"info",resultCode:code,diagnostic:details)})
+        let library = resourceLibrary
+        let attachments = chatAttachments
+        return PlanningCoordinator(store:store,routes:routes,agents:agents,runner:runner,sources:{id, selections in
+            if selections.isEmpty { return [] }
+            guard let library else { throw PlanningError.storage }
+            let refs = try selections.map { fields in
+                guard Set(fields.keys)==["id","version"],let id=fields["id"],let version=fields["version"],
+                      UUID(uuidString:id) != nil, UUID(uuidString:version) != nil else{throw PlanningError.invalid}
+                return ResourceSelection(id:id,version:version)
+            }
+            do { return try library.generationReferences(id,selections:refs) }
+            catch ResourceError.changed { throw PlanningError.generationStale }
+        },attachment:{ id, file in
+            guard let attachments else { throw PlanningAgentError.attachment }
+            return try attachments.read(file, project: id)
+        },log:{event,code,details in diagnosticLog.record(event,level:event.hasSuffix("failed") ? "warn":"info",resultCode:code,diagnostic:details)})
+    }()
+    lazy var resourceBridge: ResourceBridge? = {
+        guard let library = resourceLibrary, let planning = planningStore else { return nil }
+        let coordinator = planningCoordinator
+        return ResourceBridge(library: library, planning: planning, agent: planningAgent, chatAttachments: chatAttachments, invalidate: { project, ref in
+            coordinator?.cancelForResource(project, id: ref)
+        })
     }()
     let agentQueue = DispatchQueue(label: "vibe-improve.agents", attributes: .concurrent)
     var wakeObserver: NSObjectProtocol?
@@ -258,11 +293,16 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     private func handleProjectMessage(_ message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
         guard message.frameInfo.isMainFrame, let origin = message.frameInfo.request.url, isAllowed(origin),
               let body = message.body as? [String: Any], body.count <= 2, let action = body["action"] as? String,
-              let bytes = try? JSONSerialization.data(withJSONObject: body), bytes.count <= (action.hasPrefix("planning.") ? 2_097_152:65_536),
+              projectPayloadFits(action, body),
               let store = projectStore else { replyHandler(nil, "PROJECT_STORAGE_UNAVAILABLE"); return }
         let value = body["value"] as? [String: Any] ?? [:]
         if action.hasPrefix("planning."){handlePlanning(action,value:value,replyHandler:replyHandler);return}
         if action.hasPrefix("route."){handleRoutePreparation(action,value:value,replyHandler:replyHandler);return}
+        if action.hasPrefix("resources.") {
+            guard let resourceBridge else { replyHandler(nil, ResourceError.storage.rawValue); return }
+            resourceBridge.request(action, value: value, window: window, english: preferences["language"] as? String == "en", reply: replyHandler)
+            return
+        }
         if action == "chooseParent" || action == "chooseProject" {
             let panel = NSOpenPanel()
             panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.allowsMultipleSelection = false
@@ -314,6 +354,17 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 DispatchQueue.main.async { replyHandler(nil, code) }
             }
         }
+    }
+    private func projectPayloadFits(_ action:String,_ body:[String:Any])->Bool {
+        var measured=body
+        if var value=body["value"] as? [String:Any] {
+            // These lists contain only project-local UUIDs and are checked by their handlers.
+            if action=="planning.begin"{value.removeValue(forKey:"attachmentIds")}
+            if action=="resources.chooseChatFiles"{value.removeValue(forKey:"retaining")}
+            measured["value"]=value
+        }
+        guard let bytes=try? JSONSerialization.data(withJSONObject:measured) else{return false}
+        return bytes.count<=(action.hasPrefix("planning.") ? 2_097_152:65_536)
     }
     private func handlePlanning(_ action:String,value:[String:Any],replyHandler:@escaping(Any?,String?)->Void){
         guard let coordinator=planningCoordinator else{replyHandler(nil,PlanningError.storage.rawValue);return}
@@ -370,6 +421,7 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
               let body=message.body as? [String:Any],Set(body.keys).isSubset(of:["action","value"]),let action=body["action"] as? String,
               let data=try? JSONSerialization.data(withJSONObject:body),data.count<=8192,
               let value=body["value"] as? [String:Any],let manager=agentManager else{replyHandler(nil,AgentError.invalid.rawValue);return}
+        let planning=action=="choice.save" ? planningCoordinator:nil
         agentQueue.async {
             do {
                 var result:Any=NSNull()
@@ -377,7 +429,10 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 case "detection.read": guard value.isEmpty else{throw AgentError.invalid};result=try manager.detection()
                 case "probe": guard Set(value.keys)==["id"],let id=value["id"] as? String else{throw AgentError.invalid};result=try manager.probe(id)
                 case "choice.read": guard Set(value.keys)==["scope"],let scope=value["scope"] as? String else{throw AgentError.invalid};result=try manager.choice(scope)
-                case "choice.save": guard Set(value.keys)==["scope","choice"],let scope=value["scope"] as? String,let choice=value["choice"] as? String else{throw AgentError.invalid};try manager.save(scope,choice:choice)
+                case "choice.save":
+                    guard Set(value.keys)==["scope","choice"],let scope=value["scope"] as? String,let choice=value["choice"] as? String else{throw AgentError.invalid}
+                    if scope=="default"{try manager.save(scope,choice:choice)}
+                    else{guard let planning else{throw AgentError.unavailable};try planning.saveProjectAgent(scope,choice:choice)}
                 case "session.prepare": guard Set(value.keys)==["projectId"],let id=value["projectId"] as? String else{throw AgentError.invalid};result=try manager.prepareSession(projectID:id).summary
                 case "install.begin": guard Set(value.keys)==["id"],let id=value["id"] as? String else{throw AgentError.invalid};result=try manager.beginInstall(id)
                 case "login.begin": guard Set(value.keys)==["id"],let id=value["id"] as? String else{throw AgentError.invalid};result=try manager.beginLogin(id)

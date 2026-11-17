@@ -45,6 +45,10 @@
         "hermes"
       ]
     },
+    "agentChoice": {
+      "description": "Project agent selection when explicitly saved after planning begins. The active provider may be null in manual entry.",
+      "enum": ["manual", "codex", "claude-code", "codebuddy", "qoder", "openclaw", "hermes"]
+    },
     "locale": {
       "enum": [
         "zh-CN",
@@ -269,9 +273,67 @@
     },
     "generationDraft": {
       "$ref": "#/$defs/generationDraft"
+    },
+    "resourceSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "items"],
+      "properties": {
+        "provider": {"$ref": "#/$defs/token"},
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 40,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/resourceSelection"}
+        }
+      }
+    },
+    "routeMaterials": {
+      "type": "array",
+      "maxItems": 22,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["routeId", "links"],
+        "properties": {
+          "routeId": {"$ref": "#/$defs/token"},
+          "links": {
+            "type": "array",
+            "maxItems": 1024,
+            "items": {"$ref": "#/$defs/materialLink"}
+          }
+        }
+      }
     }
   },
   "$defs": {
+    "resourceId": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$"
+    },
+    "resourceSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {"$ref": "#/$defs/resourceId"},
+        "version": {"$ref": "#/$defs/resourceId"}
+      }
+    },
+    "materialLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "kind", "targetId", "origin"],
+      "properties": {
+        "id": {"$ref": "#/$defs/resourceId"},
+        "version": {"$ref": "#/$defs/resourceId"},
+        "kind": {"enum": ["chapter", "lesson"]},
+        "targetId": {"$ref": "#/$defs/token"},
+        "origin": {"enum": ["ai", "editor"]},
+        "segmentId": {"type": "string", "pattern": "^s[1-9][0-9]{0,4}$"}
+      }
+    },
     "token": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,100}$"
@@ -483,6 +545,9 @@
         "questionId": {
           "$ref": "#/$defs/questionId"
         },
+        "provider": {
+          "$ref": "#/properties/provider"
+        },
         "target": {
           "$ref": "#/$defs/target"
         },
@@ -493,7 +558,25 @@
             "$ref": "#/$defs/mention"
           },
           "description": "Inline mention token bound to stable IDs; chapter content is resolved by the runtime before the request. Legacy single target remains readable."
+        },
+        "attachments": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "kind"],
+            "properties": {
+              "id": {"type": "string", "pattern": "^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$"},
+              "name": {"type": "string", "minLength": 1, "maxLength": 240},
+              "kind": {"enum": ["image", "document"]}
+            }
+          }
         }
+      },
+      "dependentSchemas": {
+        "attachments": {"properties": {"role": {"const": "user"}}}
       }
     },
     "target": {
@@ -1045,7 +1128,7 @@
         "revision": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1000
+          "maximum": 999999
         },
         "createdAt": {
           "type": "string",
@@ -1081,6 +1164,15 @@
         "routeId": {
           "type": "string",
           "pattern": "^route_[a-f0-9-]{36}$"
+        },
+        "revisedLessonIds": {
+          "type": "array",
+          "maxItems": 512,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^node_[1-9][0-9]*_[1-9][0-9]*$"
+          }
         },
         "outline": {
           "type": "object",
@@ -1233,6 +1325,11 @@
                     "items": {
                       "$ref": "route.schema.json#/$defs/nodeV2"
                     }
+                  },
+                  "materialLinks": {
+                    "type": "array",
+                    "maxItems": 128,
+                    "items": {"$ref": "#/$defs/materialLink"}
                   }
                 }
               }

@@ -1,6 +1,7 @@
 import {validateRoute} from './route-validation.mjs';
 import {sha256} from './sha256.mjs';
 import manifest from '../planning-prompts/manifest.json' with {type:'json'};
+import {materialKey,validMaterialLink} from './route-materials.mjs';
 
 export const GENERATION_POLICY=manifest.generationCheckpointVersion;
 const fail=()=>{throw new Error('PLANNING_GENERATION_INVALID')};
@@ -14,7 +15,9 @@ export const generationEqual=(a,b)=>JSON.stringify(canonical(a))===JSON.stringif
 export const generationRouteHash=route=>sha256(JSON.stringify(canonical(route??null)));
 
 export function validateGenerationDraft(d){
- if(!keys(d,['schemaVersion','id','revision','createdAt','updatedAt','backgroundEpoch','factsHash','policyVersion','locale','baseRouteHash','routeId','outline','chapters'])||d.schemaVersion!==1||!/^generation_[A-Za-z0-9._-]{1,64}$/.test(d.id)||!integer(d.revision,1,1000)||!integer(d.backgroundEpoch,0,999999)||!hash(d.factsHash)||!hash(d.baseRouteHash)||!text(d.policyVersion,80)||!['zh-CN','en'].includes(d.locale)||!/^route_[a-f0-9-]{36}$/.test(d.routeId))fail();
+ const fields=['schemaVersion','id','revision','createdAt','updatedAt','backgroundEpoch','factsHash','policyVersion','locale','baseRouteHash','routeId','outline','chapters'];
+ if(object(d)&&Object.hasOwn(d,'revisedLessonIds'))fields.push('revisedLessonIds');
+ if(!keys(d,fields)||d.schemaVersion!==1||!/^generation_[A-Za-z0-9._-]{1,64}$/.test(d.id)||!integer(d.revision,1,999_999)||!integer(d.backgroundEpoch,0,999999)||!hash(d.factsHash)||!hash(d.baseRouteHash)||!text(d.policyVersion,80)||!['zh-CN','en'].includes(d.locale)||!/^route_[a-f0-9-]{36}$/.test(d.routeId))fail();
  for(const field of ['createdAt','updatedAt'])if(typeof d[field]!=='string'||!/^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(d[field])||!Number.isFinite(Date.parse(d[field])))fail();
  if(Date.parse(d.updatedAt)<Date.parse(d.createdAt))fail();
  const envelope=d.outline,result=envelope?.result;
@@ -41,8 +44,15 @@ export function validateGenerationDraft(d){
  d.chapters.forEach((c,i)=>{
   if(c===null)return;
   const outline=result.chapters[i];
-  if(!keys(c,['id','title','stageGoal','nodes'])||c.id!==`ch_${i+1}`||c.title!==outline.title||c.stageGoal!==outline.stageGoal||!Array.isArray(c.nodes)||!c.nodes.length||c.nodes.length>outline.lessons.length||c.nodes.length<outline.lessons.length&&c.nodes.length%3!==0)fail();
+  const fields=['id','title','stageGoal','nodes'];
+  if(c&&Object.hasOwn(c,'materialLinks'))fields.push('materialLinks');
+  if(!keys(c,fields)||c.id!==`ch_${i+1}`||c.title!==outline.title||c.stageGoal!==outline.stageGoal||!Array.isArray(c.nodes)||!c.nodes.length||c.nodes.length>outline.lessons.length||c.nodes.length<outline.lessons.length&&c.nodes.length%3!==0)fail();
   const copy=JSON.parse(JSON.stringify(c));
+  delete copy.materialLinks;
+  if(c.materialLinks!==undefined){
+   const ids=new Set(c.nodes.map(node=>node?.id));
+   if(!Array.isArray(c.materialLinks)||c.materialLinks.length>c.nodes.length*2||!c.materialLinks.every(link=>validMaterialLink(link)&&link.origin==='ai'&&link.kind==='lesson'&&ids.has(link.targetId))||new Set(c.materialLinks.map(materialKey)).size!==c.materialLinks.length)fail();
+  }
   c.nodes.forEach((n,j)=>{
    const id=`node_${i+1}_${j+1}`,order=positions.get(id);
    if(!object(n)||n.id!==id||n.title!==outline.lessons[j].title||!Array.isArray(n.activities)||!n.activities.length||!Array.isArray(n.objectives)||n.objectives.some((o,k)=>!object(o)||o.id!==id+`_o${k+1}`)||!Array.isArray(n.prerequisites)||n.prerequisites.some(p=>!positions.has(p)||positions.get(p)>=order))fail();
@@ -52,10 +62,15 @@ export function validateGenerationDraft(d){
   completed+=c.nodes.length;
  });
  if(JSON.stringify(d).length>2_097_152)fail();
+ if(fields.includes('revisedLessonIds')){
+  const ids=d.revisedLessonIds;
+  if(completed!==total||!Array.isArray(ids)||ids.length>total||new Set(ids).size!==ids.length||ids.some(id=>!positions.has(id)))fail();
+  return {completed,total,revised:ids.length};
+ }
  return {completed,total};
 }
 
 export function generationDraftMatches(state,factsHash){
  const d=state.generationDraft;
- return Boolean(d&&d.backgroundEpoch===(state.backgroundEpoch??0)&&d.factsHash===factsHash&&d.policyVersion===GENERATION_POLICY&&d.locale===state.locale&&d.baseRouteHash===generationRouteHash(state.routeDraft));
+ return Boolean(d&&(!state.resourceSnapshot||state.resourceSnapshot.provider===state.provider)&&d.backgroundEpoch===(state.backgroundEpoch??0)&&d.factsHash===factsHash&&d.policyVersion===GENERATION_POLICY&&d.locale===state.locale&&d.baseRouteHash===generationRouteHash(state.routeDraft));
 }

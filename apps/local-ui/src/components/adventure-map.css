@@ -210,11 +210,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.adventure-marker:focus-visible {
-  outline-color: #fff4bd;
-  outline-offset: 3px;
-  border-radius: 24%;
-}
+.adventure-marker:focus-visible { filter: brightness(1.26) saturate(1.2); }
 
 .adventure-marker:hover,
 .adventure-marker[aria-expanded='true'] {
@@ -352,6 +348,7 @@
   cursor: pointer;
 }
 
+.adventure-map-page-select select:focus { background: color-mix(in srgb, var(--map-sheet) 78%, var(--map-accent)); }
 .adventure-map-page-select svg { position: absolute; right: 6px; pointer-events: none; }
 
 .adventure-map-empty {
@@ -409,10 +406,10 @@
   overscroll-behavior: contain;
   scrollbar-color: var(--map-accent) transparent;
 }
+.adventure-card-details:focus-visible { background: color-mix(in srgb, var(--map-accent) 12%, transparent); }
 
 .adventure-card-content > header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; align-items: start; }
 .adventure-card-content h2 { font-size: 21px; line-height: 1.25; font-weight: 800; }
-.adventure-card-content h2:focus { outline: 0; }
 .adventure-card-chapter { color: var(--map-accent); font-size: 12px; margin-bottom: 3px; }
 .adventure-card-meta, .adventure-card-state { display: flex; align-items: center; gap: 6px; }
 .adventure-card-state { margin-inline-start: auto; color: var(--map-accent); }
@@ -435,7 +432,7 @@
   font: inherit;
   resize: vertical;
 }
-.adventure-card-skip-form textarea:focus-visible { outline: 2px solid var(--map-accent); outline-offset: -2px; }
+.adventure-card-skip-form textarea:focus { background: color-mix(in srgb, var(--map-sheet) 88%, var(--map-accent)); }
 .adventure-card-skip-reason p { white-space: pre-wrap; }
 .adventure-card-skip-error { color: #842b25; }
 
@@ -451,8 +448,8 @@
   color: var(--map-accent);
 }
 
-.adventure-card-close:hover { color: var(--map-ink); }
-.adventure-card-close:hover svg { stroke-width: 3; }
+.adventure-card-close:is(:hover, :focus-visible) { color: var(--map-ink); }
+.adventure-card-close:is(:hover, :focus-visible) svg { stroke-width: 3; }
 .adventure-card-close:disabled { opacity: .5; }
 
 @media (max-width: 600px) {

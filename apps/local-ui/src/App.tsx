@@ -423,7 +423,7 @@ export default function App() {
     if (page === 'lesson' && lessonId && learningProgress) {
       const chapter = route.chapters.find(item => item.nodes.some(node => node.id === lessonId));
       const node = chapter?.nodes.find(item => item.id === lessonId);
-      if (chapter && node) return <LessonPage chapter={chapter} node={node} language={language} completed={learningProgress.completedNodeIds.has(node.id)}
+      if (chapter && node) return <LessonPage key={route.id + ':' + node.id} chapter={chapter} node={node} language={language} projectId={project.id} routeId={route.id} completed={learningProgress.completedNodeIds.has(node.id)}
         busy={learningBusy} error={learningError ? t('保存失败，请重试。', 'Could not save progress. Try again.') : ''}
         onComplete={() => void completeLesson()} onMap={() => navigate('map')} onHome={() => navigate('home')}/>;
     }

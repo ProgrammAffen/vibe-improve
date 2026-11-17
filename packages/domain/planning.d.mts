@@ -17,13 +17,19 @@ export interface PlanningFacts {answers:Partial<Record<QuestionId,{revision:numb
 export interface PlanningQuestion {id:QuestionId;status:QuestionStatus;summary:string;fields:Record<string,string>;evidence:PlanningEvidence[];missing:string[];answerProposal?:{summary:string;messageId:string;consistency?:BoundConsistencyAssessment};conversationFrom?:number;acceptedSnapshot?:AcceptedAnswerSnapshot;baselineOptions?:string[]}
 export interface PlanningTarget {chapterId:string;nodeId?:string}
 export interface PlanningMention {target:PlanningTarget;token:string}
-export interface PlanningMessage {id:string;role:'user'|'assistant';text:string;createdAt:string;questionId?:QuestionId;target?:PlanningTarget;mentions?:PlanningMention[]}
+export interface PlanningAttachment {id:string;name:string;kind:'image'|'document'}
+export interface PlanningMessage {id:string;role:'user'|'assistant';text:string;createdAt:string;questionId?:QuestionId;target?:PlanningTarget;mentions?:PlanningMention[];provider?:string|null;attachments?:PlanningAttachment[]}
 export interface PlanningPending {id:string;kind:'interview'|'generate'|'edit'|'consistency';baseRevision:number;questionId:QuestionId|null;backgroundEpoch?:number;factsHash?:string;prefill?:true}
 export interface PlanningProposal {route:RouteDocument;reply:string;baseRevision:number;routeRevision:number}
 export interface AgentOptions {model:string|null;effort:string|null}
 export type GenerationMode='new'|'resume'|'restart';
-export interface GenerationDraft {schemaVersion:1;id:string;revision:number;createdAt:string;updatedAt:string;backgroundEpoch:number;factsHash:string;policyVersion:string;locale:'zh-CN'|'en';baseRouteHash:string;routeId:string;outline:{status:'ok';reply:string;result:{title:string;chapters:{title:string;stageGoal:string;lessons:{title:string;focus:string}[]}[]};missing:[]};chapters:(RouteDocument['chapters'][number]|null)[]}
-export interface PlanningState {generationDraft?:GenerationDraft;resources?:string;intakeChanged?:boolean;agentOptions?:AgentOptions;schemaVersion:1;projectId:string;revision:number;step:'intake'|'editor';provider:string|null;locale:'zh-CN'|'en';currentQuestion:QuestionId|null;questions:PlanningQuestion[];messages:PlanningMessage[];routeDraft?:RouteDocument;importedOriginal?:RouteDocument;confirmedRevision?:number;pending?:PlanningPending;proposal?:PlanningProposal;undoRoute?:RouteDocument;history?:{past:RouteDocument[];future:RouteDocument[]};backgroundEpoch?:number;consistency?:PlanningConsistency;answerEvents?:PlanningAnswerEvent[]}
+export interface ResourceSelection {id:string;version:string}
+export interface MaterialLink extends ResourceSelection {kind:'chapter'|'lesson';targetId:string;origin:'ai'|'editor';segmentId?:string}
+export interface ResourceSnapshot {provider:string;items:ResourceSelection[]}
+export interface GenerationDraft {schemaVersion:1;id:string;revision:number;createdAt:string;updatedAt:string;backgroundEpoch:number;factsHash:string;policyVersion:string;locale:'zh-CN'|'en';baseRouteHash:string;routeId:string;outline:{status:'ok';reply:string;result:{title:string;chapters:{title:string;stageGoal:string;lessons:{title:string;focus:string}[]}[]};missing:[]};chapters:(RouteDocument['chapters'][number]|null)[];revisedLessonIds?:string[]}
+export interface GenerationProgress {completed:number;total:number;resumable:boolean;revised?:number}
+export interface GenerationRevisionPatch {nodes:RouteDocument['chapters'][number]['nodes'];renamedLessons:string[];materialLinks?:MaterialLink[]}
+export interface PlanningState {generationDraft?:GenerationDraft;resources?:string;resourceSnapshot?:ResourceSnapshot;routeMaterials?:{routeId:string;links:MaterialLink[]}[];intakeChanged?:boolean;agentOptions?:AgentOptions;agentChoice?:string;schemaVersion:1;projectId:string;revision:number;step:'intake'|'editor';provider:string|null;locale:'zh-CN'|'en';currentQuestion:QuestionId|null;questions:PlanningQuestion[];messages:PlanningMessage[];routeDraft?:RouteDocument;importedOriginal?:RouteDocument;confirmedRevision?:number;pending?:PlanningPending;proposal?:PlanningProposal;undoRoute?:RouteDocument;history?:{past:RouteDocument[];future:RouteDocument[]};backgroundEpoch?:number;consistency?:PlanningConsistency;answerEvents?:PlanningAnswerEvent[]}
 export interface InterviewUpdate {id:QuestionId;fields:Record<string,string>;evidence:PlanningEvidence[];missing:string[];complete:boolean}
 export interface InterviewResult {reply:string;summary?:string;updates:InterviewUpdate[];consistency?:ConsistencyAssessment;baselineOptions?:string[]}
 export interface ConsistencyCheckResult {reply:string;consistency:ConsistencyAssessment}
@@ -48,12 +54,13 @@ export function createPlanning(projectId:string,provider:string|null,locale:'zh-
 export function validatePlanning(value:unknown):PlanningState;
 export function parseInterviewResult(text:string):InterviewResult;
 export function canGenerate(state:PlanningState):boolean;
-export function appendUser(state:PlanningState,text:string,messageId:string,requestId:string,expectedRevision:number,now?:string,target?:PlanningTarget|null,mentions?:PlanningMention[]):PlanningState;
+export function validPlanningAttachments(value:unknown):value is PlanningAttachment[];
+export function appendUser(state:PlanningState,text:string,messageId:string,requestId:string,expectedRevision:number,now?:string,target?:PlanningTarget|null,mentions?:PlanningMention[]|null,attachments?:PlanningAttachment[]):PlanningState;
 export function canPrefillInterview(state:PlanningState):boolean;
 export function beginInterviewPrefill(state:PlanningState,requestId:string,expectedRevision:number):PlanningState;
 export function validatePlanningTarget(route:RouteDocument,target:PlanningTarget):PlanningTarget;
 export function applyInterview(state:PlanningState,result:InterviewResult,requestId:string,baseRevision:number,now?:string):PlanningState;
-export function startGeneration(state:PlanningState,requestId:string,expectedRevision:number,replaceExisting?:boolean,generationMode?:GenerationMode):PlanningState;
+export function startGeneration(state:PlanningState,requestId:string,expectedRevision:number,replaceExisting?:boolean,generationMode?:GenerationMode,resources?:ResourceSnapshot|null):PlanningState;
 export function answerConfirmation(state:PlanningState,id:QuestionId):AnswerConfirmation|null;
 export function acceptAnswer(state:PlanningState,id:QuestionId,messageId:string,expectedRevision:number,now?:string):PlanningState;
 export function reanswerQuestion(state:PlanningState,id:QuestionId,expectedRevision:number):PlanningState;
@@ -62,7 +69,8 @@ export function restartIntakeFrom(state:PlanningState,id:QuestionId,expectedRevi
 export function questionMessages(state:PlanningState,id:QuestionId):PlanningMessage[];
 export function needsGenerationReplacement(state:PlanningState):boolean;
 export function setResources(state:PlanningState,text:string,expectedRevision:number):PlanningState;
-export function applyGenerated(state:PlanningState,route:RouteDocument,requestId:string,baseRevision:number,revisedLessons?:string[],renamedLessons?:string[]):PlanningState;
+export function applyGenerated(state:PlanningState,route:RouteDocument,requestId:string,baseRevision:number,revisedLessons?:string[],renamedLessons?:string[],materialLinks?:MaterialLink[]):PlanningState;
+export function setRouteMaterial(state:PlanningState,routeId:string,link:MaterialLink,add:boolean,expectedRevision:number):PlanningState;
 export function applyEdit(state:PlanningState,result:{reply:string;route?:RouteDocument|null},requestId:string,baseRevision:number,now?:string):PlanningState;
 export function applyProposal(state:PlanningState,expectedRevision:number):PlanningState;
 export function discardProposal(state:PlanningState,expectedRevision:number):PlanningState;
@@ -71,7 +79,7 @@ export function redoEditor(state:PlanningState,expectedRevision:number):Planning
 export function cancelPlanningRequest(state:PlanningState,requestId:string,expectedRevision:number):PlanningState;
 export function recoverPlanning(state:PlanningState,now?:string):PlanningState;
 export function focusQuestion(state:PlanningState,id:QuestionId,expectedRevision:number):PlanningState;
-export function setProvider(state:PlanningState,provider:string|null,expectedRevision:number):PlanningState;
+export function setProvider(state:PlanningState,provider:string|null,expectedRevision:number,rememberChoice?:boolean):PlanningState;
 export function openEditor(state:PlanningState,expectedRevision:number):PlanningState;
 export function resetEditor(state:PlanningState,expectedRevision:number):PlanningState;
 export function saveEditor(state:PlanningState,route:RouteDocument,expectedRevision:number):PlanningState;
@@ -90,5 +98,6 @@ export function intakeCurrentQuestion(state:PlanningState):QuestionId|null;
 
 export function setAgentOptions(state:PlanningState,options:AgentOptions,expectedRevision:number):PlanningState;
 
-export function generationProgress(state:PlanningState):{completed:number;total:number;resumable:boolean}|null;
+export function generationProgress(state:PlanningState):GenerationProgress|null;
 export function saveGenerationProgress(state:PlanningState,progress:Pick<GenerationDraft,'routeId'|'outline'|'chapters'>,requestId:string,baseRevision:number,now?:string):PlanningState;
+export function saveGenerationRevision(state:PlanningState,patch:GenerationRevisionPatch|null,requestId:string,baseRevision:number,now?:string):PlanningState;

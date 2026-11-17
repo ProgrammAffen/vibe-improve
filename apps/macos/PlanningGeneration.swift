@@ -68,14 +68,14 @@ enum PlanningGeneration {
         }
         func progress(_ chapters:[([String:Any])?])->[String:Any]{["routeId":id,"outline":envelope,"chapters":chapters.map{$0.map{$0 as Any} ?? NSNull()}]}
         func route(_ completed:[[String:Any]])->[String:Any]{
-            ["format":"vibe-improve.route","schemaVersion":2,"id":id,"revision":1,"title":title,"locale":locale,"sourceLanguage":locale,"chapters":completed]
+            ["format":"vibe-improve.route","schemaVersion":2,"id":id,"revision":1,"title":title,"locale":locale,"sourceLanguage":locale,"chapters":completed.map{$0.filter{$0.key != "materialLinks"}}]
         }
         func completeRoute(_ completed:[[String:Any]])throws->[String:Any]{
             guard completed.count==chapters.count else{throw issue("chapters","count")}
             var available=Set<String>()
             for (index,chapter) in chapters.enumerated(){
                 let actual=completed[index]
-                guard Set(actual.keys)==["id","title","stageGoal","nodes"],actual["id"] as? String==chapter.id,actual["title"] as? String==chapter.title,actual["stageGoal"] as? String==chapter.stageGoal,let nodes=actual["nodes"] as? [[String:Any]],nodes.count==chapter.lessons.count else{throw issue("chapters.\(index)","invalid")}
+                guard chapterFields(actual),actual["id"] as? String==chapter.id,actual["title"] as? String==chapter.title,actual["stageGoal"] as? String==chapter.stageGoal,let nodes=actual["nodes"] as? [[String:Any]],nodes.count==chapter.lessons.count else{throw issue("chapters.\(index)","invalid")}
                 for (lessonIndex,node) in nodes.enumerated(){
                     let lesson=chapter.lessons[lessonIndex]
                     try validateNativeNode(node,lesson:lesson,available:available,path:"chapters.\(index).nodes.\(lessonIndex)")
@@ -86,21 +86,94 @@ enum PlanningGeneration {
         }
     }
 
+    private static func chapterFields(_ chapter:[String:Any])->Bool{
+        let fields=Set(chapter.keys)
+        return fields==["id","title","stageGoal","nodes"] || fields==["id","title","stageGoal","nodes","materialLinks"]
+    }
+
+    private struct MaterialExcerpt {
+        let ref:String,id:String,version:String,segment:String,format:String,location:[String:Any],text:String
+        func input(limit:Int)->[String:Any]{
+            ["ref":ref,"format":format,"location":location,"text":String(text.prefix(limit))]
+        }
+    }
+
+    private static func materialExcerpts(context:[String:Any],query:[String]?=nil)->[MaterialExcerpt]{
+        guard let sources=context["materialSources"] as? [[String:Any]],!sources.isEmpty else{return []}
+        let choices=sources.enumerated().flatMap{index,source->[MaterialExcerpt] in
+            guard let id=source["id"] as? String,let version=source["version"] as? String,
+                  let format=source["format"] as? String,let segments=source["segments"] as? [[String:Any]] else{return []}
+            let count=query == nil ? 1:12
+            return segments.prefix(count).compactMap{segment in
+                guard let key=segment["id"] as? String,let location=segment["location"] as? [String:Any],
+                      let text=segment["text"] as? String,!text.isEmpty else{return nil}
+                return MaterialExcerpt(ref:"R\(index+1)_\(key)",id:id,version:version,segment:key,format:format,location:location,text:text)
+            }
+        }
+        guard let query else{return Array(choices.prefix(40))}
+        let terms=materialTerms(query.joined(separator:" "))
+        var scored:[(excerpt:MaterialExcerpt,score:Int,position:Int)]=[]
+        for (index,source) in choices.enumerated(){
+            let text=source.text.lowercased()
+            let score=terms.reduce(0){total,term in total+(text.contains(term) ? 1:0)}
+            scored.append((source,score,index))
+        }
+        scored.sort{first,second in first.score==second.score ? first.position<second.position:first.score>second.score}
+        var counts:[String:Int]=[:],result:[MaterialExcerpt]=[]
+        for (excerpt,_,_) in scored where counts[excerpt.id,default:0]<2 {
+            result.append(excerpt);counts[excerpt.id,default:0]+=1
+            if result.count==8{break}
+        }
+        return result
+    }
+
+    private static func materialTerms(_ query:String)->Set<String>{
+        let regex=try! NSRegularExpression(pattern:#"[a-z0-9][a-z0-9+._-]{1,}|[\p{Han}]{2,}"#)
+        let value=query.lowercased() as NSString
+        var terms=Set<String>()
+        for match in regex.matches(in:value as String,range:NSRange(location:0,length:value.length)){
+            let word=value.substring(with:match.range)
+            if word.utf8.count==word.count{terms.insert(word)}
+            else{for (first,second) in zip(word,word.dropFirst()){terms.insert(String([first,second]));if terms.count>=90{break}}}
+            if terms.count>=90{break}
+        }
+        return terms
+    }
+
+    private static func chapterExcerpts(context:[String:Any],chapter:Chapter,range:Range<Int>)->[MaterialExcerpt]{
+        materialExcerpts(context:context,query:[chapter.title,chapter.stageGoal]+chapter.lessons[range].flatMap{[$0.title,$0.focus]})
+    }
+
     struct QualityTarget: Equatable {
         let index:Int
         let range:Range<Int>
     }
     struct QualityReview {
-        let repairTargets:[QualityTarget]?
         let reason:String?
         let summary:String?
+        let hasUnscopedIssues:Bool
+        fileprivate let materialSuggestions:[[String:String]]
+        fileprivate let lessonIssues:[String:Set<String>]
         fileprivate let renameableRefs:Set<String>
         fileprivate let blockers:[[String:Any]]
-        var issueKeys:Set<String>{
-            Set(blockers.compactMap{issue in
-                guard let code=issue["code"] as? String,let refs=issue["targetRefs"] as? [String] else{return nil}
-                return ([code]+refs.sorted()).joined(separator:"/")
-            })
+
+        func targets(in plan:Plan,attempts:[String:Int]=[:])->[QualityTarget]{
+            var batches:[QualityTarget]=[]
+            for (index,chapter) in plan.chapters.enumerated(){
+                for (offset,lesson) in chapter.lessons.enumerated(){
+                    guard let codes=lessonIssues[lesson.ref],codes.contains(where:{attempts[lesson.ref+"/"+$0,default:0]<2}) else{continue}
+                    if let last=batches.last,last.index==index,last.range.upperBound==offset,last.range.count<3{
+                        batches[batches.count-1]=QualityTarget(index:index,range:last.range.lowerBound..<(offset+1))
+                    }else{batches.append(QualityTarget(index:index,range:offset..<(offset+1)))}
+                }
+            }
+            return batches
+        }
+
+        func issueKeys(in target:QualityTarget,plan:Plan)->[String]{
+            plan.chapters[target.index].lessons[target.range].flatMap{lesson in
+                (lessonIssues[lesson.ref] ?? []).map{lesson.ref+"/"+$0}
+            }
         }
 
         func renameableRefs(in target:QualityTarget,plan:Plan)->Set<String>{
@@ -108,27 +181,36 @@ enum PlanningGeneration {
         }
     }
 
-    static func reviewPrompt(context:[String:Any],plan:Plan,chapters:[[String:Any]],previousReview:QualityReview?=nil)throws->String{
+    static func reviewPrompt(context:[String:Any],plan:Plan,chapters:[[String:Any]],previousReview:QualityReview?=nil,localizeIssues:Bool=false)throws->String{
         var data=try promptData(context)
         guard data["locale"] as? String==plan.locale else{throw PlanningAgentError.invalid}
         data["outline"]=plan.taskOutline
         data["knownRefs"]=plan.chapters.indices.map{chapterRef($0)}+plan.orderedLessons.map(\.ref)
         data["candidate"]=["title":plan.title,"chapters":try reviewChapters(plan:plan,chapters:chapters)]
         if let previousReview{data["previousBlockingIssues"]=previousReview.blockers}
+        if localizeIssues{data["localizeBlockingIssues"]=true}
         return try PlanningPromptPack.make(task:"review",data:data)
     }
 
     static func review(_ envelope:[String:Any],plan:Plan,chapters:[[String:Any]]?=nil)throws->QualityReview{
+        try bounded(envelope)
         var normalized=envelope
-        if var result=envelope["result"] as? [String:Any],let rawSummary=result["summary"]{
-            result["summary"]=learnerSummary(rawSummary)
+        var materialSuggestions:[[String:String]]=[]
+        if var result=envelope["result"] as? [String:Any]{
+            if let rawSummary=result["summary"]{result["summary"]=learnerSummary(rawSummary)}
+            // Optional resource suggestions cannot invalidate the review's teaching assessment.
+            let suggestions=result.removeValue(forKey:"materials") as? [Any] ?? []
+            materialSuggestions=suggestions.prefix(40).compactMap{raw in
+                guard let entry=raw as? [String:String],Set(entry.keys)==["targetRef","excerptRef"] else{return nil}
+                return entry
+            }
             normalized["result"]=result
         }
         let result=try PlanningPromptPack.unwrap(normalized,task:"review")
         guard let ready=result["ready"] as? Bool,let issues=result["issues"] as? [[String:Any]] else{throw issue("result","invalid")}
         let chapterRefs=Dictionary(uniqueKeysWithValues:plan.chapters.indices.map{(chapterRef($0),$0)})
         let lessonRefs=Set(plan.aliasToNodeID.keys)
-        var blockers:[[String:Any]]=[],selected=Set<String>(),renameable=Set<String>(),unscoped=false
+        var blockers:[[String:Any]]=[],selected:[String:Set<String>]=[:],renameable=Set<String>(),unscoped=false
         for (index,reviewIssue) in issues.enumerated(){
             let path="result.issues.\(index)"
             guard let refs=reviewIssue["targetRefs"] as? [String],Set(refs).count==refs.count,
@@ -140,9 +222,11 @@ enum PlanningGeneration {
                 blockers.append(reviewIssue)
                 if refs.isEmpty{unscoped=true}
                 for ref in refs{
-                    if let index=chapterRefs[ref]{selected.formUnion(plan.chapters[index].lessons.map(\.ref))}
+                    if let index=chapterRefs[ref]{
+                        for lesson in plan.chapters[index].lessons{selected[lesson.ref,default:[]].insert(code)}
+                    }
                     else{
-                        selected.insert(ref)
+                        selected[ref,default:[]].insert(code)
                         if code=="learning_language"{renameable.insert(ref)}
                     }
                 }
@@ -161,7 +245,7 @@ enum PlanningGeneration {
                     let titleNeedsChange=hasCodeIdentifier(lesson.title)
                     let goals=(node["objectives"] as! [[String:String]]).compactMap{$0["description"]}
                     guard titleNeedsChange || goals.contains(where:hasCodeIdentifier) else{continue}
-                    selected.insert(lesson.ref)
+                    selected[lesson.ref,default:[]].insert("learning_language")
                     if titleNeedsChange{renameable.insert(lesson.ref)}
                     let alreadyReported=blockers.contains{issue in issue["code"] as? String=="learning_language" && (issue["targetRefs"] as? [String])?.contains(lesson.ref)==true}
                     if alreadyReported{continue}
@@ -171,20 +255,9 @@ enum PlanningGeneration {
                 }
             }
         }
-        var targets:[QualityTarget]?=nil
-        if !unscoped,selected.count<=12{
-            var batches:[QualityTarget]=[]
-            for (index,chapter) in plan.chapters.enumerated(){
-                for (offset,lesson) in chapter.lessons.enumerated() where selected.contains(lesson.ref){
-                    if let last=batches.last,last.index==index,last.range.upperBound==offset,last.range.count<3{
-                        batches[batches.count-1]=QualityTarget(index:index,range:last.range.lowerBound..<(offset+1))
-                    }else{batches.append(QualityTarget(index:index,range:offset..<(offset+1)))}
-                }
-            }
-            if batches.count<=6{targets=batches}
-        }
         let reason=blockers.first?["code"] as? String
-        return QualityReview(repairTargets:targets,reason:reason,summary:modelReason==nil ? nil : result["summary"] as? String,renameableRefs:renameable,blockers:blockers)
+        return QualityReview(reason:reason,summary:modelReason==nil ? nil : result["summary"] as? String,
+            hasUnscopedIssues:unscoped,materialSuggestions:materialSuggestions,lessonIssues:selected,renameableRefs:renameable,blockers:blockers)
     }
 
     private static func learningWordingIssue(ref:String?,message:String)->[String:Any]{
@@ -201,20 +274,24 @@ enum PlanningGeneration {
         return summary
     }
 
-    static func revisionPrompt(context:[String:Any],plan:Plan,chapters:[[String:Any]],target:QualityTarget,review:QualityReview)throws->String{
-        guard review.repairTargets?.contains(target)==true else{throw issue("result.issues","identity")}
+    static func revisionPrompt(context:[String:Any],plan:Plan,chapters:[[String:Any]],target:QualityTarget,review:QualityReview,previousReview:QualityReview?=nil)throws->String{
         var data=try chapterPromptData(context:context,plan:plan,index:target.index,range:target.range)
+        guard plan.chapters[target.index].lessons[target.range].allSatisfy({review.lessonIssues[$0.ref] != nil}) else{throw issue("result.issues","identity")}
         let candidate=try reviewChapters(plan:plan,chapters:chapters)
         let current=candidate[target.index]["lessons"] as! [[String:Any]]
         let refs=Set(plan.chapters[target.index].lessons[target.range].map(\.ref)+[chapterRef(target.index)])
-        let blocking=review.blockers.filter{issue in
+        func concernsTarget(_ issue:[String:Any])->Bool{
             (issue["targetRefs"] as? [String])?.contains(where:refs.contains)==true
         }
+        let blocking=review.blockers.filter(concernsTarget)
         var revision:[String:Any]=[
             "requestedCandidate":Array(current[target.range]),
             "blockingIssues":blocking,
             "routeCandidate":candidate
         ]
+        if let previous=previousReview?.blockers.filter(concernsTarget),!previous.isEmpty{
+            revision["previousBlockingIssues"]=previous
+        }
         let renameable=review.renameableRefs(in:target,plan:plan)
         if !renameable.isEmpty{revision["renameableLessonRefs"]=plan.chapters[target.index].lessons[target.range].map(\.ref).filter{renameable.contains($0)}}
         data["qualityRevision"]=revision
@@ -274,7 +351,7 @@ enum PlanningGeneration {
         for (index,raw) in parts.enumerated(){
             if raw is NSNull{result.append(nil);continue}
             let expected=restored.chapters[index]
-            guard let chapter=raw as? [String:Any],Set(chapter.keys)==["id","title","stageGoal","nodes"],chapter["id"] as? String==expected.id,chapter["title"] as? String==expected.title,chapter["stageGoal"] as? String==expected.stageGoal,let nodes=chapter["nodes"] as? [[String:Any]],!nodes.isEmpty,nodes.count<=expected.lessons.count,nodes.count==expected.lessons.count || nodes.count%3==0 else{throw PlanningAgentError.invalid}
+            guard let chapter=raw as? [String:Any],chapterFields(chapter),chapter["id"] as? String==expected.id,chapter["title"] as? String==expected.title,chapter["stageGoal"] as? String==expected.stageGoal,let nodes=chapter["nodes"] as? [[String:Any]],!nodes.isEmpty,nodes.count<=expected.lessons.count,nodes.count==expected.lessons.count || nodes.count%3==0 else{throw PlanningAgentError.invalid}
             var available=Set(restored.chapters.prefix(index).flatMap{$0.lessons.map(\.id)})
             for (position,node) in nodes.enumerated(){let lesson=expected.lessons[position];try validateNativeNode(node,lesson:lesson,available:available,path:"chapters.\(index).nodes.\(position)");available.insert(lesson.id)}
             result.append(chapter)
@@ -357,6 +434,9 @@ enum PlanningGeneration {
         data["currentChapter"]=["title":chapter.title,"stageGoal":chapter.stageGoal]
         data["requestedLessons"]=chapter.lessons[requested].map(\.data)
         data["availablePrerequisites"]=plan.orderedLessons.prefix(firstIndex).map(\.prerequisite)
+        if data["materialExcerpts"] != nil {
+            data["materialExcerpts"]=chapterExcerpts(context:context,chapter:chapter,range:requested).map{$0.input(limit:1000)}
+        }
         return data
     }
     private static func priorPractice(chapters:[[String:Any]],priority:[[String:Any]],available:ArraySlice<Lesson>)->[[String:Any]]{
@@ -379,10 +459,15 @@ enum PlanningGeneration {
         let order=Dictionary(uniqueKeysWithValues:available.enumerated().map{($0.element.ref,$0.offset)})
         return selected.sorted{order[$0["ref"] as! String]! < order[$1["ref"] as! String]!}
     }
-    static func chapter(_ envelope:[String:Any],plan:Plan,index:Int,range:Range<Int>?=nil,renameableRefs:Set<String>=[],revising:Bool=false)throws->[String:Any]{
+    static func chapter(_ envelope:[String:Any],plan:Plan,index:Int,range:Range<Int>?=nil,renameableRefs:Set<String>=[],revising:Bool=false,context:[String:Any]=[:])throws->[String:Any]{
         let requested=try lessonRange(plan:plan,index:index,range:range),chapter=plan.chapters[index],path="chapters.\(index)"
         try bounded(envelope)
-        let result=try PlanningPromptPack.unwrap(envelope,task:"lessons")
+        var core=envelope,suggestions:Any?
+        if var body=envelope["result"] as? [String:Any] {
+            suggestions=body.removeValue(forKey:"materials")
+            core["result"]=body
+        }
+        let result=try PlanningPromptPack.unwrap(core,task:"lessons")
         guard Set(result.keys)==["nodes"],let rawNodes=result["nodes"] as? [[String:Any]],rawNodes.count==requested.count else{throw issue(path+".nodes","count")}
         let first=chapter.lessons[requested.lowerBound]
         guard let firstIndex=plan.orderedLessons.firstIndex(where:{$0.ref==first.ref}) else{throw PlanningAgentError.invalid}
@@ -419,13 +504,57 @@ enum PlanningGeneration {
             nodes.append(node);available.insert(expected.ref);nativeAvailable.insert(expected.id)
         }
         guard wordingPaths.isEmpty else{throw PlanningLearningLanguageError(paths:wordingPaths)}
-        return ["id":chapter.id,"title":chapter.title,"stageGoal":chapter.stageGoal,"nodes":nodes]
+        var resultChapter:[String:Any]=["id":chapter.id,"title":chapter.title,"stageGoal":chapter.stageGoal,"nodes":nodes]
+        let links=materialLinks(suggestions,lessons:chapter.lessons[requested],excerpts:chapterExcerpts(context:context,chapter:chapter,range:requested))
+        if !links.isEmpty || revising && (suggestions as? [Any])?.isEmpty == true {resultChapter["materialLinks"]=links}
+        return resultChapter
+    }
+    private static func materialLinks(_ suggestions:Any?,lessons:ArraySlice<Lesson>,excerpts:[MaterialExcerpt])->[[String:String]]{
+        guard !excerpts.isEmpty,let entries=suggestions as? [Any] else{return []}
+        let targets=Dictionary(uniqueKeysWithValues:lessons.map{($0.ref,$0.id)})
+        let available=Dictionary(uniqueKeysWithValues:excerpts.map{($0.ref,$0)})
+        var counts:[String:Int]=[:],used=Set<String>()
+        return entries.prefix(24).compactMap{raw in
+            guard let entry=raw as? [String:String],Set(entry.keys)==["lessonRef","excerptRef"],
+                  let label=entry["lessonRef"],let target=targets[label],let ref=entry["excerptRef"],let source=available[ref],
+                  counts[target,default:0]<2,used.insert(target+"/"+ref).inserted else{return nil}
+            counts[target,default:0]+=1
+            return ["kind":"lesson","targetId":target,"id":source.id,"version":source.version,"segmentId":source.segment,"origin":"ai"]
+        }
     }
     private static func lessonRange(plan:Plan,index:Int,range:Range<Int>?)throws->Range<Int>{
         guard plan.chapters.indices.contains(index) else{throw PlanningAgentError.invalid}
         let value=range ?? 0..<plan.chapters[index].lessons.count
         guard !value.isEmpty,value.count<=3,value.lowerBound>=0,value.upperBound<=plan.chapters[index].lessons.count else{throw PlanningAgentError.invalid}
         return value
+    }
+    static func verifiedMaterialLinks(context:[String:Any],plan:Plan,chapters:[[String:Any]],review:QualityReview)->[[String:String]]{
+        let sources=context["materialSources"] as? [[String:Any]] ?? []
+        let authorized=Set(sources.flatMap{source->[String] in
+            guard let id=source["id"] as? String,let version=source["version"] as? String else{return []}
+            return (source["segments"] as? [[String:Any]] ?? []).compactMap{part in
+                (part["id"] as? String).map{id+"/"+version+"/"+$0}
+            }
+        })
+        var links=chapters.flatMap{$0["materialLinks"] as? [[String:String]] ?? []}.filter{
+            guard let id=$0["id"],let version=$0["version"],let segment=$0["segmentId"] else{return false}
+            return authorized.contains(id+"/"+version+"/"+segment)
+        }
+        guard review.reason==nil,!review.materialSuggestions.isEmpty else{return links}
+        let excerpts=Dictionary(uniqueKeysWithValues:materialExcerpts(context:context).map{($0.ref,$0)})
+        var targets=Dictionary(uniqueKeysWithValues:plan.chapters.enumerated().map{
+            (chapterRef($0.offset),(kind:"chapter",id:$0.element.id))
+        })
+        for lesson in plan.orderedLessons{targets[lesson.ref]=(kind:"lesson",id:lesson.id)}
+        var linkedSources=Set(links.compactMap{$0["id"]})
+        for suggestion in review.materialSuggestions where links.count<1024 {
+            guard let ref=suggestion["excerptRef"],let source=excerpts[ref],
+                  let targetRef=suggestion["targetRef"],let target=targets[targetRef],
+                  linkedSources.insert(source.id).inserted else{continue}
+            links.append(["kind":target.kind,"targetId":target.id,"id":source.id,"version":source.version,
+                          "segmentId":source.segment,"origin":"ai"])
+        }
+        return links
     }
     private static func promptData(_ context:[String:Any])throws->[String:Any]{
         guard let locale=context["locale"] as? String,["zh-CN","en"].contains(locale),let questions=context["questions"] as? [[String:Any]] else{throw PlanningAgentError.invalid}
@@ -442,6 +571,8 @@ enum PlanningGeneration {
             guard let value=resources as? String,!value.contains("\0"),value.utf16.count<=4000 else{throw PlanningAgentError.invalid}
             data["resources"]=value
         }
+        let snippets=materialExcerpts(context:context)
+        if !snippets.isEmpty{data["materialExcerpts"]=snippets.map{$0.input(limit:420)}}
         return data
     }
     private static func validateNativeNode(_ node:[String:Any],lesson:Lesson,available:Set<String>,path:String)throws{

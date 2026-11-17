@@ -5,18 +5,20 @@ import {assertStudiedRouteUnchanged,type AgentOptions,type PlanningState,type Pl
 import {planningMentionToken,refreshPlanningMentions} from '../../../../packages/domain/planning-references.mjs';
 import {routeIssues,type RouteDocument,type RouteChapter,type RouteNode} from '../../../../packages/domain/route-validation.mjs';
 import {routeOutline,routeTargetPosition,moveRouteItem,moveRouteItemBy} from '../../../../packages/domain/route-order.mjs';
-import {PROVIDERS} from '../agents/domain';
+import {PROVIDERS,type ProviderId} from '../agents/domain';
 import {translate,type Language} from '../i18n';
+import type {AttachmentTarget} from '../resources/service';
 import PlanningNavigation from './PlanningNavigation';
 import GameButton from './GameButton';
 import GameToggle from './GameToggle';
 import Modal from './Modal';
 import EditorMenu,{type EditorMenuItem} from './RouteEditorMenu';
 import RouteMoveDialog from './RouteMoveDialog';
-import PlanningModelControls from './PlanningModelControls';
+import PlanningModelControls,{PlanningAgentControl} from './PlanningModelControls';
 import {PlanningComposer,PlanningMessages} from './PlanningConversation';
+import type {PlanningAttachment} from '../../../../packages/domain/planning.mjs';
 
-type EditorProps={language:Language;state:PlanningState;route:RouteDocument;busy?:boolean;working?:boolean;workingLabel?:string;partialReply?:string;activity?:PlanningActivity;dirty?:boolean;error?:string;conversationError?:string;notice?:string;onOptions?:(options:AgentOptions)=>void;onRoute:(route:RouteDocument)=>void;onSave:()=>void;onConfirm:()=>void;onSend:(text:string,mentions?:PlanningMention[],target?:PlanningTarget)=>void|boolean|Promise<boolean>;onCancel:()=>void;onApply:()=>void;onDiscard:()=>void;onUndo:()=>void;onRedo?:()=>void;onPrevious:()=>void;onHome:()=>void;onRemoveImport?:()=>void;studiedNodeIds?:ReadonlySet<string>;learningRead?:'loading'|'failed';onRetryLearning?:()=>void;onResetLearning?:()=>void};
+type EditorProps={language:Language;state:PlanningState;route:RouteDocument;busy?:boolean;working?:boolean;workingLabel?:string;partialReply?:string;partialProviderId?:string|null;activity?:PlanningActivity;dirty?:boolean;error?:string;conversationError?:string;notice?:string;onOptions?:(options:AgentOptions)=>void;onProvider?:(provider:ProviderId)=>void;onRoute:(route:RouteDocument)=>void;onSave:()=>void;onConfirm:()=>void;onSend:(text:string,mentions?:PlanningMention[],target?:PlanningTarget,files?:PlanningAttachment[])=>void|boolean|Promise<boolean>;onCancel:()=>void;onApply:()=>void;onDiscard:()=>void;onUndo:()=>void;onRedo?:()=>void;onPrevious:()=>void;onHome:()=>void;onRemoveImport?:()=>void;studiedNodeIds?:ReadonlySet<string>;learningRead?:'loading'|'failed';onRetryLearning?:()=>void;onResetLearning?:()=>void;renderMaterials?:(target:AttachmentTarget,locked:boolean)=>ReactNode};
 const ASSET=import.meta.env.BASE_URL+'assets/images/';
 const newID=(prefix:string)=>prefix+'_'+crypto.randomUUID().replaceAll('-','');
 const NO_STUDIED_NODES:ReadonlySet<string>=new Set();
@@ -25,7 +27,7 @@ function EditorIcon({label,onClick,children,disabled=false}:{label:string;onClic
  return <button type="button" className="icon-button route-editor-icon" aria-label={label} title={label} onClick={onClick} disabled={disabled}>{children}</button>;
 }
 
-export function RouteEditorSurface({language,state,route,busy=false,working=false,workingLabel,partialReply,activity,dirty=false,error='',conversationError='',notice='',onOptions,onRoute,onSave,onConfirm,onSend,onCancel,onApply,onDiscard,onUndo,onRedo,onPrevious,onHome,onRemoveImport,studiedNodeIds=NO_STUDIED_NODES,learningRead,onRetryLearning,onResetLearning}:EditorProps){
+export function RouteEditorSurface({language,state,route,busy=false,working=false,workingLabel,partialReply,partialProviderId,activity,dirty=false,error='',conversationError='',notice='',onOptions,onProvider,onRoute,onSave,onConfirm,onSend,onCancel,onApply,onDiscard,onUndo,onRedo,onPrevious,onHome,onRemoveImport,studiedNodeIds=NO_STUDIED_NODES,learningRead,onRetryLearning,onResetLearning,renderMaterials}:EditorProps){
  const t=(zh:string,en:string)=>translate(language,zh,en);
  const [selection,setSelection]=useState<{chapterId:string;nodeId:string|null}>({chapterId:route.chapters[0]?.id??'',nodeId:route.chapters[0]?.nodes[0]?.id??null});
  const [expanded,setExpanded]=useState<Set<string>>(()=>new Set(route.chapters[0]?[route.chapters[0].id]:[]));
@@ -34,7 +36,7 @@ export function RouteEditorSurface({language,state,route,busy=false,working=fals
  const outlineRef=useRef<HTMLElement>(null),movedTarget=useRef<PlanningTarget|null>(null);
  const referenceSequence=useRef(0),[referenceRequest,setReferenceRequest]=useState<{sequence:number;mention:PlanningMention}>();
  function addToChat(target:PlanningTarget){setReferenceRequest({sequence:++referenceSequence.current,mention:{target,token:planningMentionToken(route,target,language)}})}
- async function sendMessage(text:string,mentions?:PlanningMention[],target?:PlanningTarget){const refreshed=mentions?.length?refreshPlanningMentions(route,text,mentions,language):{text,mentions};return await onSend(refreshed.text,refreshed.mentions,target?routeTargetPosition(route,target)?.target??target:undefined)!==false}
+ async function sendMessage(text:string,mentions?:PlanningMention[],target?:PlanningTarget,files?:PlanningAttachment[]){const refreshed=mentions?.length?refreshPlanningMentions(route,text,mentions,language):{text,mentions};return await onSend(refreshed.text,refreshed.mentions,target?routeTargetPosition(route,target)?.target??target:undefined,files)!==false}
  const [remove,setRemove]=useState<{chapterId:string;nodeId?:string}|null>(null);
  const [moving,setMoving]=useState<PlanningTarget|null>(null);
  const selectedPosition=routeTargetPosition(route,{chapterId:selection.chapterId,...(selection.nodeId?{nodeId:selection.nodeId}:{})});
@@ -60,7 +62,7 @@ export function RouteEditorSurface({language,state,route,busy=false,working=fals
   if(target.nodeId)return protectedPrerequisites.has(target.nodeId);
   return route.chapters.find(ch=>ch.id===target.chapterId)?.nodes.some(lesson=>protectedPrerequisites.has(lesson.id))??false;
  }
- const editorMessages=state.messages.filter(message=>!message.questionId),lastMessage=editorMessages.at(-1),answeredText=lastMessage?.role==='assistant'?editorMessages.slice(0,-1).reverse().find(message=>message.role==='user')?.text:undefined;
+ const editorMessages=state.messages.filter(message=>!message.questionId),lastMessage=editorMessages.at(-1),answeredMessage=lastMessage?.role==='assistant'?editorMessages.slice(0,-1).reverse().find(message=>message.role==='user'):undefined;
  const unanswered=lastMessage?.role==='user'&&!state.pending&&!busy&&!working;
  const conversationFeedback=conversationError||(unanswered?t('上一条消息未收到回复，可重试。','The last message has no reply. Retry when ready.'):'');
  useEffect(()=>{
@@ -136,6 +138,7 @@ export function RouteEditorSurface({language,state,route,busy=false,working=fals
      {node?<>
       <label data-route-field="title" className="route-editor-field"><span>{t('小章名称','Lesson name')}</span><input value={node.title} maxLength={160} disabled={editingDisabled} readOnly={detailLocked} onChange={event=>editNode(n=>{n.title=event.target.value})}/></label>
       <div data-route-field="objectives" className="route-editor-field route-editor-objectives"><div className="route-editor-field-heading"><span>{t('学习目标','Learning goals')}</span><EditorIcon label={t('添加目标','Add goal')} disabled={detailDisabled||node.objectives.length>=12} onClick={()=>editNode(n=>{n.objectives.push({id:newID('objective'),description:''});if(n.assessment)n.assessment.objectiveIds=n.objectives.map(o=>o.id)})}><Plus/></EditorIcon></div>{node.objectives.map((o,index)=><div key={o.id} className="route-editor-objective"><textarea data-route-field="description" aria-label={t('学习目标','Learning goal')+' '+(index+1)} value={o.description} disabled={editingDisabled} readOnly={detailLocked} maxLength={2000} onChange={event=>editNode(n=>{n.objectives[index].description=event.target.value})}/>{node.objectives.length>1&&<EditorIcon label={t('删除目标','Delete goal')+' '+(index+1)} disabled={detailDisabled} onClick={()=>removeObjective(o.id)}><Trash2/></EditorIcon>}</div>)}</div>
+      {renderMaterials?.({kind:'lesson',targetId:node.id},detailDisabled)}
       <label data-route-field="estimatedMinutes" className="route-editor-duration"><span>{t('预计时长','Estimated time')}</span><input type="number" min={1} max={1440} aria-label={t('预计时长（分钟）','Estimated time (minutes)')} value={node.estimatedMinutes} disabled={editingDisabled} readOnly={detailLocked} onChange={event=>editNode(n=>{n.estimatedMinutes=Math.max(1,Math.min(1440,Number(event.target.value)||1))})}/><span>{t('分钟','min')}</span></label>
       <div className="route-editor-disclosures">
        <details data-route-section="assessment"><summary>{t('验收标准（可选）','Assessment (optional)')}<ChevronRight/></summary><div className="route-editor-disclosure-body">
@@ -165,20 +168,24 @@ export function RouteEditorSurface({language,state,route,busy=false,working=fals
      </>:<>
       <label data-route-field="title" className="route-editor-field"><span>{t('大章名称','Chapter name')}</span><input value={chapter.title} maxLength={160} disabled={editingDisabled} readOnly={detailLocked} onChange={event=>editChapter(ch=>{ch.title=event.target.value})}/></label>
       <label data-route-field="stageGoal" className="route-editor-field"><span>{t('大章目标','Stage goal')}</span><textarea value={chapter.stageGoal??''} maxLength={2000} disabled={editingDisabled} readOnly={detailLocked} onChange={event=>editChapter(ch=>{ch.stageGoal=event.target.value})}/></label>
+      {renderMaterials?.({kind:'chapter',targetId:chapter.id},detailDisabled)}
      </>}
     </>:<div className="route-editor-empty"><FileText aria-hidden="true"/><span>{t('暂无章节','No chapters')}</span></div>}
    </section>
    {state.provider&&<aside className="route-editor-assistant" aria-label={t('AI对话','AI conversation')}>
-    <header><h2>{t('AI 对话','AI chat')}</h2><span><img src={ASSET+(selectedProvider?.icon??'agent-codex.png')} alt=""/>{selectedProvider?.name??state.provider}</span></header>
-    {onOptions&&<PlanningModelControls state={state} language={language} busy={busy} onOptions={onOptions}/>}
-    <PlanningMessages messages={state.messages.filter(message=>!message.questionId)} providerId={state.provider} language={language} busy={working} workingLabel={workingLabel} partialReply={partialReply} activity={activity} route={route}>
+    <header><h2>{t('AI 对话','AI chat')}</h2>
+     {onProvider?<PlanningAgentControl state={state} language={language} busy={busy} onProvider={onProvider} showLabel={false}/>
+      :<span><img src={ASSET+(selectedProvider?.icon??'agent-codex.png')} alt=""/>{selectedProvider?.name??state.provider}</span>}
+    </header>
+    {onOptions&&<PlanningModelControls key={state.provider} state={state} language={language} busy={busy} onOptions={onOptions}/>}
+    <PlanningMessages messages={state.messages.filter(message=>!message.questionId)} providerId={state.provider} language={language} busy={working} workingLabel={workingLabel} partialReply={partialReply} partialProviderId={partialProviderId} activity={activity} route={route}>
     {proposal&&<details key={proposal.baseRevision} className="route-editor-proposal"><summary><FileText/>{t('查看修改','Review changes')}<ChevronRight/></summary><p>{proposal.reply}</p>{proposalLocked&&<p className="route-editor-proposal-warning">{t('这项修改涉及已学章节。清空学习记录后可采用。','This change affects studied lessons. Clear learning progress to apply it.')}</p>}<div><GameButton disabled={editingDisabled||dirty||proposalLocked} onClick={onApply}>{t('采用修改','Apply')}</GameButton><GameButton variant="secondary" disabled={busy} onClick={onDiscard}>{t('放弃','Discard')}</GameButton></div></details>}
     </PlanningMessages>
-    {conversationFeedback&&<div className="route-editor-conversation-feedback"><p role={conversationError?'alert':'status'}>{conversationFeedback}</p>{lastMessage?.role==='user'&&<GameButton variant="secondary" disabled={busy||working||Boolean(state.pending)} onClick={()=>void sendMessage(lastMessage.text,lastMessage.mentions,lastMessage.target)}>{t('重试','Retry')}</GameButton>}</div>}
-    <PlanningComposer inputRef={composerRef} route={route} referenceRequest={referenceRequest} language={language} busy={working} disabled={busy&&!working} onSend={(text,mentions)=>sendMessage(text,mentions)} onCancel={onCancel} answeredText={answeredText} placeholder={t('提问或描述想调整的内容…','Ask about or adjust your route…')}/>
+    {conversationFeedback&&<div className="route-editor-conversation-feedback"><p role={conversationError?'alert':'status'}>{conversationFeedback}</p>{lastMessage?.role==='user'&&<GameButton variant="secondary" disabled={busy||working||Boolean(state.pending)} onClick={()=>void sendMessage(lastMessage.text,lastMessage.mentions,lastMessage.target,lastMessage.attachments)}>{t('重试','Retry')}</GameButton>}</div>}
+    <PlanningComposer attachmentProject={state.projectId} inputRef={composerRef} route={route} referenceRequest={referenceRequest} language={language} busy={working} disabled={busy&&!working} onSend={(text,mentions,files)=>sendMessage(text,mentions,undefined,files)} onCancel={onCancel} answeredMessage={answeredMessage} placeholder={t('提问或描述想调整的内容…','Ask about or adjust your route…')}/>
    </aside>}
   </div>
-  <footer className="route-editor-footer"><span className="route-editor-save-state" role="status">{notice||(dirty?t('未保存','Unsaved'):state.confirmedRevision?t('已确认','Confirmed'):t('已保存','Saved'))}</span>{issues.length>0&&<button type="button" className="text-button route-editor-review" disabled={busy} onClick={()=>setIssuesOpen(true)}>{t('待补全 ','Review ')}{issues.length}{t(' 项',' items')}</button>}<EditorIcon label={t('撤销','Undo')} onClick={onUndo} disabled={editingDisabled||!dirty&&(!state.undoRoute&&!state.history?.past.length||!respectsLocks(state.history?.past.at(-1)??state.undoRoute))}><Undo2/></EditorIcon><EditorIcon label={t('前进','Redo')} onClick={()=>onRedo?.()} disabled={editingDisabled||dirty||!state.history?.future.length||!respectsLocks(state.history?.future.at(-1))}><Redo2/></EditorIcon><GameButton variant="secondary" disabled={editingDisabled} onClick={onSave}>{t('保存草稿','Save draft')}</GameButton><GameButton disabled={editingDisabled} onClick={()=>issues.length?setIssuesOpen(true):onConfirm()}>{t('确认路线','Confirm route')}</GameButton></footer>
+  <footer className="route-editor-footer"><span className="route-editor-save-state" role="status">{notice||(dirty?t('未保存','Unsaved'):state.confirmedRevision?t('已确认','Confirmed'):t('已保存','Saved'))}</span>{!state.provider&&onProvider&&<PlanningAgentControl state={state} language={language} busy={busy} onProvider={onProvider} showLabel={false} above/>}{issues.length>0&&<button type="button" className="text-button route-editor-review" disabled={busy} onClick={()=>setIssuesOpen(true)}>{t('待补全 ','Review ')}{issues.length}{t(' 项',' items')}</button>}<EditorIcon label={t('撤销','Undo')} onClick={onUndo} disabled={editingDisabled||!dirty&&(!state.undoRoute&&!state.history?.past.length||!respectsLocks(state.history?.past.at(-1)??state.undoRoute))}><Undo2/></EditorIcon><EditorIcon label={t('前进','Redo')} onClick={()=>onRedo?.()} disabled={editingDisabled||dirty||!state.history?.future.length||!respectsLocks(state.history?.future.at(-1))}><Redo2/></EditorIcon><GameButton variant="secondary" disabled={editingDisabled} onClick={onSave}>{t('保存草稿','Save draft')}</GameButton><GameButton disabled={editingDisabled} onClick={()=>issues.length?setIssuesOpen(true):onConfirm()}>{t('确认路线','Confirm route')}</GameButton></footer>
   {error&&<div className="route-editor-feedback"><p className="form-message is-error" role="alert">{error}</p></div>}
   {issuesOpen&&<Modal title={t('待补全内容','Complete these items')} closeLabel={t('关闭','Close')} onClose={()=>setIssuesOpen(false)}><ul className="route-editor-issues">{issues.map(issue=><li key={issue.path}><button className="text-button" onClick={()=>locateIssue(issue.path)}><span title={issueLabel(issue.path)}>{issueLabel(issue.path)}</span><small>{issue.code==='required'?t('必填','Required'):issue.code==='dependencies'?t('检查依赖','Check dependencies'):issue.code==='duplicate'?t('重复','Duplicate'):issue.code==='count'?t('调整数量','Adjust count'):t('检查内容','Review content')}</small><ChevronRight/></button></li>)}</ul></Modal>}
   {moving&&!targetLocked(moving)&&<RouteMoveDialog route={route} source={moving} language={language} busy={busy} onMove={target=>moveTo(moving,target)} onClose={()=>setMoving(null)}/>}

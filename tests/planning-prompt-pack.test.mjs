@@ -113,9 +113,9 @@ test('one canonical prompt pack supplies isolated task schemas, valid examples a
 test('assembled planning and repair prompts include aligned learning and executable practice rules',async()=>{
   const pack=await loadPromptPack();
   const taskRules={
-    outline:['跨章共用约定','最终表现任务与可观察证据','早期带指导的尝试','案例标识','交接状态','分配总和须满足预算','stageGoal 写给学习者','把目录中每节分配的分钟数实际相加'],
-    lessons:['目录里的章节标题','即使 assessment 为 null','按题面输入推演每项达标证据','按其上限估算','input.priorPractice','练习的数据结构和字段清单写入活动步骤','renameableLessonRefs','两种 mode 都把复算值','公开字段中同一独立题的解答','后续对账、提示或总结','公式、形状断言与相关阈值也要随之变化','如何隔离状态并观察不同结果','固定结果不能绕过待验证的组件','以当前候选为编辑基线'],
-    review:['外部结果的证据','同层次的达标证据','正确解无法通过','learning_language','result.summary','先只读学习者看到的','用候选提供的证据下结论','沿同一案例检查准备、操作、后续汇总和自查','不同的合法配置','误用示范常量或取到上一条输入','只把候选中所有小节的 estimatedMinutes 相加','最终练习是否调用了要验收的组件'],
+    outline:['在 practiceRules 约定初始数据','最终表现任务与可观察证据','早期带指导的尝试','案例标识','交接状态','分配总和须满足预算','stageGoal 写给学习者','把目录中每节分配的分钟数实际相加'],
+    lessons:['目录里的章节标题','即使 assessment 为 null','按题面输入推演每项达标证据','按其上限估算','input.priorPractice','练习的数据结构和字段清单写入活动步骤','renameableLessonRefs','两种 mode 都把复算值','公开字段中同一独立题的解答','准备、活动、提交、对账与收尾','公式、形状断言与相关阈值也要随之变化','如何隔离状态并观察不同结果','固定结果不能绕过待验证的组件','以 requestedCandidate 为编辑基线','previousBlockingIssues','可重复的触发条件','准备输入、执行动作、取得回报、提交证据'],
+    review:['外部结果的证据','同层次的达标证据','正确解无法通过','learning_language','result.summary','先只读学习者看到的','用候选提供的证据下结论','沿同一案例检查准备、操作、后续汇总和自查','不同的合法配置','误用示范常量或取到上一条输入','只把候选中所有小节的 estimatedMinutes 相加','最终练习是否调用了要验收的组件','只列真正需要修改的小节','复审要从当前文字验证仍存在的问题','操作后回报是否给出'],
   };
   const practiceRules=[
     '每项核心目标都有练习和达标证据',
@@ -126,7 +126,8 @@ test('assembled planning and repair prompts include aligned learning and executa
     '保留解答由学习者得出',
     '在后续相关小节安排主动回忆或解释',
     '用题给输入复算',
-    '逐节对照上一节结束状态和下一节起点',
+    '逐节对照产出方结束状态和使用方起点',
+    '可读取的初始记录',
     '明确同一操作的判定键、未终结与终结状态',
     '推演练习与验收',
     '消费方需要的字段由生产方产出',

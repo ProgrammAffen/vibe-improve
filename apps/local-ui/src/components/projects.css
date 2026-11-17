@@ -20,7 +20,7 @@
 .project-list-toolbar h1{margin:0}
 .project-list-recovery{display:flex;justify-content:flex-end;flex:none;margin-bottom:.7cqw}.project-list-recovery .game-button{min-height:44px;font-size:16px}
 .project-list-scroll{flex:1;min-height:0;overflow:auto;padding:0 .25cqw;scroll-padding:4.5cqw;scrollbar-gutter:stable;overscroll-behavior:contain}
-.project-list-scroll:focus-visible{outline:2px solid #71845d;outline-offset:3px}
+.project-list-scroll:focus-visible{background:#e1e7cc8c}
 .project-table{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;font-size:clamp(17px,1.5cqw,26px);line-height:1.45;color:#344b2d;text-align:start}
 .project-col-name{width:28%}.project-col-progress{width:25%}.project-col-date{width:20%}.project-col-action{width:27%}
 .project-table th,.project-table td{padding:1.2cqw .8cqw;text-align:start;vertical-align:middle;border-bottom:1px solid #73856435;overflow-wrap:anywhere}
@@ -29,7 +29,7 @@
 .project-table tbody tr:hover{background:#e1e7cc60}
 .project-table :is(th,td):nth-child(3){padding-inline-start:2cqw}
 .project-record-name.text-button{display:block;width:100%;min-width:0;max-width:100%;min-height:44px;padding:.4cqw 0;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;font:inherit;font-weight:700;text-align:start;text-decoration:none;color:inherit}
-.project-record-name:focus-visible{outline:2px solid #71845d;outline-offset:3px;border-radius:2px}
+.project-record-name.text-button:focus-visible{text-decoration:underline;text-underline-offset:.2em}
 .project-progress{display:flex;align-items:center;gap:.9cqw;min-width:0;flex-wrap:wrap;padding-inline-end:1.8cqw}
 .project-progress progress{appearance:none;flex:0 1 10cqw;min-width:56px;max-width:145px;width:45%;height:clamp(10px,.85cqw,15px);border:0;border-radius:20px;overflow:hidden;background:#c7cebd}
 .project-progress progress::-webkit-progress-bar{background:#c7cebd;border-radius:20px}
@@ -50,7 +50,7 @@
 .project-pagination{flex:none;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px 1.5cqw;padding:1.2cqw .5cqw 0;border-top:1px solid #73856445;font-size:clamp(16px,1.15cqw,21px);line-height:1.4;color:#536347}
 .project-page-size{display:flex;align-items:center;gap:.6cqw;white-space:nowrap}
 .project-page-size select{min-height:44px;min-width:65px;padding:6px 9px;background:#fbfcf5cc;color:#405037;border:1px solid #a0ad92;border-radius:4px;cursor:pointer;font:inherit}
-.project-page-size select:focus-visible{outline:2px solid #71845d;outline-offset:2px}
+.project-page-size select:focus{background:#e6ebd9}
 .project-page-navigation{display:flex;align-items:center;gap:1cqw;max-width:100%;flex-wrap:wrap;justify-content:center}
 .project-page-navigation .game-button{
   width:min(9cqw,164px);

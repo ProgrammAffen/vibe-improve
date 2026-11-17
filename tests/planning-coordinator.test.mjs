@@ -18,6 +18,14 @@ mode=sys.argv[1]
 def emit(value): print(json.dumps(value),flush=True)
 for line in sys.stdin:
  m=json.loads(line)
+ if m.get('type')=='control_request':
+  emit({'type':'control_response','response':{'request_id':m['request_id'],'subtype':'success','response':{'models':[{'id':'buddy-model','name':'Buddy Model','isDefault':True}]}}})
+ if m.get('type')=='user':
+  ctx=json.loads(m['message']['content'][0]['text'].split('CONTEXT_JSON_DATA:\n',1)[1])
+  assert ctx['acceptedAnswers']['goal']['fields']['topic']=='Python data analysis'
+  payload=json.dumps({'status':'ok','reply':'CodeBuddy can continue from the answers already saved.','result':{'questionId':ctx['currentQuestion'],'summary':'','fields':{},'evidence':[],'unresolved':['Which Python tasks have you tried?'],'complete':False},'missing':[]})
+  emit({'type':'assistant','message':{'content':[{'type':'text','text':payload}]}})
+  emit({'type':'result','subtype':'success','is_error':False,'result':payload})
  if m.get('method')=='initialize': emit({'id':0,'result':{}})
  if m.get('method')=='model/list':emit({'id':1,'result':{'data':[{'model':'synthetic','displayName':'Synthetic','isDefault':True,'supportedReasoningEfforts':[{'reasoningEffort':'medium'}]}],'nextCursor':None}})
  if m.get('method')=='thread/start': emit({'id':1,'result':{'thread':{'id':'t'}}})
@@ -74,12 +82,16 @@ let workspace=base.appendingPathComponent("Workspace"),runtime=try RuntimeDirect
 try FileManager.default.createDirectory(at:workspace,withIntermediateDirectories:true)
 let manualID="proj_12345678-1234-4234-8234-123456789abc",aiID="proj_12345678-1234-4234-8234-123456789abd",retiredID="proj_12345678-1234-4234-8234-123456789abe"
 func workspaceFor(_ id:String)throws->URL{workspace}
-let agents=try AgentManager(runtime:runtime,resolver:{_ in URL(fileURLWithPath:"/synthetic/cli")},runner:{_,args,_ in AgentCommandResult(status:0,text:args==["--version"] ? "0.165.0":"Logged in using ChatGPT",diagnostic:"",timedOut:false)},projectWorkspace:workspaceFor)
 let routes=try RoutePreparationStore(runtime:runtime,validatorURL:routeURL,workspace:workspaceFor),store=try PlanningStore(runtime:runtime,validatorURL:planningURL,workspace:workspaceFor)
+let agents=try AgentManager(runtime:runtime,resolver:{_ in URL(fileURLWithPath:"/synthetic/cli")},runner:{_,args,_ in
+ if args==["auth","status","--json"]{return AgentCommandResult(status:1,text:"{\\"loggedIn\\":false}",diagnostic:"",timedOut:false)}
+ return AgentCommandResult(status:0,text:args==["--version"] ? "0.165.0":"Logged in using ChatGPT",diagnostic:"",timedOut:false)
+},projectWorkspace:workspaceFor,projectChoice:{id in try store.read(projectID:id)?["agentChoice"] as? String})
 var mode="success"
 let runner=PlanningAgentManager(agents:agents,idleTimeout:3,prepare:{id in
- let launch=try AgentSessionLaunch(provider:"codex",projectID:id,executable:URL(fileURLWithPath:"/usr/bin/python3"),arguments:[fixture,mode],workspace:workspace,environment:ProcessInfo.processInfo.environment)
- return AgentSessionPreparation(projectID:id,provider:"codex",launch:launch)
+ guard let provider=try agents.choice(id) as? String else{throw AgentError.unavailable}
+ let launch=try AgentSessionLaunch(provider:provider,projectID:id,executable:URL(fileURLWithPath:"/usr/bin/python3"),arguments:[fixture,mode],workspace:workspace,environment:ProcessInfo.processInfo.environment)
+ return AgentSessionPreparation(projectID:id,provider:provider,launch:launch)
 })
 let bridge=PlanningCoordinator(store:store,routes:routes,agents:agents,runner:runner)
 func call(_ action:String,_ id:String,_ extra:[String:Any]=[:])throws->[String:Any]{var value=extra;value["projectId"]=id;guard let result=try bridge.request(action,value:value) as? [String:Any] else{throw PlanningError.invalid};return result}
@@ -317,6 +329,24 @@ check(try awaitJob(aiID,baselinePrefill["id"] as! String)["state"] as? String=="
 ai=try call("planning.read",aiID)
 let prefilledBaseline=(ai["questions"] as! [[String:Any]])[2]
 check(prefilledBaseline["status"] as? String=="needs-detail" && (prefilledBaseline["baselineOptions"] as? [String])?.count==3,"baseline choices were not saved as suggestions")
+let beforeSwitch=rev(ai)
+do{_ = try call("planning.provider",aiID,["provider":"codebuddy","expectedRevision":0]);check(false,"stale provider switch accepted")}catch PlanningError.conflict{}
+do{_ = try call("planning.provider",aiID,["provider":"claude-code","expectedRevision":beforeSwitch]);check(false,"signed-out provider selected")}catch AgentError.auth{}
+do{_ = try call("planning.provider",aiID,["provider":"qoder","expectedRevision":beforeSwitch]);check(false,"unsupported CLI selected")}catch PlanningAgentError.unsupported{}
+check(try agents.choice(aiID) as? String=="codex" && rev(call("planning.read",aiID))==beforeSwitch,"failed provider selection changed the project")
+let savedQuestions=try JSONSerialization.data(withJSONObject:ai["questions"]!,options:.sortedKeys)
+let savedMessages=try JSONSerialization.data(withJSONObject:ai["messages"]!,options:.sortedKeys)
+ai=try call("planning.provider",aiID,["provider":"codebuddy","expectedRevision":beforeSwitch])
+check(ai["step"] as? String=="intake" && ai["provider"] as? String=="codebuddy" && ai["agentOptions"]==nil,"switch reset intake or retained incompatible options")
+check(try JSONSerialization.data(withJSONObject:ai["questions"]!,options:.sortedKeys)==savedQuestions,"switch changed answers")
+check(try JSONSerialization.data(withJSONObject:ai["messages"]!,options:.sortedKeys)==savedMessages,"switch changed old messages")
+check(try agents.choice(aiID) as? String=="codebuddy" && agents.choice(manualID) as? String=="codex","switch did not persist at project scope")
+let buddyCatalog=try call("planning.models",aiID)
+check(buddyCatalog["provider"] as? String=="codebuddy" && (buddyCatalog["models"] as! [[String:Any]]).first?["id"] as? String=="buddy-model","switch kept the old catalog")
+let switched=try call("planning.begin",aiID,["intent":"interview","text":"I have followed a tutorial.","expectedRevision":rev(ai)])
+check(try awaitJob(aiID,switched["id"] as! String)["state"] as? String=="completed","the new CLI could not use the intake context")
+ai=try call("planning.read",aiID)
+check((ai["messages"] as! [[String:Any]]).last?["provider"] as? String=="codebuddy","new answer lacked provider attribution")
 ai=try call("planning.answer.reset",aiID,["questionId":"purpose","expectedRevision":rev(ai)])
 check(ai["currentQuestion"] as? String=="purpose" && (ai["questions"] as! [[String:Any]])[1]["status"] as? String=="current","cascade did not select requested question")
 check(try JSONSerialization.data(withJSONObject:(ai["questions"] as! [[String:Any]])[0]["acceptedSnapshot"]!,options:.sortedKeys)==JSONSerialization.data(withJSONObject:adoptedGoal,options:.sortedKeys),"cascade changed an earlier answer")
@@ -396,6 +426,7 @@ let learnedPreparation=try routes.read(projectID:manualID)
 do{_ = try call("planning.import.remove",manualID,["expectedRouteRevision":rev(learnedPreparation),"expectedPlanningRevision":rev(learned)]);check(false,"studied imported route was removed")}catch PlanningError.studiedLessonLocked{}
 check(rev(try routes.read(projectID:manualID))==rev(learnedPreparation),"a denied import removal modified route preparation")
 let pendingEdit=try store.appendUser(projectID:manualID,text:"Test pending reset",messageID:"pending-reset-msg",requestID:"pending-reset-req",expectedRevision:rev(learned))
+do{_ = try call("planning.provider",manualID,["provider":"codebuddy","expectedRevision":rev(pendingEdit)]);check(false,"switch interrupted an editor request")}catch AgentError.busy{}
 let resetLearnedRequest=learnedIdentity.merging(["progressRevision":progressRevision(startLearned)]){_,new in new}
 do{_ = try call("planning.learning.reset",manualID,resetLearnedRequest);check(false,"reset ran while AI had an active request")}catch PlanningError.busy{}
 learned=try store.cancel(projectID:manualID,requestID:"pending-reset-req",expectedRevision:rev(pendingEdit))
@@ -403,6 +434,15 @@ _ = try routes.removeImport(projectID:manualID,expectedRevision:rev(learnedPrepa
 check((try call("planning.read",manualID))["routeDraft"] != nil,"legacy partial removal discarded a studied route")
 _ = try call("planning.learning.reset",manualID,resetLearnedRequest)
 check((try call("planning.read",manualID))["routeDraft"] != nil,"learning reset discarded an imported route with missing preparation")
+let beforeEditorSwitch=try call("planning.read",manualID)
+let routeBytes=try JSONSerialization.data(withJSONObject:beforeEditorSwitch["routeDraft"]!,options:.sortedKeys)
+let editorSwitched=try call("planning.provider",manualID,["provider":"codebuddy","expectedRevision":rev(beforeEditorSwitch)])
+check(editorSwitched["step"] as? String=="editor" && editorSwitched["confirmedRevision"] as? Int==beforeEditorSwitch["confirmedRevision"] as? Int,"editor switch invalidated route confirmation")
+check(try JSONSerialization.data(withJSONObject:editorSwitched["routeDraft"]!,options:.sortedKeys)==routeBytes,"editor switch changed the route")
+let manualEntry=try call("planning.enter",manualID,["locale":"en","mode":"manual"])
+check(try manualEntry["provider"] is NSNull && agents.choice(manualID) as? String=="codebuddy","manual entry erased the saved project agent")
+try bridge.saveProjectAgent(manualID,choice:"manual")
+check(try agents.choice(manualID) as? String=="manual","original agent selection screen could not replace an inline choice")
 runner.shutdown();print("PASS native planning coordinator revisions, trusted choices, resume, import, cancellation, failure and job retirement")
 `);
   const result=spawnSync('/usr/bin/swiftc',['-module-cache-path','tmp/cache/swift','-framework','JavaScriptCore','apps/macos/RuntimeDirectory.swift','apps/macos/AgentManager.swift','apps/macos/CodeBuddyAdapter.swift','apps/macos/RoutePreparationStore.swift','apps/macos/PlanningStore.swift','apps/macos/PlanningPromptPackResources.swift','apps/macos/PlanningPromptPack.swift','apps/macos/PlanningAgent.swift', 'apps/macos/PlanningGeneration.swift','apps/macos/PlanningCoordinator.swift',source,'-o',binary],{encoding:'utf8',timeout:210_000});

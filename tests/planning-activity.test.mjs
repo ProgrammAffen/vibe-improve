@@ -24,6 +24,10 @@ test('CLI activity accepts only bounded metadata and renders localized live or s
  assert.match(planningProgress({intent:'generate',state:'pending',generationOutput:[{kind:'revision',state:'streaming'}],diagnostic:{stage:'generating',durationMs:0}},'zh-CN'),/正在修正章节/);
  assert.match(planningProgress({diagnostic:{stage:'generating',durationMs:1_810_000}},'en'),/1810s/);
  assert.doesNotMatch(planningProgress({diagnostic:{stage:'generating',durationMs:0,completedChapters:9,chapterCount:8}},'en'),/chapters ready/);
+ const saved={stage:'generating',durationMs:0,completedChapters:0,chapterCount:2,completedLessons:3,lessonCount:6};
+ assert.match(planningProgress({diagnostic:saved},'zh-CN'),/已保存 3 \/ 6 节草稿 · 正在生成内容/);
+ assert.match(planningProgress({diagnostic:{...saved,stage:'reviewing',completedLessons:6}},'en'),/6 \/ 6 lesson drafts saved · Reviewing route content/);
+ assert.doesNotMatch(planningProgress({diagnostic:{...saved,completedLessons:7}},'en'),/lesson drafts saved/);
  const sample={durationMs:60000,lastActivityMs:59000,thinkingCharacters:12345,outputCharacters:456,events:[{sequence:1,stage:'thinking',atMs:59000,thinkingCharacters:12345,outputCharacters:456}]};
  assert.deepEqual(parsePlanningActivity(sample),sample);assert.equal(parsePlanningActivity(undefined),undefined);
  for(const [stage,caption] of [['reviewing','Reviewing route content'],['revising','Revising lessons']]){

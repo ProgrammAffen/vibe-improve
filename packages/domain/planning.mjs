@@ -3,6 +3,7 @@ import {targetShape,validatePlanningTarget,validatePlanningMentions} from './pla
 import {GENERATION_POLICY,validateGenerationDraft,generationDraftMatches,generationRouteHash,generationEqual} from './planning-generation-draft.mjs';
 import {CONSISTENCY_VERSION,QUESTION_FIELDS,acceptedAnswer,planningFacts,planningFactsHash,consistencyReady,validateConsistencyAssessment,materializeAccepted,dirtyConsistency,bumpBackground,applyAssessment} from './planning-consistency.mjs';
 import {DEFAULT_QUESTION_IDS,QUESTION_IDS,LEGACY_QUESTION_IDS} from './planning-questions.mjs';
+import {materialKey,materialTargetExists,retainRouteMaterials,validMaterialLink,validResourceSnapshot,validRouteMaterials} from './route-materials.mjs';
 export {DEFAULT_QUESTION_IDS,QUESTION_IDS,questionLabel,questionText,questionHelp,questionExample} from './planning-questions.mjs';
 export {validatePlanningTarget} from './planning-references.mjs';
 export {CONSISTENCY_VERSION,acceptedAnswer,planningFacts,planningFactsHash,consistencyReady} from './planning-consistency.mjs';
@@ -44,7 +45,7 @@ const project=value=>typeof value==='string'&&/^proj_[a-f0-9]{8}-[a-f0-9]{4}-[a-
 const date=value=>typeof value==='string'&&/^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(value)&&Number.isFinite(Date.parse(value));
 function bounded(value,max=MAX_PLANNING_BYTES){let text;try{text=JSON.stringify(value)}catch{fail()}if(typeof text!=='string'||text.length>max)fail('PLANNING_TOO_LARGE');let count=0;for(const c of text){const n=c.codePointAt(0);if(n>=0xd800&&n<=0xdfff)fail();count+=n<128?1:n<2048?2:n<65536?3:4;if(count>max)fail('PLANNING_TOO_LARGE')}return value}
 function expectRevision(state,expected){validatePlanning(state);if(expected!==state.revision)fail('PLANNING_CONFLICT');if(state.revision>=999_999)fail('PLANNING_CONFLICT')}
-function progressed(state){state.revision++;return validatePlanning(bounded(state))}
+function progressed(state){retainRouteMaterials(state);state.revision++;return validatePlanning(bounded(state))}
 function changed(state){delete state.confirmedRevision;return progressed(state)}
 function idle(state){if(state.pending)fail('PLANNING_BUSY')}
 function editorHistory(state){return clone(state.history??{past:state.undoRoute?[state.undoRoute]:[],future:[]})}
@@ -54,7 +55,11 @@ function keepHistory(state,history){
   state.history=history;delete state.undoRoute;
 }
 function rememberRoute(state){const history=editorHistory(state);if(state.routeDraft)history.past.push(clone(state.routeDraft));history.future=[];keepHistory(state,history)}
-function addMessage(state,message){if(state.messages.length>=128)fail('PLANNING_LIMIT');if(state.messages.some(item=>item.id===message.id))fail('PLANNING_CONFLICT');state.messages.push(message)}
+function addMessage(state,message){
+  if(state.messages.length>=128)fail('PLANNING_LIMIT');
+  if(state.messages.some(item=>item.id===message.id))fail('PLANNING_CONFLICT');
+  state.messages.push(message.role==='assistant'?{...message,provider:state.provider}:message);
+}
 function clearEditorConversation(state){
   const messages=state.messages,keep=message=>message.questionId!==undefined;
   for(const question of state.questions)if(question.conversationFrom!==undefined)question.conversationFrom=messages.slice(0,question.conversationFrom).filter(keep).length;
@@ -198,7 +203,9 @@ function validateReceipt(state){
 }
 export function validatePlanning(value){
   bounded(value);
-  if(!keys(value,['schemaVersion','projectId','revision','step','provider','locale','currentQuestion','questions','messages','routeDraft','importedOriginal','confirmedRevision','pending','proposal','undoRoute','history','agentOptions','intakeChanged','resources','backgroundEpoch','consistency','answerEvents','generationDraft'],['schemaVersion','projectId','revision','step','provider','locale','currentQuestion','questions','messages']))fail();
+  if(!keys(value,['schemaVersion','projectId','revision','step','provider','agentChoice','locale','currentQuestion','questions','messages','routeDraft','importedOriginal','confirmedRevision','pending','proposal','undoRoute','history','agentOptions','intakeChanged','resources','backgroundEpoch','consistency','answerEvents','generationDraft','resourceSnapshot','routeMaterials'],['schemaVersion','projectId','revision','step','provider','locale','currentQuestion','questions','messages']))fail();
+  if(value.agentChoice!==undefined&&value.agentChoice!=='manual'&&!providers.includes(value.agentChoice))fail();
+  if(value.resourceSnapshot!==undefined&&!validResourceSnapshot(value.resourceSnapshot)||value.routeMaterials!==undefined&&!validRouteMaterials(value.routeMaterials))fail();
   if(value.generationDraft!==undefined){bounded(value.generationDraft,2_097_152);validateGenerationDraft(value.generationDraft)}
   if(value.backgroundEpoch!==undefined&&!integer(value.backgroundEpoch))fail();
   if(value.resources!==undefined&&!string(value.resources,4000,true))fail();
@@ -213,7 +220,13 @@ export function validatePlanning(value){
     for(const event of value.answerEvents){if(!keys(event,['id','kind','questionId','answerRevision','epoch','summary','fields','createdAt','issueId','sourceRequestId'],['id','kind','questionId','answerRevision','epoch','summary','fields','createdAt'])||!token(event.id)||seen.has(event.id)||event.kind!=='suggestion'||!QUESTION_IDS.includes(event.questionId)||!integer(event.answerRevision)||!integer(event.epoch)||event.epoch>(value.backgroundEpoch??0)||!string(event.summary,2000)||!record(event.fields)||!Object.keys(event.fields).length||Object.keys(event.fields).some(field=>!fieldsByQuestion[event.questionId].includes(field)||!string(event.fields[field]))||!date(event.createdAt)||event.issueId!==undefined&&!token(event.issueId)||event.sourceRequestId!==undefined&&!requestToken(event.sourceRequestId))fail();seen.add(event.id)}
   }
   const ids=new Set();
-  for(const message of value.messages){if(!keys(message,['id','role','text','createdAt','questionId','target','mentions'],['id','role','text','createdAt'])||!token(message.id)||ids.has(message.id)||!['user','assistant'].includes(message.role)||!string(message.text,8000)||!date(message.createdAt)||(message.questionId!==undefined&&!QUESTION_IDS.includes(message.questionId))||(message.target!==undefined&&(message.role!=='user'||message.questionId!==undefined||message.mentions!==undefined||!targetShape(message.target))))fail();if(message.mentions!==undefined){if(message.role!=='user'||message.questionId!==undefined)fail();validatePlanningMentions(undefined,message.text,message.mentions,false)}ids.add(message.id)}
+  for(const message of value.messages){
+    if(!keys(message,['id','role','text','createdAt','questionId','target','mentions','provider','attachments'],['id','role','text','createdAt'])||!token(message.id)||ids.has(message.id)||!['user','assistant'].includes(message.role)||!string(message.text,8000)||!date(message.createdAt)||(message.questionId!==undefined&&!QUESTION_IDS.includes(message.questionId))||(message.target!==undefined&&(message.role!=='user'||message.questionId!==undefined||message.mentions!==undefined||!targetShape(message.target))))fail();
+    if(message.provider!==undefined&&(message.role!=='assistant'||(message.provider!==null&&!providers.includes(message.provider))))fail();
+    if(message.mentions!==undefined){if(message.role!=='user'||message.questionId!==undefined)fail();validatePlanningMentions(undefined,message.text,message.mentions,false)}
+    if(message.attachments!==undefined&&(message.role!=='user'||!validPlanningAttachments(message.attachments)))fail();
+    ids.add(message.id);
+  }
   for(let index=0;index<value.questions.length;index++){
     const q=value.questions[index];
     if(!keys(q,['id','status','summary','fields','evidence','missing','answerProposal','conversationFrom','acceptedSnapshot','baselineOptions'],['id','status','summary','fields','evidence','missing'])||q.id!==expectedQuestions[index]||!['pending','current','needs-detail','awaiting-confirmation','complete','needs-review'].includes(q.status)||!string(q.summary,2000,true)||!record(q.fields)||Object.keys(q.fields).length>8||Object.keys(q.fields).some(field=>!fieldsByQuestion[q.id].includes(field)||!string(q.fields[field]))||!Array.isArray(q.evidence)||q.evidence.length>8||!Array.isArray(q.missing)||q.missing.length>12||q.missing.some(item=>!string(item,400)))fail();
@@ -265,15 +278,22 @@ export function beginInterviewPrefill(state,requestId,expectedRevision){
   next.pending={id:requestId,kind:'interview',baseRevision:next.revision,questionId:next.currentQuestion,backgroundEpoch:next.backgroundEpoch,factsHash:planningFactsHash(next),prefill:true};
   return validatePlanning(next);
 }
-export function appendUser(state,text,messageId,requestId,expectedRevision,now=new Date().toISOString(),target,mentions){
+export function validPlanningAttachments(value){
+  return Array.isArray(value)&&value.length>=1&&value.every(ref=>
+    keys(ref,['id','name','kind'])&&typeof ref.id==='string'&&/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(ref.id)&&
+    string(ref.name,240)&&['image','document'].includes(ref.kind))&&new Set(value.map(ref=>ref.id)).size===value.length;
+}
+
+export function appendUser(state,text,messageId,requestId,expectedRevision,now=new Date().toISOString(),target,mentions,attachments){
   expectRevision(state,expectedRevision);idle(state);if(!state.provider||!string(text,8000)||!token(messageId)||!requestToken(requestId)||!date(now))fail();
-  if(target!=null){if(state.step!=='editor'||mentions!==undefined)fail('PLANNING_TARGET_UNAVAILABLE');validatePlanningTarget(state.routeDraft,target)}
-  if(mentions!==undefined){if(state.step!=='editor')fail('PLANNING_TARGET_UNAVAILABLE');validatePlanningMentions(state.routeDraft,text,mentions)}
-  const last=state.messages.at(-1),retry=state.step==='editor'&&last?.role==='user'&&!last.questionId&&last.text===text.trim()&&sameRoute(last.target??null,target??null)&&sameRoute(last.mentions??[],mentions??[]);
+  if(target!=null){if(state.step!=='editor'||mentions!=null)fail('PLANNING_TARGET_UNAVAILABLE');validatePlanningTarget(state.routeDraft,target)}
+  if(mentions!=null){if(state.step!=='editor')fail('PLANNING_TARGET_UNAVAILABLE');validatePlanningMentions(state.routeDraft,text,mentions)}
+  if(attachments!==undefined&&!validPlanningAttachments(attachments))fail();
+  const last=state.messages.at(-1),retry=state.step==='editor'&&last?.role==='user'&&!last.questionId&&last.text===text.trim()&&sameRoute(last.target??null,target??null)&&sameRoute(last.mentions??[],mentions??[])&&sameRoute(last.attachments??[],attachments??[]);
   if(state.messages.length>=(retry?128:127))fail('PLANNING_LIMIT');if(state.revision>=999_998)fail('PLANNING_CONFLICT');
   const next=clone(state),questionId=next.step==='intake'?intakeCurrentQuestion(next):null;materializeAccepted(next);
   if(next.step==='intake'){const q=next.questions.find(q=>q.id===questionId);if(!q||q.status==='complete')fail('PLANNING_INCOMPLETE');next.currentQuestion=q.id;delete q.answerProposal;delete q.baselineOptions;q.status='current';if(next.routeDraft?.chapters.length)next.intakeChanged=true;}
-  if(!retry)addMessage(next,{id:messageId,role:'user',text:text.trim(),createdAt:now,...(next.step==='intake'?{questionId}:target?{target:clone(target)}:mentions?.length?{mentions:clone(mentions)}:{})});
+  if(!retry)addMessage(next,{id:messageId,role:'user',text:text.trim(),createdAt:now,...(next.step==='intake'?{questionId}:target?{target:clone(target)}:mentions?.length?{mentions:clone(mentions)}:{}),...(attachments?{attachments:clone(attachments)}:{})});
   next.revision++;next.pending={id:requestId,kind:next.step==='editor'?'edit':'interview',baseRevision:next.revision,questionId:next.step==='intake'?questionId:null,...(next.step==='intake'?{backgroundEpoch:next.backgroundEpoch,factsHash:planningFactsHash(next)}:{})};
   return validatePlanning(bounded(next));
 }
@@ -448,14 +468,23 @@ export function acceptConsistencySuggestion(state,issueId,expectedRevision,now=n
   if(next.routeDraft?.chapters.length)next.intakeChanged=true;return changed(next);
 }
 export function generationProgress(state){validatePlanning(state);return state.generationDraft?{...validateGenerationDraft(state.generationDraft),resumable:generationDraftMatches(state,planningFactsHash(state))}:null}
-export function startGeneration(state,requestId,expectedRevision,replaceExisting=false,generationMode='new'){
+export function startGeneration(state,requestId,expectedRevision,replaceExisting=false,generationMode='new',resourceSnapshot=null){
   expectRevision(state,expectedRevision);if(!canGenerate(state)||!requestToken(requestId))fail('PLANNING_INCOMPLETE');
   if(!['new','resume','restart'].includes(generationMode))fail();
   if(generationMode==='resume'&&!generationDraftMatches(state,planningFactsHash(state)))fail('PLANNING_GENERATION_STALE');
   if(generationMode==='new'&&state.generationDraft)fail('PLANNING_GENERATION_EXISTS');
   if(needsGenerationReplacement(state)&&replaceExisting!==true)fail('PLANNING_REPLACE_REQUIRED');
   if(state.revision>=999_998)fail('PLANNING_CONFLICT');
-  const next=clone(state);if(generationMode==='restart')delete next.generationDraft;next.revision++;next.pending={id:requestId,kind:'generate',baseRevision:next.revision,questionId:null,backgroundEpoch:next.backgroundEpoch??0,factsHash:planningFactsHash(next)};return validatePlanning(next);
+  const next=clone(state);
+  if(generationMode==='restart')delete next.generationDraft;
+  if(generationMode==='resume'){
+    if(next.resourceSnapshot&&next.resourceSnapshot.provider!==next.provider)fail('PLANNING_GENERATION_STALE');
+  }else if(resourceSnapshot===null)delete next.resourceSnapshot;
+  else{
+    if(!validResourceSnapshot(resourceSnapshot)||resourceSnapshot.provider!==next.provider)fail();
+    next.resourceSnapshot=clone(resourceSnapshot);
+  }
+  next.revision++;next.pending={id:requestId,kind:'generate',baseRevision:next.revision,questionId:null,backgroundEpoch:next.backgroundEpoch??0,factsHash:planningFactsHash(next)};return validatePlanning(next);
 }
 export function saveGenerationProgress(state,progress,requestId,baseRevision,now=new Date().toISOString()){
   pending(state,requestId,baseRevision,'generate');
@@ -463,24 +492,75 @@ export function saveGenerationProgress(state,progress,requestId,baseRevision,now
   const previous=state.generationDraft;
   if(previous){
     if(!generationDraftMatches(state,planningFactsHash(state))||progress.routeId!==previous.routeId||!generationEqual(progress.outline,previous.outline))fail('PLANNING_GENERATION_STALE');
+    if(previous.revisedLessonIds!==undefined)fail('PLANNING_CONFLICT');
     if(!Array.isArray(progress.chapters)||progress.chapters.length!==previous.chapters.length)fail('PLANNING_GENERATION_INVALID');
-    previous.chapters.forEach((chapter,i)=>{if(chapter&&(!progress.chapters[i]||!generationEqual(chapter.nodes,progress.chapters[i].nodes?.slice(0,chapter.nodes.length))))fail('PLANNING_CONFLICT')});
+    previous.chapters.forEach((chapter,i)=>{
+      if(!chapter)return;
+      const next=progress.chapters[i];
+      if(!next||!generationEqual(chapter.nodes,next.nodes?.slice(0,chapter.nodes.length)))fail('PLANNING_CONFLICT');
+      const ids=new Set(chapter.nodes.map(node=>node.id));
+      if(!generationEqual(chapter.materialLinks??[],(next.materialLinks??[]).filter(link=>ids.has(link.targetId))))fail('PLANNING_CONFLICT');
+    });
   }
   const next=clone(state);
   next.generationDraft={schemaVersion:1,id:previous?.id??'generation_'+requestId,revision:(previous?.revision??0)+1,createdAt:previous?.createdAt??now,updatedAt:now,backgroundEpoch:state.backgroundEpoch??0,factsHash:planningFactsHash(state),policyVersion:GENERATION_POLICY,locale:state.locale,baseRouteHash:generationRouteHash(state.routeDraft),...clone(progress)};
   return validatePlanning(next);
 }
-export function applyGenerated(state,route,requestId,baseRevision,revisedLessons=[],renamedLessons=[]){
+export function saveGenerationRevision(state,patch,requestId,baseRevision,now=new Date().toISOString()){
+  pending(state,requestId,baseRevision,'generate');
+  const factsHash=planningFactsHash(state);
+  if(!date(now)||state.pending.backgroundEpoch!==(state.backgroundEpoch??0)||state.pending.factsHash!==factsHash)fail('PLANNING_CONFLICT');
+  if(!generationDraftMatches(state,factsHash))fail('PLANNING_GENERATION_STALE');
+  const previous=state.generationDraft;
+  if(previous.chapters.some((chapter,index)=>chapter?.nodes.length!==previous.outline.result.chapters[index].lessons.length))fail('PLANNING_GENERATION_INVALID');
+  if(patch===null&&previous.revisedLessonIds!==undefined)return state;
+
+  const next=clone(state),draft=next.generationDraft;
+  const revised=new Set(draft.revisedLessonIds??[]);
+  if(patch!==null){
+    if(!keys(patch,['nodes','renamedLessons','materialLinks'],['nodes','renamedLessons'])||
+       !Array.isArray(patch.nodes)||patch.nodes.length<1||patch.nodes.length>3||patch.nodes.some(node=>!record(node))||
+       !Array.isArray(patch.renamedLessons)||new Set(patch.renamedLessons).size!==patch.renamedLessons.length)fail('PLANNING_GENERATION_INVALID');
+    const ids=new Set(patch.nodes.map(node=>node.id));
+    const chapterIndex=draft.chapters.findIndex(chapter=>chapter.nodes.some(node=>node.id===patch.nodes[0].id));
+    if(chapterIndex<0||patch.renamedLessons.some(id=>!ids.has(id)))fail('PLANNING_GENERATION_INVALID');
+    const chapter=draft.chapters[chapterIndex],outline=draft.outline.result.chapters[chapterIndex];
+    const start=chapter.nodes.findIndex(node=>node.id===patch.nodes[0].id);
+    const oldLinks=chapter.materialLinks??[];
+    let links=oldLinks;
+    if(Object.hasOwn(patch,'materialLinks')){
+      const allowed=new Map((state.resourceSnapshot?.items??[]).map(ref=>[ref.id,ref.version]));
+      if(!Array.isArray(patch.materialLinks)||patch.materialLinks.some(link=>!validMaterialLink(link)||link.origin!=='ai'||link.kind!=='lesson'||!ids.has(link.targetId)||allowed.get(link.id)!==link.version))fail('PLANNING_GENERATION_INVALID');
+      links=[...oldLinks.filter(link=>!ids.has(link.targetId)),...clone(patch.materialLinks)];
+      chapter.materialLinks=links;
+    }
+    const renamed=new Set(patch.renamedLessons);
+    patch.nodes.forEach((node,offset)=>{
+      const index=start+offset,before=chapter.nodes[index];
+      if(!before||before.id!==node.id||(before.title!==node.title)!==renamed.has(node.id))fail('PLANNING_GENERATION_INVALID');
+      if(!generationEqual(before,node)||!generationEqual(oldLinks.filter(link=>link.targetId===node.id),links.filter(link=>link.targetId===node.id)))revised.add(node.id);
+      chapter.nodes[index]=clone(node);
+      outline.lessons[index].title=node.title;
+    });
+  }
+  draft.revisedLessonIds=[...revised];
+  draft.revision++;
+  draft.updatedAt=now;
+  return validatePlanning(next);
+}
+export function applyGenerated(state,route,requestId,baseRevision,revisedLessons=[],renamedLessons=[],materialLinks=[]){
   pending(state,requestId,baseRevision,'generate');if(!state.questions.every(q=>!isCoreQuestion(q.id)||q.status==='complete')||!consistencyReady(state))fail('PLANNING_INCOMPLETE');
   if(state.pending.backgroundEpoch!==(state.backgroundEpoch??0)||state.pending.factsHash!==planningFactsHash(state))fail('PLANNING_CONFLICT');
   try{validateRoute(route)}catch{fail('PLANNING_ROUTE_INVALID')}if(route.schemaVersion!==2)fail('PLANNING_ROUTE_INVALID');
-  if(!Array.isArray(revisedLessons)||revisedLessons.length>12||new Set(revisedLessons).size!==revisedLessons.length||revisedLessons.some(id=>typeof id!=='string'))fail('PLANNING_GENERATION_INVALID');
+  if(!Array.isArray(revisedLessons)||revisedLessons.length>512||new Set(revisedLessons).size!==revisedLessons.length||revisedLessons.some(id=>typeof id!=='string'))fail('PLANNING_GENERATION_INVALID');
   const revised=new Set(revisedLessons);
   if(!Array.isArray(renamedLessons)||renamedLessons.length>revised.size||new Set(renamedLessons).size!==renamedLessons.length||renamedLessons.some(id=>!revised.has(id)))fail('PLANNING_GENERATION_INVALID');
   const renamed=new Set(renamedLessons);
   if(state.generationDraft){
     const d=state.generationDraft;if(!generationDraftMatches(state,planningFactsHash(state)))fail('PLANNING_GENERATION_STALE');
-    const original={format:'vibe-improve.route',schemaVersion:2,id:d.routeId,revision:1,title:d.outline.result.title,locale:d.locale,sourceLanguage:d.locale,chapters:d.chapters};
+    if(d.revisedLessonIds!==undefined&&revisedLessons.length)fail('PLANNING_GENERATION_INVALID');
+    const chapters=d.chapters.map(chapter=>{if(!chapter)return null;const {materialLinks:_,...content}=chapter;return content});
+    const original={format:'vibe-improve.route',schemaVersion:2,id:d.routeId,revision:1,title:d.outline.result.title,locale:d.locale,sourceLanguage:d.locale,chapters};
     if(revisedLessons.length){
       if(d.chapters.some((chapter,index)=>chapter?.nodes.length!==d.outline.result.chapters[index].lessons.length))fail('PLANNING_GENERATION_INVALID');
       const identity=({chapters,...metadata})=>({...metadata,chapters:chapters.map(({nodes,...chapter})=>({...chapter,nodes:nodes.map(({id})=>id)}))});
@@ -494,7 +574,23 @@ export function applyGenerated(state,route,requestId,baseRevision,revisedLessons
       if(revised.size)fail('PLANNING_GENERATION_INVALID');
     }else if(!generationEqual(route,original))fail('PLANNING_GENERATION_INVALID');
   }else if(revisedLessons.length)fail('PLANNING_GENERATION_INVALID');
-  const next=clone(state);rememberRoute(next);clearEditorConversation(next);next.routeDraft=clone(route);next.step='editor';next.intakeChanged=false;delete next.pending;delete next.proposal;delete next.generationDraft;return changed(next);
+  const allowed=new Map((state.resourceSnapshot?.items??[]).map(ref=>[ref.id,ref.version]));
+  if(!validRouteMaterials([{routeId:route.id,links:materialLinks}])||materialLinks.some(link=>link.origin!=='ai'||allowed.get(link.id)!==link.version||!materialTargetExists(route,link)))fail('PLANNING_GENERATION_INVALID');
+  const next=clone(state);rememberRoute(next);clearEditorConversation(next);next.routeDraft=clone(route);next.step='editor';next.intakeChanged=false;
+  if(materialLinks.length)next.routeMaterials=[...(next.routeMaterials??[]).filter(entry=>entry.routeId!==route.id),{routeId:route.id,links:clone(materialLinks)}];
+  delete next.pending;delete next.proposal;delete next.generationDraft;delete next.resourceSnapshot;return changed(next);
+}
+export function setRouteMaterial(state,routeId,link,add,expectedRevision){
+  expectRevision(state,expectedRevision);idle(state);
+  if(state.step!=='editor'||state.routeDraft?.id!==routeId||!validMaterialLink(link)||!materialTargetExists(state.routeDraft,link)||typeof add!=='boolean')fail();
+  const existing=state.routeMaterials?.find(entry=>entry.routeId===routeId)?.links??[];
+  const index=existing.findIndex(item=>materialKey(item)===materialKey(link));
+  if(add?index>=0:index<0)return state;
+  if(add&&(link.origin!=='editor'||existing.length>=1024))fail('PLANNING_LIMIT');
+  const links=add?[...existing,clone(link)]:existing.filter((_,position)=>position!==index);
+  const next=clone(state);
+  next.routeMaterials=[...(next.routeMaterials??[]).filter(entry=>entry.routeId!==routeId),{routeId,links}];
+  return progressed(next);
 }
 export function applyEdit(state,result,requestId,baseRevision,now=new Date().toISOString()){
   pending(state,requestId,baseRevision,'edit');if(!keys(result,['reply','route'],['reply'])||!string(result.reply,8000)||!state.routeDraft||!date(now))fail('PLANNING_RESPONSE_INVALID');
@@ -525,7 +621,22 @@ export function recoverPlanning(state,now=new Date().toISOString()){
   delete next.pending;return ['edit','consistency'].includes(state.pending.kind)?progressed(next):changed(next);
 }
 export function focusQuestion(state,id,expectedRevision){expectRevision(state,expectedRevision);idle(state);if(!state.questions.some(question=>question.id===id)||state.step!=='intake')fail();const next=clone(state);next.currentQuestion=id;return changed(next)}
-export function setProvider(state,provider,expectedRevision){expectRevision(state,expectedRevision);idle(state);if(!(provider===null||providers.includes(provider)))fail();if(state.provider===provider)return state;const next=clone(state);next.provider=provider;delete next.agentOptions;return changed(next)}
+export function setProvider(state,provider,expectedRevision,rememberChoice=false){
+  expectRevision(state,expectedRevision);idle(state);
+  if(!(provider===null||providers.includes(provider)))fail();
+  const choice=provider??'manual';
+  if(state.provider===provider&&(!rememberChoice||state.agentChoice===choice))return state;
+  const next=clone(state);
+  if(rememberChoice)next.agentChoice=choice;
+  if(next.provider!==provider){
+    for(const message of next.messages){
+      if(message.role==='assistant'&&message.provider===undefined)message.provider=state.provider;
+    }
+    next.provider=provider;
+    delete next.agentOptions;
+  }
+  return progressed(next);
+}
 export function openEditor(state,expectedRevision){expectRevision(state,expectedRevision);idle(state);const next=clone(state);next.step='editor';if(!next.routeDraft)next.routeDraft=emptyRoute(next.projectId,next.locale);return changed(next)}
 export function resetEditor(state,expectedRevision){expectRevision(state,expectedRevision);idle(state);const next=clone(state);rememberRoute(next);next.routeDraft=emptyRoute(next.projectId,next.locale);next.routeDraft.revision=(state.routeDraft?.revision??0)+1;next.step='editor';delete next.importedOriginal;delete next.proposal;return changed(next)}
 export function saveEditor(state,route,expectedRevision){

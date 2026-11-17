@@ -73,7 +73,7 @@ test('persisted review UI preserves facts and exposes explicit update or reanswe
  assert.match(html,/Answer review/);assert.match(html,/Question 2/);
  assert.match(html,/Confirm update/);assert.match(html,/Answer again/);assert.match(html,/Start over/);
  assert.doesNotMatch(html,/Use suggestion|>Later<|View earlier replies/);
- assert.match(html,/planning-composer/);
+ assert.match(html,/<textarea[^>]*disabled=""/);
  assert.match(html,/Real prior image classification experience/);assert.match(html,/Five hours each week/);
  assert.match(generateButton(html),/disabled=""/);
  const zh=surface({...state,locale:'zh-CN'},'zh-CN');assert.match(zh,/待复核/);assert.match(zh,/回答需要确认/);assert.match(zh,/确认调整/);assert.match(zh,/重新采集/);assert.match(zh,/重新回答/);assert.doesNotMatch(zh,/采用建议|稍后处理/);

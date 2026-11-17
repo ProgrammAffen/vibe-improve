@@ -209,27 +209,53 @@ final class PlanningStore {
             return next
         }
     }
-    func appendUser(projectID:String,text:String,messageID:String,requestID:String,expectedRevision:Int,target:[String:Any]?=nil,mentions:[[String:Any]]?=nil)throws->[String:Any]{var args:[Any]=[text,messageID,requestID,expectedRevision];if let mentions{args += [ISO8601DateFormatter().string(from:Date()),target.map{$0 as Any} ?? NSNull(),mentions]}else if let target{args += [ISO8601DateFormatter().string(from:Date()),target]};return try mutate(projectID,"appendUser",args)}
+    func appendUser(projectID:String,text:String,messageID:String,requestID:String,expectedRevision:Int,target:[String:Any]?=nil,
+                    mentions:[[String:Any]]?=nil,attachments:[[String:String]]?=nil)throws->[String:Any]{
+        var args:[Any]=[text,messageID,requestID,expectedRevision]
+        if let attachments {
+            args += [ISO8601DateFormatter().string(from:Date()),target.map{$0 as Any} ?? NSNull(),mentions.map{$0 as Any} ?? NSNull(),attachments]
+        } else if let mentions {
+            args += [ISO8601DateFormatter().string(from:Date()),target.map{$0 as Any} ?? NSNull(),mentions]
+        } else if let target {
+            args += [ISO8601DateFormatter().string(from:Date()),target]
+        }
+        return try mutate(projectID,"appendUser",args)
+    }
     func beginInterviewPrefill(projectID:String,requestID:String,expectedRevision:Int)throws->[String:Any]{try mutate(projectID,"beginInterviewPrefill",[requestID,expectedRevision])}
     func applyInterview(projectID:String,result:[String:Any],requestID:String,baseRevision:Int)throws->[String:Any]{try mutate(projectID,"applyInterview",[result,requestID,baseRevision])}
     func beginConsistencyCheck(projectID:String,requestID:String,expectedRevision:Int)throws->[String:Any]{try mutate(projectID,"beginConsistencyCheck",[requestID,expectedRevision])}
     func applyConsistencyCheck(projectID:String,result:[String:Any],requestID:String,baseRevision:Int)throws->[String:Any]{try mutate(projectID,"applyConsistencyCheck",[result,requestID,baseRevision])}
     func acceptConsistencySuggestion(projectID:String,issueID:String,expectedRevision:Int)throws->[String:Any]{try mutate(projectID,"acceptConsistencySuggestion",[issueID,expectedRevision])}
     func planningFacts(projectID:String)throws->[String:Any]{try synchronized(projectID){guard let state=try initialized(projectID) else{throw PlanningError.invalid};return try call("planningFacts",[state])}}
-    func startGeneration(projectID:String,requestID:String,expectedRevision:Int,replaceExisting:Bool=false,generationMode:String="new")throws->[String:Any]{try mutate(projectID,"startGeneration",[requestID,expectedRevision,replaceExisting,generationMode])}
+    func startGeneration(projectID:String,requestID:String,expectedRevision:Int,replaceExisting:Bool=false,generationMode:String="new",snapshot:[String:Any]?=nil)throws->[String:Any]{try mutate(projectID,"startGeneration",[requestID,expectedRevision,replaceExisting,generationMode,snapshot.map{$0 as Any} ?? NSNull()])}
     func saveGenerationProgress(projectID:String,progress:[String:Any],requestID:String,baseRevision:Int)throws->[String:Any]{try mutate(projectID,"saveGenerationProgress",[progress,requestID,baseRevision])}
+    func saveGenerationRevision(projectID:String,patch:[String:Any]?,requestID:String,baseRevision:Int)throws->[String:Any]{
+        try mutate(projectID,"saveGenerationRevision",[patch.map{$0 as Any} ?? NSNull(),requestID,baseRevision])
+    }
     func acceptAnswer(projectID:String,questionID:String,messageID:String,expectedRevision:Int)throws->[String:Any]{try mutate(projectID,"acceptAnswer",[questionID,messageID,expectedRevision])}
     func reanswer(projectID:String,questionID:String,expectedRevision:Int)throws->[String:Any]{try mutate(projectID,"restartIntakeFrom",[questionID,expectedRevision])}
     func restartIntake(projectID:String,expectedRevision:Int)throws->[String:Any]{try mutate(projectID,"restartIntake",[expectedRevision])}
     func cancelAnswerDraft(projectID:String,questionID:String,expectedRevision:Int)throws->[String:Any]{try mutate(projectID,"cancelAnswerDraft",[questionID,expectedRevision])}
     func setResources(projectID:String,text:String,expectedRevision:Int)throws->[String:Any]{try mutate(projectID,"setResources",[text,expectedRevision])}
-    func applyGenerated(projectID:String,route:[String:Any],requestID:String,baseRevision:Int,revisedLessons:[String]=[],renamedLessons:[String]=[])throws->[String:Any]{try mutate(projectID,"applyGenerated",[route,requestID,baseRevision,revisedLessons,renamedLessons])}
+    func applyGenerated(projectID:String,route:[String:Any],requestID:String,baseRevision:Int,revisedLessons:[String]=[],renamedLessons:[String]=[],materialLinks:[[String:String]] = [])throws->[String:Any]{try mutate(projectID,"applyGenerated",[route,requestID,baseRevision,revisedLessons,renamedLessons,materialLinks])}
+    func setRouteMaterial(projectID: String, routeID: String, link: [String: String], add: Bool, expectedRevision: Int) throws -> [String: Any] {
+        try mutate(projectID, "setRouteMaterial", [routeID, link, add, expectedRevision], beforeCommit: {
+            guard let state = try self.raw(projectID), let route = state["routeDraft"] as? [String: Any],
+                  let chapters = route["chapters"] as? [[String: Any]], let target = link["targetId"] else { throw PlanningError.conflict }
+            let location = try self.learningLocation(projectID, routeID)
+            let studied = try self.readProgress(location.directory, location.name, routeID: routeID).studiedNodeIds
+            let affected = link["kind"] == "lesson" ? [target] : (chapters.first(where: { $0["id"] as? String == target })?["nodes"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }
+            if affected.contains(where: studied.contains) { throw PlanningError.studiedLessonLocked }
+        })
+    }
     func applyEdit(projectID:String,result:[String:Any],requestID:String,baseRevision:Int)throws->[String:Any]{try mutate(projectID,"applyEdit",[result,requestID,baseRevision])}
     func agentRouteDiagnostics(projectID:String,route:Any)throws->[String:Any]{try synchronized(projectID){guard let state=try initialized(projectID) else{throw PlanningError.invalid};return try call("agentRouteDiagnostics",[state,route])}}
     func agentInterviewDiagnostics(projectID:String,result:[String:Any])throws->[String:Any]{try synchronized(projectID){guard let state=try initialized(projectID) else{throw PlanningError.invalid};return try call("agentInterviewDiagnostics",[state,result])}}
     func cancel(projectID:String,requestID:String,expectedRevision:Int)throws->[String:Any]{try mutate(projectID,"cancelPlanningRequest",[requestID,expectedRevision])}
     func focus(projectID:String,questionID:String,expectedRevision:Int)throws->[String:Any]{try mutate(projectID,"focusQuestion",[questionID,expectedRevision])}
-    func setProvider(projectID:String,provider:String?,expectedRevision:Int)throws->[String:Any]{try mutate(projectID,"setProvider",[provider.map{$0 as Any} ?? NSNull(),expectedRevision])}
+    func setProvider(projectID:String,provider:String?,expectedRevision:Int,rememberChoice:Bool=false)throws->[String:Any]{
+        try mutate(projectID,"setProvider",[provider.map{$0 as Any} ?? NSNull(),expectedRevision,rememberChoice])
+    }
     func setAgentOptions(projectID:String,options:[String:Any],expectedRevision:Int)throws->[String:Any]{try mutate(projectID,"setAgentOptions",[options,expectedRevision])}
     func reopenIntake(projectID:String,expectedRevision:Int)throws->[String:Any]{try mutate(projectID,"reopenIntake",[expectedRevision])}
     func reconcileMissingImport(projectID: String, expectedRevision: Int) throws {

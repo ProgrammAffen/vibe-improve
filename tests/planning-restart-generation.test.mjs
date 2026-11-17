@@ -68,7 +68,7 @@ test('independent generation output retains every task, full chapter content, re
  const full='A complete long lesson\n'+'Practice and feedback.\n'.repeat(600);
  entries=mergeGenerationOutput(entries,{id:'route',intent:'generate',generationOutput:[segment(1,'Outline begins with two stages.','reply','complete','outline'),segment(2,'First detailed lesson','content'),segment(3,'Interrupted attempt','reply','incomplete'),segment(4,full,'content')]});
  assert.equal(entries.length,5);assert.ok(entries.at(-1).text.length>8000);assert.equal(entries[0].text,'All answers are consistent.');assert.equal(entries[3].state,'incomplete');
- const html=renderToStaticMarkup(createElement(PlanningGenerationLog,{entries,language:'en',running:false}));assert.match(html,/Outline begins with two stages/);assert.match(html,/First detailed lesson/);assert.match(html,/Interrupted attempt/);assert.equal((html.match(/Practice and feedback\./g)??[]).length,600);
+ const html=renderToStaticMarkup(createElement(PlanningGenerationLog,{entries,language:'en'}));assert.match(html,/Outline begins with two stages/);assert.match(html,/First detailed lesson/);assert.match(html,/Interrupted attempt/);assert.equal((html.match(/Practice and feedback\./g)??[]).length,600);
  const unchanged=mergeGenerationOutput(entries,{id:'route',intent:'generate',generationOutput:[segment(2,'First','content','streaming')]});assert.deepEqual(unchanged,entries);
  assert.doesNotMatch(html,/Planning conversation|输入回答|textarea/);
 });
@@ -84,21 +84,24 @@ test('generation log displays the review, targeted revision and recheck in both 
  assert.deepEqual(parseGenerationOutput(output),output);
  const entries=mergeGenerationOutput([],{id:'route',intent:'generate',generationOutput:output});
  for(const [language,review,revision,receiving] of [['en','Content review','Lesson revision','Receiving'],['zh-CN','内容复核','章节修正','接收中']]){
-  const html=renderToStaticMarkup(createElement(PlanningGenerationLog,{entries,language,running:true}));
-  assert.equal((html.match(new RegExp(review,'g'))??[]).length,2);assert.match(html,new RegExp(revision));assert.match(html,new RegExp(receiving));
+  const html=renderToStaticMarkup(createElement(PlanningGenerationLog,{entries,language}));
+  assert.equal((html.match(new RegExp(review,'g'))??[]).length,2);assert.match(html,new RegExp(revision));
+  const streaming=html.match(/data-state="streaming"><header>(.*?)<\/header>/)?.[1]??'';
+  assert.match(streaming,new RegExp(receiving));assert.match(streaming,/<svg\b[^>]*\bplanning-activity-spinner\b/);
+  assert.equal((html.match(/planning-activity-spinner/g)??[]).length,1);
   assert.ok(html.indexOf('Initial review')<html.indexOf('Revised lesson')&&html.indexOf('Revised lesson')<html.indexOf('Final review'));
  }
 });
 
 const qualityReason='practice_sequence',qualitySummary={text:'模拟练习先安排下单，再要求记录下单前的余额，导致初始余额无法核对。',locale:'zh-CN'};
 test('bridge accepts a concise learner summary only on failed route review',async()=>{
- const response={id:'route',projectId:project,intent:'generate',state:'failed',errorCode:'PLANNING_AGENT_QUALITY_REVIEW',qualityReason,qualitySummary,restartGeneration:true};
+ const response={id:'route',projectId:project,intent:'generate',state:'failed',errorCode:'PLANNING_AGENT_QUALITY_REVIEW',qualityReason,qualitySummary};
  let job=response;globalThis.window={vibeNative:{projects:{request:async()=>job}}};
  try{
   const failed=await planningService.job(project,'route');
-  assert.equal(failed.qualityReason,qualityReason);assert.deepEqual(failed.qualitySummary,qualitySummary);assert.equal(failed.restartGeneration,true);
+  assert.equal(failed.qualityReason,qualityReason);assert.deepEqual(failed.qualitySummary,qualitySummary);
   assert.match(planningMessage(planningFailure(failed),'zh-CN'),/本次未保存新路线/);
-  for(const invalid of [{intent:'edit'},{state:'pending'},{errorCode:'PLANNING_AGENT_NETWORK'},{userReply:'Unstructured review reply'},{qualityReason:'unknown'},{qualityReason:undefined},{restartGeneration:false},{qualitySummary:{...qualitySummary,text:'L6 uses position_before'}},{qualitySummary:{...qualitySummary,text:'x'.repeat(161)}},{qualitySummary:{...qualitySummary,text:'two\nlines'}},{qualitySummary:{...qualitySummary,locale:'fr'}}]){
+  for(const invalid of [{intent:'edit'},{state:'pending'},{errorCode:'PLANNING_AGENT_NETWORK'},{userReply:'Unstructured review reply'},{qualityReason:'unknown'},{qualityReason:undefined},{qualitySummary:{...qualitySummary,text:'L6 uses position_before'}},{qualitySummary:{...qualitySummary,text:'x'.repeat(161)}},{qualitySummary:{...qualitySummary,text:'two\nlines'}},{qualitySummary:{...qualitySummary,locale:'fr'}}]){
    job={...response,...invalid};await assert.rejects(planningService.job(project,'route'),/PLANNING_RESPONSE_INVALID/);
   }
   job={...response,qualitySummary:undefined};assert.equal((await planningService.job(project,'route')).qualityReason,qualityReason);
@@ -108,11 +111,11 @@ test('bridge accepts a concise learner summary only on failed route review',asyn
 test('generation terminal views show only the learner-facing reason while running still shows progress',()=>{
  const entries=mergeGenerationOutput([],{id:'route',intent:'generate',generationOutput:[segment(1,'Private intermediate chapter text')]}),savedProgress={completed:2,total:2,resumable:true};
  const render=(language,props)=>renderToStaticMarkup(createElement(PlanningGenerationDialog,{entries,language,running:false,error:'Connection interrupted',reviewNeeded:false,savedProgress,onResume:()=>{},onRestart:()=>{},...props}));
- for(const [language,heading,restart,resume,reason] of [['en','No new route generated','Regenerate route','Resume generation','Some practice steps are out of order'],['zh-CN','未生成新路线','重新生成','继续生成',qualitySummary.text]]){
-  const blocked=render(language,{qualityReason,qualitySummary,restartGeneration:true}),interrupted=render(language,{}),stopped=render(language,{error:''}),active=render(language,{running:true,error:''});
+ for(const [language,heading,restart,resume,reason,revised] of [['en','Route revision paused','>Generate route<','>Resume generation<','Some practice steps are out of order','1 revised lesson saved'],['zh-CN','路线修订已暂停','>生成路线<','>继续生成路线<',qualitySummary.text,'已保存 1 节修订']]){
+  const blocked=render(language,{qualityReason,qualitySummary,savedProgress:{...savedProgress,revised:1}}),interrupted=render(language,{}),stopped=render(language,{error:''}),active=render(language,{running:true,error:''});
   const unfinished=render(language,{qualityReason:'learning_language'}),notStarted=render(language,{qualityReason:'learning_language',savedProgress:undefined});
-  for(const value of [heading,reason,restart])assert.ok(blocked.includes(value),value);
-  assert.ok(!blocked.includes(resume)&&!blocked.includes('Connection interrupted'));
+  for(const value of [heading,reason,resume,revised])assert.ok(blocked.includes(value),value);
+  assert.ok(!blocked.includes(restart)&&!blocked.includes('Connection interrupted'));
   assert.doesNotMatch(blocked,/2 \/ 2/);assert.match(interrupted,/2 \/ 2/);
   assert.ok(interrupted.includes(resume)&&interrupted.includes('Connection interrupted')&&!interrupted.includes(restart));
   assert.ok(unfinished.includes(resume)&&!unfinished.includes(restart)&&notStarted.includes(restart));

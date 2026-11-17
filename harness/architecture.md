@@ -10,7 +10,7 @@ macOS 壳始终从安装包加载界面、视频、字体与其他静态资源�
 
 学习功能采用 TypeScript 领域层、Node 本地运行时与 SQLite 私有存储；新增本地业务 API 前落实本文件的 Origin、会话凭据与文件访问约束。
 
-当前规划执行由`PlanningAgent.swift`承载Codex app-server与Claude Code / CodeBuddy stream-json文本协议；三者共用[版本化内置提示词包](../packages/planning-prompts/README.md)，共享核心、教学标准与按任务拼装的访谈、总纲、课批次、审阅、纠错和编辑规则，不按模型添加专用教学提示。`PlanningPromptPack.swift`通过生成的`PlanningPromptPackResources.swift`读取同一任务契约，构建有界上下文并将任务局部U/A/B/L引用映射到持久ID。生成统一先总纲、每批至多3课、最多2章并行，最后校验真实完整依赖图再一次应用；协议、模型参数和认证差异留在传输边界。每次CLI在用户选定项目目录启动，不复用其他工具的私有会话。`PlanningCoordinator.swift`校验可信工具选择、预期修订和固定操作，完整协议成功后才向领域层提交。文本通道关闭工具并拒绝权限请求，前端不传任意提示词；不将对话输出当作学习进度。其他工具未经真实能力验证不启用规划，统一规则不代表所有模型均已通过真实验收。
+当前规划执行由`PlanningAgent.swift`承载Codex app-server 与 Claude Code / CodeBuddy stream-json 对话协议；三者共用[版本化内置提示词包](../packages/planning-prompts/README.md)，共享核心、教学标准与按任务拼装的访谈、总纲、课批次、审阅、纠错和编辑规则，不按模型添加专用教学提示。`PlanningPromptPack.swift`通过生成的`PlanningPromptPackResources.swift`读取同一任务契约，构建有界上下文并将任务局部U/A/B/L引用映射到持久ID。生成统一先总纲、每批至多3课、最多2章并行，最后校验真实完整依赖图再一次应用；协议、模型参数和认证差异留在传输边界。每次CLI在用户选定项目目录启动，不复用其他工具的私有会话。`PlanningCoordinator.swift`校验可信工具选择、预期修订和固定操作，完整协议成功后才向领域层提交。文本通道关闭工具并拒绝权限请求，前端不传任意提示词；不将对话输出当作学习进度。其他工具未经真实能力验证不启用规划，统一规则不代表所有模型均已通过真实验收。
 
 地图先使用 DOM/SVG 节点与分层美术资产；按实际场景引入 Canvas / WebGL 与模型渲染。交互语义和学习状态不放在渲染引擎中。
 

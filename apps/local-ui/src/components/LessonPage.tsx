@@ -4,12 +4,15 @@ import type {RouteChapter, RouteNode} from '../../../../packages/domain/route-va
 import {translate, type Language} from '../i18n';
 import BackHomeButton from './BackHomeButton';
 import GameButton from './GameButton';
+import {LessonBackpack} from './ResourceAttachments';
 import './lesson-page.css';
 
 type Props = {
   chapter: RouteChapter;
   node: RouteNode;
   language: Language;
+  projectId?: string;
+  routeId?: string;
   completed: boolean;
   busy: boolean;
   error: string;
@@ -18,7 +21,7 @@ type Props = {
   onHome: () => void;
 };
 
-export default function LessonPage({chapter, node, language, completed, busy, error, onComplete, onMap, onHome}: Props) {
+export default function LessonPage({chapter, node, language, projectId, routeId, completed, busy, error, onComplete, onMap, onHome}: Props) {
   const t = (zh: string, en: string) => translate(language, zh, en);
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), [node.id]);
@@ -38,6 +41,7 @@ export default function LessonPage({chapter, node, language, completed, busy, er
         <h2>{t('学习目标', 'Learning goals')}</h2>
         <ul>{node.objectives.map(objective => <li key={objective.id}>{objective.description}</li>)}</ul>
       </section>
+      {projectId && routeId && <LessonBackpack projectId={projectId} scope={{routeId, nodeId: node.id}} chapterId={chapter.id} language={language}/>}
       {!!node.activities?.length && <section>
         <h2>{t('学习活动', 'Learning activities')}</h2>
         <ol>{node.activities.map((activity, index) => <li key={index}>{activity}</li>)}</ol>

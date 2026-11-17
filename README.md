@@ -24,6 +24,8 @@ node scripts/package-mac.mjs --arm64
 
 输出文件为 `output/Vibe Improve.app`，可直接打开。同名旧版在构建和签名验证通过后覆盖。`--intel` 构建 Intel 版本。当前签名为 ad hoc，未公证。桌面加载安装包内的界面、动态视频与字体。CloudBase 用于账号和授权后台。偏好、设备身份、项目、智能体配置、内部日志及加密会话保存在 `~/Library/Application Support/Vibe Improve/`。设备身份由 macOS 硬件标识派生。旧版登录封装升级和迁移到另一台机器时需重新登录。运行数据迁移与会话续期见 [架构](harness/architecture.md) 和 [授权](harness/license.md)。
 
+首次打包需联网获取固定版本的 Whisper 运行库、权重及构建工具，下载保存在 `tmp/build/whisper-cache/` 并校验 SHA-256。App 自带多语言权重及 MIT 许可，可离线转写。权重约 181 MiB。[本机转写方案](research/local-transcription/2026-11-16.md)
+
 ## 项目草稿
 
 运行数据目录与系统例外见[存储分层](harness/architecture.md#存储分层)。登录采用7天本地检查窗口并自动续期；授权过期、撤销或证书校验失败停用授权功能，保留有效账号登录。更新应用不会清空运行目录。

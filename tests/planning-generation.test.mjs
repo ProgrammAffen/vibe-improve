@@ -200,7 +200,7 @@ let explainedField=mutatedNodes(payload(0,0..<1)){nodes in nodes[0]["activities"
 let practiceChapter=try PlanningGeneration.chapter(explainedField,plan:plan,index:0,range:0..<1)
 let approved=envelope(["ready":true,"issues":[] as [[String:Any]]])
 let localReview=try PlanningGeneration.review(approved,plan:plan,chapters:[objectiveChapter,["nodes":[] as [[String:Any]]]])
-check(localReview.reason=="learning_language" && localReview.repairTargets?.first?.range==0..<1,"a passed model review missed a code identifier in a learning goal")
+check(localReview.reason=="learning_language" && localReview.targets(in:plan).first?.range==0..<1,"a passed model review missed a code identifier in a learning goal")
 check(try PlanningGeneration.review(approved,plan:plan,chapters:[practiceChapter,["nodes":[] as [[String:Any]]]]).reason==nil,"an identifier used only in an exercise triggered a blocker")
 let qualitative=mutatedNodes(payload(0,3..<4)){nodes in nodes[0]["assessment"]=["task":"Explain gradient correction","passCriteria":["Identify the cause and justify the correction"],"mode":"qualitative","evaluatorPrompt":"Inspect the attempted gradient and correction. Require the cause and corrected operation; request missing evidence."]}
 let batch2=try PlanningGeneration.chapter(qualitative,plan:plan,index:0,range:3..<4)

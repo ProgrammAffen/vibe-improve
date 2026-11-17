@@ -157,6 +157,8 @@ for provider in ["codex","claude-code","codebuddy"] {
   check(calls.first?["stage"] as? String=="outline" && calls.allSatisfy{$0["cwd"] as? String==directory.path},"task order or project cwd changed")
   if ["success","repair-once"].contains(mode) {
    check(result["state"] as? String=="completed" && applies==1 && finalValidations==1,"unified success did not validate and apply once: "+provider+" "+mode+" "+String(describing:result))
+   let progress=result["diagnostic"] as? [String:Any]
+   check(result["generationPhase"] as? String=="complete" && progress?["completedLessons"] as? Int==5 && progress?["lessonCount"] as? Int==5,"completed phase or saved lesson count missing")
    let output=result["generationOutput"] as? [[String:Any]] ?? [],content=output.filter{$0["form"] as? String=="content"}
    check(output.count==(mode=="success" ? 9:10) && Set(output.compactMap{$0["sequence"] as? Int}).count==output.count,"generation segments were replaced or lost")
    check(content.count==4 && content.allSatisfy{$0["state"] as? String=="complete"},"validated outline or lesson content missing")
@@ -177,6 +179,8 @@ for provider in ["codex","claude-code","codebuddy"] {
    }
   }else{
    check(applies==0 && saved==nil && finalValidations==0,"partial, cancelled or invalid route applied")
+   check(result["generationPhase"] as? String != "complete","failed or interrupted generation displayed as saved")
+   if mode=="cancel"{check(result["generationPhase"] as? String=="lessons","cancel lost the last active stage")}
    let expected=mode=="unknown-reference" ? "PLANNING_AGENT_RESULT_REJECTED":["cancel","aborted_streaming"].contains(mode) ? "PLANNING_AGENT_CANCELLED":mode=="network" ? "PLANNING_AGENT_NETWORK":mode=="needs_input" ? "PLANNING_NEEDS_INPUT":mode=="cannot_complete" ? "PLANNING_CANNOT_COMPLETE":"PLANNING_AGENT_PERMISSION_REQUIRED"
    check(result["errorCode"] as? String==expected,"provider error outcome diverged: "+provider+" "+mode+" "+String(describing:result))
    check(repairs.count==(mode=="unknown-reference" ? 1:0),"nonformat fault retried or bad reference was not bounded")

@@ -656,6 +656,19 @@
           },
           "minItems": 1,
           "maxItems": 3
+        },
+        "materials": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["lessonRef", "excerptRef"],
+            "properties": {
+              "lessonRef": {"type": "string", "pattern": "^L[1-9][0-9]{0,2}$"},
+              "excerptRef": {"type": "string", "pattern": "^R[1-9][0-9]?_s[1-9][0-9]{0,4}$"}
+            }
+          }
         }
       },
       "required": [
@@ -732,6 +745,19 @@
           },
           "minItems": 0,
           "maxItems": 24
+        },
+        "materials": {
+          "type": "array",
+          "maxItems": 40,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["targetRef", "excerptRef"],
+            "properties": {
+              "targetRef": {"type": "string", "pattern": "^[CL][1-9][0-9]{0,2}$"},
+              "excerptRef": {"type": "string", "pattern": "^R[1-9][0-9]?_s[1-9][0-9]{0,4}$"}
+            }
+          }
         }
       },
       "required": [
