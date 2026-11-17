@@ -31,12 +31,15 @@ def answer(text):
  else:system=text.split('CONTEXT_JSON_DATA:',1)[0]
  context=json.loads(text.split('CONTEXT_JSON_DATA:',1)[1]);lessons=context.get('requestedLessons')
  assert 'generation' not in context and 'routeDraft' not in context and 'messages' not in context
- stage='lessons' if lessons is not None else 'outline'
+ stage='review' if 'TASK: review' in system else 'lessons' if lessons is not None else 'outline'
  previous=[json.loads(line) for line in open('requests.ndjson')] if os.path.exists('requests.ndjson') else []
  refs=[lesson['ref'] for lesson in lessons] if lessons is not None else []
  current={'stage':stage,'refs':refs,'repair':'repair' in context,'cwd':os.getcwd(),'systemHash':hashlib.sha256(system.strip().encode()).hexdigest()}
  record(current)
- if lessons is not None:
+ if stage=='review':
+  assert 'node_' not in json.dumps(context) and 'route_' not in json.dumps(context)
+  result={'ready':True,'issues':[]};reply='The complete route is ready.'
+ elif lessons is not None:
   assert 1<=len(lessons)<=3 and all(set(lesson)=={'ref','title','focus'} for lesson in lessons)
   assert 'node_' not in json.dumps(context) and 'route_' not in json.dumps(context)
   if mode=='cancel':time.sleep(5)
@@ -53,7 +56,9 @@ def answer(text):
   result={'title':'Synthetic tutorial','chapters':[{'title':'Foundations','stageGoal':'Explain and apply four related concepts.','lessons':[{'title':'Concept '+str(index),'focus':'Explain and practice this named concept.'} for index in range(1,5)]},{'title':'Transfer','stageGoal':'Apply the method to a new case.','lessons':[{'title':'Fresh case','focus':'Apply earlier concepts to a new case.'}]}]};reply='The fixed outline is ready.'
   if mode in ['needs_input','cannot_complete']:
    return json.dumps({'status':mode,'reply':'What specific outcome would you like to achieve?','result':None,'missing':['Confirmed learning outcome'] if mode=='needs_input' else []}),None
- payload=json.dumps({'status':'ok','reply':reply,'result':result,'missing':[]})
+ envelope={'status':'ok','reply':reply,'result':result}
+ if mode not in ['success','aborted_streaming']:envelope['missing']=[]
+ payload=json.dumps(envelope)
  if mode=='repair-once' and refs and refs[0]=='L1' and not any(item['refs']==refs for item in previous):payload=payload[:-1]
  return payload,None
 for line in sys.stdin:
@@ -94,14 +99,45 @@ func check(_ value:Bool,_ message:String){if !value{fputs(message+"\\n",stderr);
 let base=URL(fileURLWithPath:CommandLine.arguments[1]),fixture=CommandLine.arguments[2],validator=try String(contentsOfFile:CommandLine.arguments[3],encoding:.utf8)
 let project="proj_12345678-1234-4234-8234-123456789abc"
 func records(_ directory:URL)->[[String:Any]]{guard let text=try? String(contentsOf:directory.appendingPathComponent("requests.ndjson"),encoding:.utf8) else{return []};return text.split(separator:"\\n").compactMap{try? JSONSerialization.jsonObject(with:Data($0.utf8)) as? [String:Any]}}
-var sharedOutline:String?,sharedLessons:String?
+let omitted:[String:Any]=["status":"ok","reply":"Route checked.","result":["ready":true,"issues":[]]]
+func equivalent(_ left:[String:Any],_ right:[String:Any])->Bool{NSDictionary(dictionary:left).isEqual(to:right)}
+func rejectsStrictly(_ envelope:[String:Any],_ task:String)->Bool{
+ do{_ = try PlanningPromptPack.unwrap(envelope,task:task);return false}catch PlanningPromptPackError.invalid{return true}catch{return false}
+}
+for kind in ["outline","lessons","review","revision"]{
+ var expected=omitted;expected["missing"]=[] as [String]
+ check(equivalent(PlanningAgentManager.generationEnvelope(omitted,kind:kind),expected),"did not default exact successful generation envelope: \\(kind)")
+}
+for kind in ["edit","interview","consistency"]{
+ check(equivalent(PlanningAgentManager.generationEnvelope(omitted,kind:kind),omitted),"defaulting escaped generation: \\(kind)")
+}
+let malformedEnvelopes:[[String:Any]]=[
+ ["status":"ok","reply":"Route checked."],
+ omitted.merging(["result":NSNull()]){_,new in new},
+ omitted.merging(["result":[] as [String]]){_,new in new},
+ omitted.merging(["extra":true]){_,new in new},
+ omitted.merging(["missing":NSNull()]){_,new in new},
+ omitted.merging(["missing":""]){_,new in new},
+ omitted.merging(["missing":["Required fact"]]){_,new in new},
+ ["status":"needs_input","reply":"What outcome do you want?","result":NSNull()],
+ ["status":"cannot_complete","reply":"Scope unavailable.","result":NSNull()]
+]
+for (index,altered) in malformedEnvelopes.enumerated(){
+ let result=PlanningAgentManager.generationEnvelope(altered,kind:"review")
+ check(equivalent(result,altered) && rejectsStrictly(result,"review"),"defaulting repaired malformed envelope \\(index)")
+}
+let invalidContentFields:[[String:Any]]=[["result":["ready":false]],["reply":42]]
+for invalidFields in invalidContentFields{
+ let invalidContent=omitted.merging(invalidFields){_,new in new}
+ check(rejectsStrictly(PlanningAgentManager.generationEnvelope(invalidContent,kind:"review"),"review"),"defaulting bypassed strict task validation")
+}
+var sharedOutline:String?,sharedLessons:String?,sharedReview:String?
 for provider in ["codex","claude-code","codebuddy"] {
- check(PlanningAgentManager.requestTimeout(provider:provider,intent:"generate")==1800 && PlanningAgentManager.requestTimeout(provider:provider,intent:"edit")==600 && PlanningAgentManager.requestTimeout(provider:provider,intent:"interview")==180,"provider changed task budgets")
  for mode in ["success","repair-once","unknown-reference","cancel","network","permission","needs_input","cannot_complete","aborted_streaming"] {
   let directory=base.appendingPathComponent(provider+"-"+mode);try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
   let runtime=try RuntimeDirectory(url:directory.appendingPathComponent("runtime")),agents=try AgentManager(runtime:runtime,projectWorkspace:{_ in directory})
   let launch=try AgentSessionLaunch(provider:provider,projectID:project,executable:URL(fileURLWithPath:"/usr/bin/python3"),arguments:[fixture,provider,mode]+(provider=="codex" ? []:["--tools",""]),workspace:directory,environment:ProcessInfo.processInfo.environment)
-  let manager=PlanningAgentManager(agents:agents,timeout:8,prepare:{_ in AgentSessionPreparation(projectID:project,provider:provider,launch:launch)})
+  let manager=PlanningAgentManager(agents:agents,idleTimeout:8,prepare:{_ in AgentSessionPreparation(projectID:project,provider:provider,launch:launch)})
   let context:[String:Any]=["projectId":project,"provider":provider,"locale":"en","questions":[],"messages":[],"agentOptions":["model":"synthetic-model","effort":"high"]]
   var applies=0,finalValidations=0,saved:[String:Any]?
   let validationLock=NSLock()
@@ -121,14 +157,16 @@ for provider in ["codex","claude-code","codebuddy"] {
   check(calls.first?["stage"] as? String=="outline" && calls.allSatisfy{$0["cwd"] as? String==directory.path},"task order or project cwd changed")
   if ["success","repair-once"].contains(mode) {
    check(result["state"] as? String=="completed" && applies==1 && finalValidations==1,"unified success did not validate and apply once: "+provider+" "+mode+" "+String(describing:result))
+   let progress=result["diagnostic"] as? [String:Any]
+   check(result["generationPhase"] as? String=="complete" && progress?["completedLessons"] as? Int==5 && progress?["lessonCount"] as? Int==5,"completed phase or saved lesson count missing")
    let output=result["generationOutput"] as? [[String:Any]] ?? [],content=output.filter{$0["form"] as? String=="content"}
-   check(output.count==(mode=="success" ? 8:9) && Set(output.compactMap{$0["sequence"] as? Int}).count==output.count,"generation segments were replaced or lost")
+   check(output.count==(mode=="success" ? 9:10) && Set(output.compactMap{$0["sequence"] as? Int}).count==output.count,"generation segments were replaced or lost")
    check(content.count==4 && content.allSatisfy{$0["state"] as? String=="complete"},"validated outline or lesson content missing")
    let allOutput=output.compactMap{$0["text"] as? String}.joined(separator:"\\n")
    check(allOutput.contains("The fixed outline is ready.") && allOutput.contains("Concept 1") && allOutput.contains("Fresh case") && allOutput.contains("Solve a new case"),"full generation output was not retained")
    if mode=="repair-once"{check(output.contains{$0["state"] as? String=="incomplete"},"failed partial reply disappeared during correction")}
 
-   check(calls.count==(mode=="success" ? 4:5) && repairs.count==(mode=="success" ? 0:1),"task count or bounded repair differs by provider")
+   check(calls.count==(mode=="success" ? 5:6) && repairs.count==(mode=="success" ? 0:1) && calls.last?["stage"] as? String=="review","task count or bounded repair differs by provider")
    let batches=calls.filter{$0["stage"] as? String=="lessons" && $0["repair"] as? Bool==false},coverage=batches.flatMap{$0["refs"] as! [String]}.sorted()
    check(coverage==["L1","L2","L3","L4","L5"] && batches.allSatisfy{($0["refs"] as! [String]).count<=3},"lesson coverage changed across providers")
    let route=saved!,chapters=route["chapters"] as! [[String:Any]],nodes=chapters.flatMap{$0["nodes"] as! [[String:Any]]}
@@ -136,11 +174,13 @@ for provider in ["codex","claude-code","codebuddy"] {
    check(nodes.map{$0["id"] as! String}==["node_1_1","node_1_2","node_1_3","node_1_4","node_2_1"],"task aliases leaked into persistent IDs")
    check((nodes[4]["prerequisites"] as! [String])==["node_1_4"],"cross chapter dependency was not translated")
    if mode=="success" {
-    let outline=calls[0]["systemHash"] as! String,lessons=batches[0]["systemHash"] as! String
-    if let sharedOutline,let sharedLessons{check(outline==sharedOutline && lessons==sharedLessons,"provider received different teaching rules")}else{sharedOutline=outline;sharedLessons=lessons}
+    let outline=calls[0]["systemHash"] as! String,lessons=batches[0]["systemHash"] as! String,review=calls.last!["systemHash"] as! String
+    if let sharedOutline,let sharedLessons,let sharedReview{check(outline==sharedOutline && lessons==sharedLessons && review==sharedReview,"provider received different teaching rules")}else{sharedOutline=outline;sharedLessons=lessons;sharedReview=review}
    }
   }else{
    check(applies==0 && saved==nil && finalValidations==0,"partial, cancelled or invalid route applied")
+   check(result["generationPhase"] as? String != "complete","failed or interrupted generation displayed as saved")
+   if mode=="cancel"{check(result["generationPhase"] as? String=="lessons","cancel lost the last active stage")}
    let expected=mode=="unknown-reference" ? "PLANNING_AGENT_RESULT_REJECTED":["cancel","aborted_streaming"].contains(mode) ? "PLANNING_AGENT_CANCELLED":mode=="network" ? "PLANNING_AGENT_NETWORK":mode=="needs_input" ? "PLANNING_NEEDS_INPUT":mode=="cannot_complete" ? "PLANNING_CANNOT_COMPLETE":"PLANNING_AGENT_PERMISSION_REQUIRED"
    check(result["errorCode"] as? String==expected,"provider error outcome diverged: "+provider+" "+mode+" "+String(describing:result))
    check(repairs.count==(mode=="unknown-reference" ? 1:0),"nonformat fault retried or bad reference was not bounded")

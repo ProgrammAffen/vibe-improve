@@ -1,0 +1,36 @@
+{
+  "name": "lessons-simulated-observations",
+  "task": "lessons",
+  "input": {
+    "locale": "zh-CN",
+    "currentChapter": {"title": "设备领用流程", "stageGoal": "用纸面记录判定领用进度与取消的影响。"},
+    "requestedLessons": [{"ref": "L2", "title": "核对取消的影响", "focus": "对照操作前后记录，独立解释取消是否影响已签收数量。"}],
+    "availablePrerequisites": [{"ref": "L1", "title": "区分申请与签收"}],
+    "qualityRevision": {
+      "requestedCandidate": [{"ref": "L2", "title": "核对取消的影响", "objectives": ["能用前后记录说明取消对签收的影响。"], "prerequisites": ["L1"], "estimatedMinutes": 20, "activities": ["申请十箱，已签收两箱。取消待领用的部分，读取回执并与签收表对照。"], "assessment": null}],
+      "blockingIssues": [{"code": "prerequisite", "targetRefs": ["L2"], "message": "纸面练习只给操作前的数字，无法读取取消回执和操作后的签收表。", "fixHint": "给同一申请的操作前记录、取消回执和操作后的签收明细。让学员独立比较。", "blocking": true}]
+    }
+  },
+  "response": {
+    "status": "ok",
+    "reply": "补齐了纸面练习需要核对的原始记录。",
+    "result": {"nodes": [{
+      "ref": "L2",
+      "objectives": ["能用前后记录说明取消对签收的影响。"],
+      "prerequisites": ["L1"],
+      "estimatedMinutes": 20,
+      "activities": [
+        "使用本节纸面材料。10:00 的申请记录为甲单申领十箱，签收明细为签收单一号、甲单、两箱。",
+        "读两份模拟系统观测。10:10 取消回执为甲单、取消待领用数量八箱。10:15 的签收表仅有一行，签收单一号、甲单、两箱。",
+        "按时间排列记录，分别标出取消数量和两次读取的签收数量，用原始记录解释取消对已签收物品的影响。"
+      ],
+      "assessment": {
+        "task": "提交时间线，并用甲单的原始记录判断取消是否改变已签收数量。",
+        "passCriteria": ["引用同一申请的取消回执和两次签收记录，分别说明待领用与已签收两部分的变化。"],
+        "mode": "qualitative",
+        "evaluatorPrompt": "取消了仍待领用的八箱。两张签收表都只有同一份两箱签收记录，取消没有撤回已签收物品。缺少任何一份前后证据时要求补充。"
+      }
+    }]},
+    "missing": []
+  }
+}

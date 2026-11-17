@@ -21,7 +21,7 @@ for line in sys.stdin:
  elif message.get('type')=='user':
   text=message['message']['content'][0]['text'];assert text.startswith('\nCONTEXT_JSON_DATA:\n')
   context=json.loads(text.split('\nCONTEXT_JSON_DATA:\n',1)[1]);repair=context.get('repair')
-  task='outline' if 'TASK: outline' in system else 'lessons'
+  task='outline' if 'TASK: outline' in system else 'review' if 'TASK: review' in system else 'lessons'
   assert 'TASK: '+task in system
   assert 'generation' not in context
   if repair:
@@ -46,6 +46,9 @@ for line in sys.stdin:
     assert 'MODE: repair' in system
    if mode=='oversized' and count==2:assert repair is None
    payload=malformed if bad else json.dumps(good)
+  elif task=='review':
+   assert not repair
+   payload=json.dumps({'status':'ok','reply':'Route checked','result':{'ready':True,'issues':[]},'missing':[]})
   else:
    target=context['requestedLessons'][0]
    assert target['ref']=='L1' and 'id' not in target
@@ -110,7 +113,7 @@ check(!String(describing:diagnosticError).contains("UNTRUSTED_CANDIDATE") && !St
 check(PlanningRepair.candidate(["text":String(repeating:"x",count:128*1024)])==nil)
 for mode in ["syntax","fields","domain","extra-brace","forever","failed-exit","network","permission","oversized","timeout","cancel"] {
  let launch=try AgentSessionLaunch(provider:"codebuddy",projectID:id,executable:URL(fileURLWithPath:"/usr/bin/python3"),arguments:[fixture,mode,"--tools",""],workspace:workspace,environment:ProcessInfo.processInfo.environment)
- let manager=PlanningAgentManager(agents:agents,timeout:mode=="timeout" ? 0.5:6,prepare:{_ in AgentSessionPreparation(projectID:id,provider:"codebuddy",launch:launch)})
+ let manager=PlanningAgentManager(agents:agents,idleTimeout:mode=="timeout" ? 0.5:6,prepare:{_ in AgentSessionPreparation(projectID:id,provider:"codebuddy",launch:launch)})
  var commits=0
  let initial=try manager.begin(projectID:id,intent:"generate",context:context,validateRoute:{route in
   let chapters=route["chapters"] as! [[String:Any]],node=(chapters[0]["nodes"] as! [[String:Any]])[0]
@@ -125,7 +128,7 @@ for mode in ["syntax","fields","domain","extra-brace","forever","failed-exit","n
   if final["state"] as? String != "pending"{break};Thread.sleep(forTimeInterval:0.01)
  }
  let attempts=Int(try String(contentsOf:workspace.appendingPathComponent(mode+"-count"),encoding:.utf8))!
- if ["syntax","fields","domain","extra-brace","oversized"].contains(mode){check(final["state"] as? String=="completed" && commits==1 && attempts==3,"bounded correction failed "+mode+" "+String(describing:final))}
+ if ["syntax","fields","domain","extra-brace","oversized"].contains(mode){check(final["state"] as? String=="completed" && commits==1 && attempts==4,"bounded correction failed "+mode+" "+String(describing:final))}
  else{check(commits==0,"failed repair committed "+mode);check(final["state"] as? String==(mode=="cancel" ? "cancelled":"failed"),"unexpected failure state "+mode);check(attempts==(mode=="forever" ? 2:1),"retry budget escaped "+mode)}
  manager.shutdown()
 }

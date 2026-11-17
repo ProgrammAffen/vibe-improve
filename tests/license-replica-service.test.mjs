@@ -93,6 +93,27 @@ test('activation atomically grants, binds a fixed slot and signs the entire seve
   assert.equal(f.repo.get(COLLECTIONS.codes, sha256(normalizeActivationCode(code))).firstDeviceId, deviceId(1));
 });
 
+test('different hardware hashes require distinct cloud bindings, obey capacity and cannot renew a copied lease', async () => {
+  const f=fixture({maxDevices:1});
+  const hardware=n=>'dev_hw_'+sha256('vibe-improve:hardware-device:v1\0macos:IOPlatformUUID\0'+n);
+  const a=hardware('12345678-1234-5678-abcd-1234567890ab'),b=hardware('87654321-4321-8765-dcba-ba0987654321');
+  const bound=await f.call({action:'activate',requestId:randomUUID(),activationCode:f.code(),deviceId:a,deviceName:'Synthetic Mac A',appVersion:'test'});
+  assert.equal(verifyCertificate(bound.certificate,signer.publicKeyPem).deviceId,a);
+  assert.equal((await f.call({action:'status',deviceId:a})).device.deviceId,a);
+  assert.equal((await f.call({action:'status',deviceId:b})).device,null);
+  await rejected(f.call({...f.renew(bound),deviceId:b}),'DEVICE_REVOKED');
+  await rejected(f.call({action:'bind',requestId:randomUUID(),deviceId:b,deviceName:'Synthetic Mac B',appVersion:'test'}),'DEVICE_LIMIT_REACHED');
+  let list=await f.call({action:'devices',currentDeviceId:b});
+  assert.equal(list.devices.length,1);assert.equal(list.devices[0].isCurrent,false);
+  await f.call({action:'revoke',requestId:randomUUID(),deviceId:a});
+  const next=await f.call({action:'bind',requestId:randomUUID(),deviceId:b,deviceName:'Synthetic Mac B',appVersion:'test'});
+  assert.notEqual(next.device.bindingId,bound.device.bindingId);
+  assert.equal(verifyCertificate(next.certificate,signer.publicKeyPem).deviceId,b);
+  list=await f.call({action:'devices',currentDeviceId:b});
+  assert.equal(list.devices.length,1);assert.equal(list.devices[0].isCurrent,true);assert.equal(list.maxDevices,1);
+  assert.equal(next.entitlement.expiresAt,bound.entitlement.expiresAt);
+});
+
 test('same signed activation code cannot be redeemed concurrently by two accounts', async () => {
   const f = fixture(), code = f.code();
   const results = await Promise.allSettled([f.activate(code, 1, 'owner-a'), f.activate(code, 2, 'owner-b')]);

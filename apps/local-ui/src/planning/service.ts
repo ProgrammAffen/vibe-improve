@@ -1,43 +1,85 @@
-import {restartIntake,setResources,resetEditor,acceptAnswer,acceptConsistencySuggestion,cancelAnswerDraft,restartIntakeFrom,reopenIntake,setAgentOptions,type GenerationMode,type AgentOptions,type PlanningTarget,type PlanningMention,removeImportedRoute,createPlanning,validatePlanning,focusQuestion,openEditor,saveEditor,confirmRoute,canGenerate,applyProposal,discardProposal,undoEditor,redoEditor,importRoute,type PlanningState,type QuestionId} from '../../../../packages/domain/planning.mjs';
+import {assertStudiedRouteUnchanged,restartIntake,setResources,resetEditor,acceptAnswer,acceptConsistencySuggestion,cancelAnswerDraft,restartIntakeFrom,reopenIntake,setAgentOptions,type GenerationMode,type ResourceSelection,type AgentOptions,type PlanningTarget,type PlanningMention,type PlanningAttachment,validPlanningAttachments,removeImportedRoute,createPlanning,validatePlanning,focusQuestion,openEditor,saveEditor,confirmRoute,canGenerate,applyProposal,discardProposal,undoEditor,redoEditor,importRoute,type PlanningState,type QuestionId} from '../../../../packages/domain/planning.mjs';
 import type {RouteDocument} from '../../../../packages/domain/route-validation.mjs';
 import type {Language} from '../i18n';
+import type {ProviderId} from '../agents/domain';
 import {routeService} from '../routes/service';
+import {browserProjectTransaction,browserRead,withProjectLock} from './browser-store';
+import type {LearningProgress} from '../routes/learning-record';
 
 export type PlanningIntent='interview'|'generate'|'edit'|'consistency';
 export type PlanningActivity={durationMs:number;lastActivityMs:number;thinkingCharacters:number;outputCharacters:number;events:{sequence:number;stage:string;atMs:number;thinkingCharacters:number;outputCharacters:number}[]};
 export function parsePlanningActivity(value:unknown):PlanningActivity|undefined{
  if(value===undefined)return undefined;
- const fail=()=>{throw new Error('PLANNING_RESPONSE_INVALID')},object=(v:unknown,keys:string[])=>v!==null&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&Object.keys(v).every(k=>keys.includes(k)),number=(v:unknown,max=86_400_000)=>Number.isInteger(v)&&Number(v)>=0&&Number(v)<=max;
+ const fail=()=>{throw new Error('PLANNING_RESPONSE_INVALID')},object=(v:unknown,keys:string[])=>v!==null&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&Object.keys(v).every(k=>keys.includes(k)),number=(v:unknown,max=Number.MAX_SAFE_INTEGER)=>Number.isSafeInteger(v)&&Number(v)>=0&&Number(v)<=max;
  if(!object(value,['durationMs','lastActivityMs','thinkingCharacters','outputCharacters','events']))return fail();
- const a=value as PlanningActivity,stages=['preparing','connecting','waiting','thinking','generating','receiving','finishing','parsing','validating','total_timeout','idle_timeout','handshake_timeout'];
+ const a=value as PlanningActivity,stages=['preparing','connecting','waiting','thinking','generating','receiving','finishing','parsing','validating','reviewing','revising','total_timeout','idle_timeout','handshake_timeout'];
  if(!number(a.durationMs)||!number(a.lastActivityMs)||a.lastActivityMs>a.durationMs||!number(a.thinkingCharacters,16_777_216)||!number(a.outputCharacters,16_777_216)||!Array.isArray(a.events)||a.events.length>60)return fail();
  let sequence=0,atMs=0;
  for(const e of a.events){if(!object(e,['sequence','stage','atMs','thinkingCharacters','outputCharacters'])||!number(e.sequence)||e.sequence<=sequence||!stages.includes(e.stage)||!number(e.atMs)||e.atMs<atMs||e.atMs>a.durationMs||!number(e.thinkingCharacters,16_777_216)||!number(e.outputCharacters,16_777_216))return fail();sequence=e.sequence;atMs=e.atMs}
  return a;
 }
-export type GenerationOutput={sequence:number;kind:'outline'|'lessons'|'consistency';form:'reply'|'content';text:string;state:'streaming'|'complete'|'incomplete'};
-export type PlanningJob={id:string;projectId:string;intent:PlanningIntent;state:'pending'|'completed'|'failed'|'cancelled';result?:PlanningState;errorCode?:string;userReply?:string;partialReply?:string;generationOutput?:GenerationOutput[];activity?:PlanningActivity;diagnostic?:{promptVersion?:string;stage:string;durationMs:number;receivedCharacters:number;completedChapters?:number;chapterCount?:number}};
+const generationKinds=['outline','lessons','consistency','review','revision'] as const;
+export type GenerationOutput={sequence:number;kind:typeof generationKinds[number];form:'reply'|'content';text:string;state:'streaming'|'complete'|'incomplete'};
+const qualityReasons={
+ coverage:['路线缺少帮助你达成学习目标的关键练习。','The route is missing a key exercise needed to reach your goal.'],
+ alignment:['练习内容和本节要掌握的技能对不上。','An exercise does not teach the skill its lesson promises.'],
+ specificity:['有些章节还没写清具体要学什么、怎么练。','Some lessons do not explain what to learn or how to practice it.'],
+ learning_language:['有些章节的标题或目标夹带了实现细节，学什么还没说清。','Some lesson titles or goals use implementation details where the skill should be explained.'],
+ practice_sequence:['有些练习的先后顺序矛盾，后面的步骤无法继续。','Some practice steps are out of order, so the exercise cannot be completed.'],
+ prerequisite:['有些练习缺少开始所需的材料或前面步骤的结果。','Some exercises are missing the materials or earlier results they need.'],
+ assessment_invalid:['验收条件无法准确判断练习有没有做对。','The assessment criteria cannot reliably tell whether the exercise was done correctly.'],
+ feasibility:['安排的练习超出了已确认的时间或条件。','The exercises exceed the agreed time or available resources.'],
+ unsupported_fact:['有些练习依赖尚未核实的关键规则或数据。','Some exercises rely on key rules or data that could not be verified.'],
+} satisfies Record<string,[string,string]>;
+export type PlanningQualityReason=keyof typeof qualityReasons;
+const routeGenerationPhases=['prepare','outline','lessons','review','revision','finalize','saving','complete'] as const;
+export type RouteGenerationPhase=typeof routeGenerationPhases[number];
+export type PlanningJob={id:string;projectId:string;intent:PlanningIntent;state:'pending'|'completed'|'failed'|'cancelled';result?:PlanningState;errorCode?:string;userReply?:string;partialReply?:string;qualityReason?:PlanningQualityReason;qualitySummary?:{text:string;locale:Language};generationPhase?:RouteGenerationPhase;generationOutput?:GenerationOutput[];activity?:PlanningActivity;diagnostic?:{promptVersion?:string;stage:string;durationMs:number;receivedCharacters:number;completedChapters?:number;chapterCount?:number;completedLessons?:number;lessonCount?:number}};
 export function planningProgress(job:PlanningJob,language:Language){
- const labels:Record<string,[string,string]>={preparing:['准备中…','Preparing…'],connecting:['连接智能体…','Connecting…'],waiting:['等待智能体响应…','Waiting for the agent…'],thinking:['智能体正在思考…','Agent is thinking…'],generating:['正在生成内容…','Generating…'],receiving:['正在接收结果…','Receiving…'],finishing:['正在完成请求…','Finishing…'],parsing:['正在检查结果…','Checking the result…'],validating:['正在校验路线…','Validating…']};
- const item=labels[job.diagnostic?.stage??''];if(!item)return job.intent==='consistency'?(language==='en'?'Checking answers…':'正在检查回答…'):undefined;
- const seconds=Math.floor(Math.max(0,Math.min(1_800_000,Number(job.diagnostic?.durationMs)||0))/10_000)*10;
- const {completedChapters,chapterCount}=job.diagnostic??{};
- const chapter=Number.isInteger(completedChapters)&&Number.isInteger(chapterCount)&&completedChapters!>=0&&chapterCount!>=1&&chapterCount!<=24&&completedChapters!<=chapterCount!?(language==='en'?`${completedChapters}/${chapterCount} chapters ready · `:`已完成 ${completedChapters}/${chapterCount} 章 · `):'';
- return (job.intent==='consistency'?(language==='en'?'Checking answers · ':'检查回答 · '):'')+chapter+item[language==='en'?1:0]+(seconds>=10?` · ${seconds}s`:'');
+ const labels:Record<string,[string,string]>={preparing:['准备中…','Preparing…'],connecting:['连接智能体…','Connecting…'],waiting:['等待智能体响应…','Waiting for the agent…'],thinking:['智能体正在思考…','Agent is thinking…'],generating:['正在生成内容…','Generating…'],receiving:['正在接收结果…','Receiving…'],finishing:['正在完成请求…','Finishing…'],parsing:['正在检查结果…','Checking the result…'],validating:['正在校验路线…','Validating…'],reviewing:['正在复核路线内容…','Reviewing route content…'],revising:['正在修正章节…','Revising lessons…']};
+ const output=job.generationOutput?.at(-1),stage=job.diagnostic?.stage??'';
+ const qualityStage=job.intent==='generate'&&job.state==='pending'&&output?.state==='streaming'?(output.kind==='review'?'reviewing':output.kind==='revision'?'revising':undefined):undefined;
+ const item=labels[qualityStage??stage];if(!item)return job.intent==='consistency'?(language==='en'?'Checking answers…':'正在检查回答…'):undefined;
+ const duration=job.diagnostic?.durationMs??0;
+ const seconds=Number.isSafeInteger(duration)&&duration>=0?Math.floor(duration/10_000)*10:0;
+ const {completedChapters,chapterCount,completedLessons,lessonCount}=job.diagnostic??{};
+ let progress='';
+ if(typeof completedLessons==='number'&&typeof lessonCount==='number'&&Number.isInteger(completedLessons)&&Number.isInteger(lessonCount)&&completedLessons>=0&&completedLessons<=lessonCount&&lessonCount>=1&&lessonCount<=512){
+  progress=language==='en'?`${completedLessons} / ${lessonCount} lesson drafts saved · `:`已保存 ${completedLessons} / ${lessonCount} 节草稿 · `;
+ }else if(Number.isInteger(completedChapters)&&Number.isInteger(chapterCount)&&completedChapters!>=0&&chapterCount!>=1&&chapterCount!<=24&&completedChapters!<=chapterCount!){
+  progress=language==='en'?`${completedChapters}/${chapterCount} chapters ready · `:`已完成 ${completedChapters}/${chapterCount} 章 · `;
+ }
+ return (job.intent==='consistency'?(language==='en'?'Checking answers · ':'检查回答 · '):'')+progress+item[language==='en'?1:0]+(seconds>=10?` · ${seconds}s`:'');
 }
 export type PlanningEntry='ai'|'manual'|'import';
-const errors=['PLANNING_GENERATION_INVALID','PLANNING_GENERATION_STALE','PLANNING_GENERATION_EXISTS','PLANNING_NEEDS_INPUT','PLANNING_CANNOT_COMPLETE','PLANNING_REPLACE_REQUIRED','PLANNING_TARGET_UNAVAILABLE','PLANNING_AGENT_OPTIONS','PLANNING_AGENT_AUTH_REQUIRED','PLANNING_AGENT_BUSY','PLANNING_AGENT_CANCELLED','PLANNING_AGENT_FAILED','PLANNING_AGENT_INVALID','PLANNING_AGENT_NETWORK','PLANNING_AGENT_OUTPUT_TOO_LARGE','PLANNING_AGENT_PERMISSION_REQUIRED','PLANNING_AGENT_PROTOCOL','PLANNING_AGENT_QUOTA','PLANNING_AGENT_RESULT_REJECTED','PLANNING_AGENT_ROUTE_MISSING','PLANNING_AGENT_ROUTE_ENCODING','PLANNING_AGENT_TIMEOUT','PLANNING_AGENT_UNAVAILABLE','PLANNING_AGENT_UNSUPPORTED','PLANNING_PROJECT_UNAVAILABLE','PLANNING_TOO_LARGE','PLANNING_ROUTE_INVALID','PLANNING_EVIDENCE_INVALID','PLANNING_INVALID','PLANNING_CONFLICT','PLANNING_STORAGE_UNAVAILABLE','PLANNING_INCOMPLETE','PLANNING_LIMIT','PLANNING_CANCELLED','PLANNING_RESPONSE_INVALID','PLANNING_TIMEOUT','PLANNING_BUSY','AGENT_DESKTOP_REQUIRED','AGENT_AUTH_REQUIRED','AGENT_UNAVAILABLE','AGENT_TIMEOUT','AGENT_INVALID','AGENT_BUSY','AGENT_PROJECT_UNAVAILABLE','AGENT_PERMISSION_REQUIRED','AGENT_CANCELLED','ROUTE_INVALID','ROUTE_VERSION_UNSUPPORTED','ROUTE_TOO_MANY_NODES','ROUTE_CONFLICT'] as const;
+const errors=['PLANNING_ATTACHMENT_UNAVAILABLE','PLANNING_AGENT_IMAGE_UNSUPPORTED','PLANNING_AGENT_INPUT_LIMIT','PLANNING_STUDIED_LESSON_LOCKED','PLANNING_GENERATION_INVALID','PLANNING_GENERATION_STALE','PLANNING_GENERATION_EXISTS','PLANNING_NEEDS_INPUT','PLANNING_CANNOT_COMPLETE','PLANNING_REPLACE_REQUIRED','PLANNING_TARGET_UNAVAILABLE','PLANNING_AGENT_OPTIONS','PLANNING_AGENT_AUTH_REQUIRED','PLANNING_AGENT_BUSY','PLANNING_AGENT_CANCELLED','PLANNING_AGENT_FAILED','PLANNING_AGENT_INVALID','PLANNING_AGENT_NETWORK','PLANNING_AGENT_OUTPUT_TOO_LARGE','PLANNING_AGENT_PERMISSION_REQUIRED','PLANNING_AGENT_PROTOCOL','PLANNING_AGENT_QUALITY_REVIEW','PLANNING_AGENT_QUOTA','PLANNING_AGENT_RESULT_REJECTED','PLANNING_AGENT_ROUTE_MISSING','PLANNING_AGENT_ROUTE_ENCODING','PLANNING_AGENT_TIMEOUT','PLANNING_AGENT_UNAVAILABLE','PLANNING_AGENT_UNSUPPORTED','PLANNING_PROJECT_UNAVAILABLE','PLANNING_TOO_LARGE','PLANNING_ROUTE_INVALID','PLANNING_EVIDENCE_INVALID','PLANNING_INVALID','PLANNING_CONFLICT','PLANNING_STORAGE_UNAVAILABLE','PLANNING_INCOMPLETE','PLANNING_LIMIT','PLANNING_CANCELLED','PLANNING_RESPONSE_INVALID','PLANNING_TIMEOUT','PLANNING_BUSY','AGENT_DESKTOP_REQUIRED','AGENT_AUTH_REQUIRED','AGENT_UNAVAILABLE','AGENT_TIMEOUT','AGENT_INVALID','AGENT_BUSY','AGENT_PROJECT_UNAVAILABLE','AGENT_PERMISSION_REQUIRED','AGENT_CANCELLED','ROUTE_INVALID','ROUTE_VERSION_UNSUPPORTED','ROUTE_TOO_MANY_NODES','ROUTE_CONFLICT'] as const;
 export function planningError(cause:unknown){const message=cause instanceof Error?cause.message:String(cause);return errors.find(code=>message.includes(code))??'PLANNING_STORAGE_UNAVAILABLE'}
+const qualityReviewFailure='PLANNING_AGENT_QUALITY_REVIEW';
+function canShowTaskReply(code?:string){return code==='PLANNING_NEEDS_INPUT'||code==='PLANNING_CANNOT_COMPLETE'}
 class PlanningTaskNotice extends Error {constructor(code:string,readonly reply:string){super(code)}}
-export function planningFailure(job:PlanningJob):Error{const code=job.errorCode??'PLANNING_RESPONSE_INVALID';return job.userReply&&['PLANNING_NEEDS_INPUT','PLANNING_CANNOT_COMPLETE'].includes(code)?new PlanningTaskNotice(code,job.userReply):new Error(code+(code==='PLANNING_AGENT_TIMEOUT'?':'+(job.diagnostic?.stage??''):''))}
+export function planningFailure(job:PlanningJob):Error{
+ const code=job.errorCode??'PLANNING_RESPONSE_INVALID';
+ if(job.intent!=='generate'&&job.userReply&&canShowTaskReply(code))return new PlanningTaskNotice(code,job.userReply);
+ return new Error(code+(code==='PLANNING_AGENT_TIMEOUT'?':'+(job.diagnostic?.stage??''):''));
+}
+export function planningGenerationMessage(cause:unknown,language:Language){
+ return planningMessage(cause instanceof PlanningTaskNotice?cause.message:cause,language);
+}
+export function planningQualityMessage(reason:PlanningQualityReason,summary:PlanningJob['qualitySummary'],language:Language){
+ return summary?.locale===language?summary.text:qualityReasons[reason][language==='en'?1:0];
+}
 export function planningMessage(cause:unknown,language:Language){
  if(cause instanceof PlanningTaskNotice)return cause.reply;
  const detail=cause instanceof Error?cause.message:String(cause);
  if(detail.includes('PLANNING_AGENT_TIMEOUT:total_timeout'))return language==='en'?'The request reached its time limit. Your route was kept.':'已达到本次请求的总时限，原路线已保留。';
- if(detail.includes('PLANNING_AGENT_TIMEOUT:idle_timeout'))return language==='en'?'The agent stopped producing output. Your route was kept. Check the connection or retry with another model.':'智能体长时间没有有效输出，原路线已保留。请检查连接或更换模型后重试。';
+ if(detail.includes('PLANNING_AGENT_TIMEOUT:idle_timeout'))return language==='en'?'Stopped after 3 minutes without agent output. Your route and saved progress were kept.':'智能体连续 3 分钟没有输出，本次请求已停止。原路线和已保存的进度已保留。';
+ if(detail.includes('PLANNING_AGENT_TIMEOUT:handshake_timeout'))return language==='en'?'Connecting to the agent timed out. Your route and saved progress were kept.':'连接智能体超时，原路线和已保存的进度已保留。';
  const messages:Record<typeof errors[number],[string,string]>={
+  PLANNING_AGENT_INPUT_LIMIT:['当前智能体或模型返回了输入超限。请减少附件或缩短消息后重试。','The agent or model reported an input limit. Try fewer attachments or a shorter message.'],
+  PLANNING_ATTACHMENT_UNAVAILABLE:['无法读取该附件，请重新添加后发送。','Could not read the attachment. Add it again to send.'],
+  PLANNING_AGENT_IMAGE_UNSUPPORTED:['当前模型无法接收图片，请切换支持图片的模型或移除图片后重试。','This model cannot accept images. Switch to a model that accepts images or remove the image and try again.'],
   PLANNING_GENERATION_INVALID:['保存的生成草稿未通过校验，请重新生成。原路线已保留。','The saved generation draft is invalid. Start again. Your route was kept.'],
-  PLANNING_GENERATION_STALE:['规划背景或原路线已改变，请重新生成。','The background or original route has changed. Start generation again.'],
+  PLANNING_GENERATION_STALE:['生成条件已变化，请重新生成。','Generation conditions have changed. Start again.'],
   PLANNING_GENERATION_EXISTS:['有未完成的生成草稿，请选择继续或重新生成。','An unfinished generation draft exists. Resume it or start again.'],
   PLANNING_NEEDS_INPUT:['请补充规划所需的信息后再继续。','Provide the missing planning information to continue.'],
   PLANNING_CANNOT_COMPLETE:['智能体暂时无法完成本次规划，请调整范围后重试。','The agent cannot complete this planning task. Adjust the scope and retry.'],
@@ -54,6 +96,7 @@ export function planningMessage(cause:unknown,language:Language){
   PLANNING_AGENT_PERMISSION_REQUIRED:['此操作需要额外权限，当前请求已停止。','The agent needs additional permission. This request was stopped.'],
   PLANNING_AGENT_PROTOCOL:['智能体返回的内容无法解析，请重试。','The agent response could not be read. Try again.'],
   PLANNING_AGENT_QUOTA:['智能体额度不足，请检查对应账户。','Check the agent account quota before retrying.'],
+  PLANNING_AGENT_QUALITY_REVIEW:['智能体未能完成路线审阅，本次未保存新路线。','The agent could not complete the review. No new route was saved.'],
   PLANNING_AGENT_ROUTE_ENCODING:['AI 返回的路线格式不完整，原路线已保留。请重试或更换模型。','The AI returned an incomplete route format. Your route was kept. Retry or choose another model.'],
   PLANNING_AGENT_ROUTE_MISSING:['AI 只返回了说明，未提交路线。原路线已保留，请重试或更换模型。','The AI returned a summary without a route. Your route was kept. Retry or choose another model.'],
   PLANNING_AGENT_RESULT_REJECTED:['AI 返回的路线未通过校验，原路线已保留。请重试。','The AI route did not pass validation. Your route was kept. Try again.'],
@@ -65,6 +108,7 @@ export function planningMessage(cause:unknown,language:Language){
   PLANNING_ROUTE_INVALID:['请补全路线名称、大章目标和小章目标，并检查前置依赖。','Complete the route name, chapter goals and lesson goals, and check prerequisites.'],
   PLANNING_EVIDENCE_INVALID:['智能体返回的信息关联异常，请重试或手动编辑。','The agent returned invalid message references. Retry or edit manually.'],
   PLANNING_INVALID:['规划数据无效，请重新打开项目。','The planning data is invalid. Open the project again.'],
+  PLANNING_STUDIED_LESSON_LOCKED:['已学小节受到保护。清空整条路线的学习记录后可重新编辑。','Studied lessons are locked. Clear the route’s learning records to edit them.'],
   PLANNING_CONFLICT:['规划已更新，请重新读取后继续。','The plan changed. Reload it to continue.'],
   PLANNING_STORAGE_UNAVAILABLE:['无法保存或读取规划，请重试。','Cannot save or read the plan. Try again.'],
   PLANNING_INCOMPLETE:['请补全必要信息或章节字段。','Complete the required information or chapter fields.'],
@@ -91,19 +135,39 @@ export function planningMessage(cause:unknown,language:Language){
 const native=()=>window.vibeNative?.projects;
 function projectID(id:string){if(!/^proj_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id))throw new Error('PLANNING_INVALID')}
 async function request<T>(action:string,values:Record<string,unknown>):Promise<T>{try{return await native()!.request(action,values) as T}catch(cause){throw new Error(planningError(cause))}}
-let database:Promise<IDBDatabase>|undefined;
-function db(){return database??=new Promise<IDBDatabase>((resolve,reject)=>{const q=indexedDB.open('vibe-improve.planning.v1',1);q.onupgradeneeded=()=>q.result.createObjectStore('plans',{keyPath:'projectId'});q.onsuccess=()=>resolve(q.result);q.onerror=()=>{database=undefined;reject(new Error('PLANNING_STORAGE_UNAVAILABLE'))}})}
-async function browserRead(id:string){const storage=await db();return new Promise<PlanningState|null>((resolve,reject)=>{const q=storage.transaction('plans').objectStore('plans').get(id);q.onsuccess=()=>{try{resolve(q.result?validatePlanning(q.result):null)}catch{reject(new Error('PLANNING_STORAGE_UNAVAILABLE'))}};q.onerror=()=>reject(new Error('PLANNING_STORAGE_UNAVAILABLE'))})}
-async function browserMutate(id:string,change:(state:PlanningState|null)=>PlanningState){const storage=await db();return new Promise<PlanningState>((resolve,reject)=>{const tx=storage.transaction('plans','readwrite'),store=tx.objectStore('plans');let next:PlanningState,error='PLANNING_STORAGE_UNAVAILABLE';const q=store.get(id);q.onsuccess=()=>{try{next=validatePlanning(change(q.result?validatePlanning(q.result):null));store.put(next)}catch(cause){error=planningError(cause);tx.abort()}};tx.oncomplete=()=>resolve(next!);tx.onerror=tx.onabort=()=>reject(new Error(error))})}
+function browserMutateUnlocked(id:string, change:(state:PlanningState|null,progress:LearningProgress)=>PlanningState){
+ return browserProjectTransaction(id,({state,progress,savePlan})=>{
+  const next=validatePlanning(change(state,progress));
+  assertStudiedRouteUnchanged(state?.routeDraft,next.routeDraft,progress.startedNodeIds);
+  if(next!==state)savePlan(next);
+  return next;
+ }).catch(cause=>{throw new Error(planningError(cause));});
+}
+function browserMutate(id:string, change:(state:PlanningState|null,progress:LearningProgress)=>PlanningState){
+ return withProjectLock(id,()=>browserMutateUnlocked(id,change));
+}
 function required(value:PlanningState|null){if(!value)throw new Error('PLANNING_INVALID');return value}
-function job(value:unknown,id:string):PlanningJob{const x=value as PlanningJob;if(!x||x.projectId!==id||typeof x.id!=='string'||!['interview','generate','edit','consistency'].includes(x.intent)||!['pending','completed','failed','cancelled'].includes(x.state))throw new Error('PLANNING_RESPONSE_INVALID');if(x.partialReply!==undefined&&(typeof x.partialReply!=='string'||x.partialReply.length>8000||!['pending','failed','cancelled'].includes(x.state)))throw new Error('PLANNING_RESPONSE_INVALID');if(x.userReply!==undefined&&(typeof x.userReply!=='string'||!x.userReply.trim()||x.userReply.length>8000||x.state!=='failed'||!['PLANNING_NEEDS_INPUT','PLANNING_CANNOT_COMPLETE'].includes(x.errorCode??'')))throw new Error('PLANNING_RESPONSE_INVALID');return{...x,generationOutput:parseGenerationOutput(x.generationOutput),activity:parsePlanningActivity(x.activity),...(x.result?{result:validatePlanning(x.result)}:{})}}
+function job(value:unknown,id:string):PlanningJob{
+ const x=value as PlanningJob;
+ if(!x||x.projectId!==id||typeof x.id!=='string'||!['interview','generate','edit','consistency'].includes(x.intent)||!['pending','completed','failed','cancelled'].includes(x.state))throw new Error('PLANNING_RESPONSE_INVALID');
+ if(x.partialReply!==undefined&&(typeof x.partialReply!=='string'||x.partialReply.length>8000||!['pending','failed','cancelled'].includes(x.state)))throw new Error('PLANNING_RESPONSE_INVALID');
+ if(x.userReply!==undefined&&(typeof x.userReply!=='string'||!x.userReply.trim()||x.userReply.length>8000||x.state!=='failed'||!canShowTaskReply(x.errorCode)||x.userReply.includes('\0')))throw new Error('PLANNING_RESPONSE_INVALID');
+ if(x.qualityReason!==undefined&&(x.intent!=='generate'||x.state!=='failed'||x.errorCode!==qualityReviewFailure||typeof x.qualityReason!=='string'||!Object.hasOwn(qualityReasons,x.qualityReason)))throw new Error('PLANNING_RESPONSE_INVALID');
+ if(x.qualitySummary!==undefined&&(!x.qualityReason||!validQualitySummary(x.qualitySummary)))throw new Error('PLANNING_RESPONSE_INVALID');
+ if(x.generationPhase!==undefined&&(x.intent!=='generate'||!routeGenerationPhases.includes(x.generationPhase)||(x.generationPhase==='complete'&&x.state!=='completed')))throw new Error('PLANNING_RESPONSE_INVALID');
+ return{...x,generationOutput:parseGenerationOutput(x.generationOutput),activity:parsePlanningActivity(x.activity),...(x.result?{result:validatePlanning(x.result)}:{})}
+}
+function validQualitySummary(summary:NonNullable<PlanningJob['qualitySummary']>){
+ return summary&&Object.keys(summary).length===2&&['zh-CN','en'].includes(summary.locale)&&typeof summary.text==='string'&&summary.text.length<=320&&[...summary.text].length<=160&&summary.text.trim()&&
+  !/[\u0000-\u001f\u007f-\u009f\u2028\u2029\x60_*=\[\]{}<>\\]|\b[LC][0-9]+\b|\b[A-Z]{2,}-[0-9]+\b/u.test(summary.text);
+}
 export function parseGenerationOutput(value:unknown):GenerationOutput[]|undefined{
  if(value===undefined)return undefined;
  if(!Array.isArray(value)||value.length>1024)throw new Error('PLANNING_RESPONSE_INVALID');
  let sequence=0,bytes=0;
  for(const item of value){
   if(!item||typeof item!=='object'||Object.keys(item).length!==5||!['sequence','kind','form','text','state'].every(key=>key in item))throw new Error('PLANNING_RESPONSE_INVALID');
-  if(!Number.isInteger(item.sequence)||item.sequence<=sequence||item.sequence>1024||!['outline','lessons','consistency'].includes(item.kind)||!['reply','content'].includes(item.form)||!['streaming','complete','incomplete'].includes(item.state)||typeof item.text!=='string'||item.text.includes('\0'))throw new Error('PLANNING_RESPONSE_INVALID');
+  if(!Number.isInteger(item.sequence)||item.sequence<=sequence||item.sequence>1024||!generationKinds.includes(item.kind)||!['reply','content'].includes(item.form)||!['streaming','complete','incomplete'].includes(item.state)||typeof item.text!=='string'||item.text.includes('\0'))throw new Error('PLANNING_RESPONSE_INVALID');
   sequence=item.sequence;bytes+=new TextEncoder().encode(item.text).length;if(bytes>8_388_608)throw new Error('PLANNING_RESPONSE_INVALID');
  }
  return value as GenerationOutput[];
@@ -112,14 +176,41 @@ export type PlanningModel={id:string;name:string;isDefault:boolean;efforts:strin
 export type ModelCatalog={provider:string;models:PlanningModel[]};
 export const planningService={
  models:async(id:string,refresh=false):Promise<ModelCatalog>=>{projectID(id);if(!native())return {provider:'',models:[]};const data=await request<ModelCatalog>('planning.models',{projectId:id,...(refresh?{refresh:true}:{})});if(!data||typeof data.provider!=='string'||!Array.isArray(data.models)||data.models.length>300||data.models.some(m=>!m||typeof m.id!=='string'||typeof m.name!=='string'||!Array.isArray(m.efforts)))throw new Error('PLANNING_RESPONSE_INVALID');return data},
+ provider:async(state:PlanningState,provider:ProviderId):Promise<PlanningState>=>{
+  if(!native())throw new Error('AGENT_DESKTOP_REQUIRED');
+  return validatePlanning(await request('planning.provider',{projectId:state.projectId,provider,expectedRevision:state.revision}));
+ },
  options:async(state:PlanningState,options:AgentOptions)=>native()?validatePlanning(await request('planning.options',{projectId:state.projectId,options,expectedRevision:state.revision})):browserMutate(state.projectId,s=>setAgentOptions(required(s),options,state.revision)),
  removeImport:async(id:string,expectedPlanningRevision:number|null,expectedRouteRevision:number):Promise<PlanningState|null>=>{
   projectID(id);if(native()){const result=await request<unknown>('planning.import.remove',{projectId:id,expectedPlanningRevision,expectedRouteRevision});return result===null?null:validatePlanning(result)}
-  const saved=await browserRead(id);if((saved?.revision??null)!==expectedPlanningRevision||saved?.pending)throw new Error('PLANNING_CONFLICT');
-  const route=await routeService.read(id);if(route.revision!==expectedRouteRevision)throw new Error('PLANNING_CONFLICT');await routeService.removeImport(route,Boolean(saved?.routeDraft&&saved.routeDraft.id!==saved.importedOriginal?.id));
-  return saved?browserMutate(id,s=>removeImportedRoute(required(s),expectedPlanningRevision!)):null;
+  return withProjectLock(id,async()=>{
+   const saved=await browserProjectTransaction(id,({state,progress})=>{
+    if((state?.revision??null)!==expectedPlanningRevision||state?.pending)throw new Error('PLANNING_CONFLICT');
+    if(state){
+     const next=removeImportedRoute(state,state.revision);
+     assertStudiedRouteUnchanged(state.routeDraft,next.routeDraft,progress.startedNodeIds);
+    }
+    return state;
+   });
+   const route=await routeService.read(id);if(route.revision!==expectedRouteRevision)throw new Error('PLANNING_CONFLICT');
+   await routeService.removeImport(route,Boolean(saved?.routeDraft&&saved.routeDraft.id!==saved.importedOriginal?.id));
+   return saved?browserMutateUnlocked(id,s=>removeImportedRoute(required(s),expectedPlanningRevision!)):null;
+  });
  },
- read:async(id:string):Promise<PlanningState|null>=>{projectID(id);if(!native()){const saved=await browserRead(id);if(saved?.importedOriginal&&!(await routeService.read(id)).routeDraft)return browserMutate(id,s=>removeImportedRoute(required(s),required(s).revision));return saved;}const value=await request<unknown>('planning.read',{projectId:id});return value===null?null:validatePlanning(value)},
+ read:async(id:string):Promise<PlanningState|null>=>{
+  projectID(id);
+  if(native()){const value=await request<unknown>('planning.read',{projectId:id});return value===null?null:validatePlanning(value)}
+  const saved=await browserRead(id);
+  if(!saved?.importedOriginal || (await routeService.read(id)).routeDraft)return saved;
+  return withProjectLock(id,async()=>{
+   if((await routeService.read(id)).routeDraft)return browserRead(id);
+   return browserMutateUnlocked(id,(state,progress)=>{
+    const current=required(state);
+    if(current.routeDraft?.id===current.importedOriginal?.id && (progress.recordedNodeCount>0 || progress.progressRevision>0))return current;
+    return removeImportedRoute(current,current.revision);
+   });
+  });
+ },
  enter:async(id:string,locale:Language,mode:PlanningEntry,expectedRevision?:number):Promise<PlanningState>=>{
   projectID(id);if(native())return validatePlanning(await request('planning.enter',{projectId:id,locale,mode,...(expectedRevision!==undefined?{expectedRevision}:{})}));
   if(mode==='ai')throw new Error('AGENT_DESKTOP_REQUIRED');const imported=mode==='import'?(await routeService.read(id)).routeDraft?.route:undefined;
@@ -137,7 +228,15 @@ export const planningService={
  openEditor:async(state:PlanningState)=>native()?validatePlanning(await request('planning.open-editor',{projectId:state.projectId,expectedRevision:state.revision})):browserMutate(state.projectId,s=>openEditor(required(s),state.revision)),
  save:async(state:PlanningState,route:RouteDocument)=>native()?validatePlanning(await request('planning.save',{projectId:state.projectId,route,expectedRevision:state.revision})):browserMutate(state.projectId,s=>saveEditor(required(s),route,state.revision)),
  confirm:async(state:PlanningState)=>native()?validatePlanning(await request('planning.confirm',{projectId:state.projectId,expectedRevision:state.revision})):browserMutate(state.projectId,s=>confirmRoute(required(s),state.revision)),
- begin:async(state:PlanningState,intent:PlanningIntent,text?:string,mentions?:PlanningMention[],target?:PlanningTarget,replaceExisting=false,generationMode:GenerationMode='new')=>{if(!native())throw new Error('AGENT_DESKTOP_REQUIRED');if(intent==='generate'&&!canGenerate(state))throw new Error('PLANNING_INCOMPLETE');return job(await request('planning.begin',{projectId:state.projectId,intent,expectedRevision:state.revision,...(intent==='generate'?{generationMode}:{}),...(replaceExisting?{replaceExisting:true}:{}),...(text!==undefined?{text}:{}),...(mentions?.length?{mentions}:target?{target}:{})}),state.projectId)},
+ chooseChatFiles:async(projectId:string,retaining:string[])=>{
+  if(!native())throw new Error('AGENT_DESKTOP_REQUIRED');
+  const result=await request<{attachments:PlanningAttachment[];skipped:number}|null>('resources.chooseChatFiles',{projectId,retaining});
+  if(result===null)return null;
+  if(!Array.isArray(result.attachments)||(result.attachments.length>0&&!validPlanningAttachments(result.attachments))||
+      !Number.isSafeInteger(result.skipped)||result.skipped<0)throw new Error('PLANNING_RESPONSE_INVALID');
+  return result;
+ },
+ begin:async(state:PlanningState,intent:PlanningIntent,text?:string,mentions?:PlanningMention[],target?:PlanningTarget,replaceExisting=false,generationMode:GenerationMode='new',resourceSelection:ResourceSelection[]=[],attachments:PlanningAttachment[]=[])=>{if(!native())throw new Error('AGENT_DESKTOP_REQUIRED');if(intent==='generate'&&!canGenerate(state))throw new Error('PLANNING_INCOMPLETE');return job(await request('planning.begin',{projectId:state.projectId,intent,expectedRevision:state.revision,...(intent==='generate'?{generationMode,...(resourceSelection.length?{resourceSelection}:{})}:{}),...(replaceExisting?{replaceExisting:true}:{}),...(text!==undefined?{text}:{}),...(mentions?.length?{mentions}:target?{target}:{}),...(attachments.length?{attachmentIds:attachments.map(file=>file.id)}:{})}),state.projectId)},
  job:async(id:string,jobId:string)=>job(await request('planning.state',{projectId:id,jobId}),id),
  cancel:async(id:string,jobId:string)=>job(await request('planning.cancel',{projectId:id,jobId}),id),
  applyProposal:async(state:PlanningState)=>native()?validatePlanning(await request('planning.proposal.apply',{projectId:state.projectId,expectedRevision:state.revision})):browserMutate(state.projectId,s=>applyProposal(required(s),state.revision)),

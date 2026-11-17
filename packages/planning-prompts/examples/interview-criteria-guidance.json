@@ -1,0 +1,19 @@
+{
+  "name": "interview-criteria-guidance",
+  "task": "interview",
+  "input": {
+    "locale": "zh-CN", "currentQuestion": "purpose",
+    "acceptedAnswers": {"goal": {"summary": "学习英语，在旅行时问路。", "fields": {"topic": "旅行英语", "outcome": "在旅行时用英语问路"}}},
+    "messages": [{"ref": "U1", "role": "user", "text": "什么叫达标表现？我没有基础，你帮我定吧。"}]
+  },
+  "response": {
+    "status": "ok",
+    "reply": "就是用一件实际做得出来的事，检查学完是否够用。按你想用英语问路的目标，我建议先做到：在一次模拟问路中，能说清目的地，听懂简短指路，没听清时能请对方重复。用这个作为起步标准合适吗？",
+    "result": {
+      "questionId": "purpose", "complete": false, "summary": "", "fields": {}, "evidence": [],
+      "unresolved": ["用这个作为起步标准合适吗？"],
+      "consistency": {"status": "consistent", "issues": []}
+    },
+    "missing": []
+  }
+}

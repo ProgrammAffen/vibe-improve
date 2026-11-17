@@ -4,11 +4,11 @@ import {readFile,mkdir,mkdtemp,writeFile} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {build} from 'esbuild';
-import {createPlanning,appendUser,applyInterview,acceptAnswer,reanswerQuestion,cancelAnswerDraft,canGenerate,canRequestGeneration,needsConsistencyCheck,planningFacts,planningFactsHash,consistencyReady,beginConsistencyCheck,applyConsistencyCheck,acceptConsistencySuggestion,setResources,setAgentOptions,focusQuestion,startGeneration,applyGenerated,cancelPlanningRequest,recoverPlanning,validatePlanning,upgradeRoute} from '../packages/domain/planning.mjs';
+import {createPlanning,appendUser,applyInterview,acceptAnswer,answerConfirmation,reanswerQuestion,cancelAnswerDraft,canGenerate,canRequestGeneration,needsConsistencyCheck,planningFacts,planningFactsHash,consistencyReady,beginConsistencyCheck,applyConsistencyCheck,acceptConsistencySuggestion,setResources,setAgentOptions,focusQuestion,startGeneration,applyGenerated,cancelPlanningRequest,recoverPlanning,validatePlanning,upgradeRoute} from '../packages/domain/planning.mjs';
 
 const project='proj_12345678-1234-4234-8234-123456789abc',now='2026-11-04T08:00:00.000Z';
 const compatible={status:'consistent',issues:[]};
-const answers={goal:{topic:'机器学习',outcome:'独立训练图像分类器'},purpose:{context:'解释一项模型训练实验',criteria:'报告图像分类准确率和错分案例'},baseline:{experience:'用过Python，做过图像分类练习'},time:{weekly:'每周5小时',session:'每次30分钟'},constraints:{scope:'实现小型模型',conditions:'只有现有电脑'}};
+const answers={goal:{topic:'机器学习',outcome:'独立训练图像分类器'},purpose:{context:'解释一项模型训练实验',criteria:'报告图像分类准确率和错分案例'},baseline:{experience:'用过Python，做过图像分类练习'},time:{weekly:'每周5小时',session:'每次30分钟'}};
 const languageGoal={topic:'字符级语言模型',outcome:'训练字符级语言模型并展示文本采样'};
 const review=()=>({status:'requires_review',issues:[{questionId:'purpose',fields:['criteria'],kind:'incompatible',reason:'新的成果是语言模型，旧标准仍只评估图像分类。',suggestion:{summary:'展示字符级语言模型采样，并说明训练表现及局限。',fields:{criteria:'展示文本采样，并根据训练/验证损失说明表现和局限'}}}]});
 function proposal(state,id,fields,assessment=compatible,complete=true){
@@ -23,29 +23,24 @@ function proposal(state,id,fields,assessment=compatible,complete=true){
 function adopt(state,id){return acceptAnswer(state,id,state.questions.find(q=>q.id===id).answerProposal.messageId,state.revision)}
 function completed(assessment=compatible){let state=createPlanning(project,'codex','zh-CN');for(const [id,fields] of Object.entries(answers))state=adopt(proposal(state,id,fields,assessment),id);return state}
 function preflight(state,assessment=compatible,request=`check_${state.revision}`){state=beginConsistencyCheck(state,request,state.revision);return applyConsistencyCheck(state,{reply:'已检查当前背景。',consistency:assessment},request,state.revision,now)}
+function legacyReviewed(assessment=review()){return preflight(adopt(proposal(completed(),'goal',languageGoal,compatible),'goal'),assessment)}
 const rawRoute=JSON.parse(await readFile('contracts/examples/route.valid.json','utf8'));
 function withOldRoute(state){const route=upgradeRoute(rawRoute);for(const chapter of route.chapters)chapter.stageGoal='独立解释并完成本阶段任务。';state=structuredClone(state);state.routeDraft=route;state.confirmedRevision=route.revision;return validatePlanning(state)}
 
-test('a candidate and its cross-answer assessment remain isolated until explicit adoption',()=>{
+test('a candidate conflicting with later accepted answers requires clarification without changing or jumping',()=>{
  const old=completed(),hash=planningFactsHash(old),epoch=old.backgroundEpoch;
- let state=proposal(old,'goal',languageGoal,review());
+ const state=proposal(old,'goal',languageGoal,review()),before=structuredClone(state);
  assert.deepEqual(state.questions[0].acceptedSnapshot.fields,answers.goal);
  assert.deepEqual(state.questions[0].fields,languageGoal);
  assert.equal(state.questions[1].status,'complete');assert.equal(state.consistency.issues.length,0);
  assert.equal(planningFactsHash(state),hash);assert.equal(state.backgroundEpoch,epoch);assert.equal(canGenerate(state),false);
- state=adopt(state,'goal');
- assert.deepEqual(state.questions[0].acceptedSnapshot.fields,languageGoal);assert.equal(state.questions[0].status,'complete');
- assert.equal(state.questions[1].status,'needs-review');assert.deepEqual(state.questions[1].fields,answers.purpose);
- assert.deepEqual(state.questions[2].acceptedSnapshot.fields,answers.baseline);assert.deepEqual(state.questions[3].fields,answers.time);
- assert.equal(state.backgroundEpoch,epoch+1);assert.notEqual(planningFactsHash(state),hash);
- assert.equal(state.consistency.anchorQuestionId,'goal');assert.equal(state.currentQuestion,'purpose');
- assert.equal(canRequestGeneration(state),false);assert.equal(canGenerate(state),false);
- assert.match(state.consistency.issues[0].id,/^issue_\d+_1$/);
+ assert.equal(answerConfirmation(state,'goal').kind,'clarify');assert.equal(state.currentQuestion,'goal');
+ assert.throws(()=>adopt(state,'goal'),/INCOMPLETE/);assert.deepEqual(state,before);
  assert.deepEqual(validatePlanning(JSON.parse(JSON.stringify(state))),state);
 });
 
 test('adopting a synchronization suggestion preserves unrelated facts and records a real action, then requires one preflight',()=>{
- let state=adopt(proposal(completed(),'goal',languageGoal,review()),'goal');
+ let state=legacyReviewed();
  const id=state.consistency.issues[0].id,oldMessages=structuredClone(state.messages),oldBaseline=structuredClone(state.questions[2]),epoch=state.backgroundEpoch;
  state=acceptConsistencySuggestion(state,id,state.revision,now);
  assert.equal(state.questions[1].fields.context,answers.purpose.context);
@@ -131,17 +126,24 @@ test('unknown question/field targets and invalid synchronization proposals are a
   const assessment=review();mutation(assessment.issues[0]);const state=completed(),before=structuredClone(state);
   assert.throws(()=>proposal(state,'goal',languageGoal,assessment),/RESPONSE/);assert.deepEqual(state,before);
  }
- const state=adopt(proposal(completed(),'goal',languageGoal,review()),'goal'),before=structuredClone(state);
+ const state=legacyReviewed(),before=structuredClone(state);
  assert.throws(()=>acceptConsistencySuggestion(state,'model_supplied_id',state.revision,now),/CONFLICT/);assert.deepEqual(state,before);
 });
 
+test('a model cannot request review for a historical question absent from a new project',()=>{
+ const collected=completed(),state=beginConsistencyCheck(collected,'legacy_scope',collected.revision),before=structuredClone(state);
+ const consistency={status:'requires_review',issues:[{questionId:'scope',fields:['scope'],kind:'uncertain',reason:'Check scope.',suggestion:null}]};
+ assert.throws(()=>applyConsistencyCheck(state,{reply:'Check scope.',consistency},'legacy_scope',state.revision,now),/PLANNING_RESPONSE_INVALID/);
+ assert.deepEqual(state,before);
+});
+
 test('multiple reviewed suggestions can be adopted without extra model calls, but final facts remain unchecked',()=>{
- const assessment=review();assessment.issues.push({questionId:'constraints',fields:['scope'],kind:'uncertain',reason:'需要说明本次小模型的范围。',suggestion:{summary:'保持现有电脑，限定为小型字符模型。',fields:{scope:'只实现小型字符模型'}}});
- let state=adopt(proposal(completed(),'goal',languageGoal,assessment),'goal');
+ const assessment=review();assessment.issues.push({questionId:'time',fields:['weekly'],kind:'uncertain',reason:'需要确认新的每周安排。',suggestion:{summary:'每周安排3小时。',fields:{weekly:'每周3小时'}}});
+ let state=legacyReviewed(assessment);
  const ids=state.consistency.issues.map(issue=>issue.id);state=acceptConsistencySuggestion(state,ids[0],state.revision,now);
- assert.equal(state.questions[4].status,'needs-review');assert.equal(canRequestGeneration(state),false);
+ assert.equal(state.questions.find(q=>q.id==='time').status,'needs-review');assert.equal(canRequestGeneration(state),false);
  state=acceptConsistencySuggestion(state,ids[1],state.revision,now);
- assert.equal(state.answerEvents.length,2);assert.equal(state.questions[4].fields.conditions,answers.constraints.conditions);
+ assert.equal(state.answerEvents.length,2);assert.equal(state.questions.find(q=>q.id==='time').fields.session,answers.time.session);
  assert.equal(canRequestGeneration(state),true);assert.equal(canGenerate(state),false);assert.equal(canGenerate(preflight(state)),true);
 });
 
@@ -153,7 +155,7 @@ test('facts hashes cover accepted summaries, versions and resources without draf
 });
 
 test('unrelated resources invalidate the receipt while preserving unresolved reviews, suggestions and the adopted anchor',()=>{
- const before=adopt(proposal(completed(),'goal',languageGoal,review()),'goal'),issues=structuredClone(before.consistency.issues);
+ const before=legacyReviewed(),issues=structuredClone(before.consistency.issues);
  const state=setResources(before,'An unrelated introductory reading list',before.revision);
  assert.deepEqual(state.questions,before.questions);assert.deepEqual(state.consistency.issues,issues);
  assert.equal(state.questions[1].status,'needs-review');assert.deepEqual(state.questions[1].fields,answers.purpose);
@@ -163,7 +165,7 @@ test('unrelated resources invalidate the receipt while preserving unresolved rev
 });
 
 test('editing a reviewed answer, saving resources and choosing Keep original restores its unresolved review',()=>{
- const before=adopt(proposal(completed(),'goal',languageGoal,review()),'goal');
+ const before=legacyReviewed();
  let state=reanswerQuestion(before,'purpose',before.revision);state=setResources(state,'An unrelated introductory reading list',state.revision);
  assert.equal(state.questions[1].status,'current');assert.deepEqual(state.questions[1].fields,{});assert.deepEqual(state.consistency.issues,before.consistency.issues);
  state=cancelAnswerDraft(state,'purpose',state.revision);
@@ -172,7 +174,7 @@ test('editing a reviewed answer, saving resources and choosing Keep original res
 });
 
 test('a newly adopted full assessment can resolve the review preserved across a resources edit',()=>{
- const before=adopt(proposal(completed(),'goal',languageGoal,review()),'goal');
+ const before=legacyReviewed();
  let state=setResources(before,'An unrelated introductory reading list',before.revision);
  const fields={...answers.purpose,...review().issues[0].suggestion.fields};state=adopt(proposal(state,'purpose',fields,compatible),'purpose');
  assert.equal(state.questions[1].status,'complete');assert.equal(state.consistency.issues.length,0);assert.equal(canGenerate(state),true);
@@ -182,7 +184,7 @@ test('a newly adopted full assessment can resolve the review preserved across a 
 test('JavaScriptCore and PlanningStore preserve review actions, hashes and receipts across restart',{skip:process.platform!=='darwin',timeout:180_000},async()=>{
  const parent=resolve('tmp/checks/answer-consistency-2026-11-04');await mkdir(parent,{recursive:true});const dir=await mkdtemp(join(parent,'domain-native-'));
  const fixture=join(dir,'state.json'),validator=join(dir,'planning.js'),source=join(dir,'main.swift'),binary=join(dir,'verify');
- const initial=adopt(proposal(completed(),'goal',languageGoal,review()),'goal');
+ const initial=legacyReviewed();
  await writeFile(fixture,JSON.stringify(initial));
  await build({entryPoints:['packages/domain/planning.mjs'],bundle:true,format:'iife',globalName:'VibePlanning',platform:'neutral',target:'es2022',outfile:validator,logLevel:'silent'});
  await writeFile(source,`import Foundation

@@ -1,0 +1,20 @@
+{
+  "name": "interview-prefill-baseline-options",
+  "task": "interview",
+  "input": {
+    "locale": "zh-CN", "currentQuestion": "baseline", "prefill": true,
+    "acceptedAnswers": {"goal": {"summary": "学习 SQL。", "fields": {"topic": "SQL"}}, "purpose": {"summary": "独立用 SQL 做业务周报。", "fields": {"criteria": "独立用 SQL 做业务周报"}}},
+    "messages": [],
+    "earlierUserMessages": [{"ref": "B1", "questionId": "goal", "text": "我想学 SQL，能独立从订单表做业务周报。每周可以学三小时。"}]
+  },
+  "response": {
+    "status": "ok",
+    "reply": "你现在能用 SQL 做到哪一步？",
+    "result": {
+      "questionId": "baseline", "complete": false, "summary": "",
+      "fields": {}, "evidence": [], "unresolved": ["你现在能用 SQL 做到哪一步？"],
+      "baselineOptions": ["我还没写过 SQL 查询", "我跟着教程写过简单查询", "我能独立查询一张数据表"]
+    },
+    "missing": []
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "name": "outline-build-agent",
+  "task": "outline",
+  "input": {
+    "locale": "zh-CN",
+    "confirmedBackground": {
+      "goal": {"summary": "搭建工单查询 Agent", "fields": {"topic": "Agent 开发", "outcome": "从命令行查询虚构工单状态，支持同一会话续问"}},
+      "purpose": {"summary": "理解调用工具的全过程", "fields": {"context": "本地练习", "criteria": "能查到工单状态，拒绝错误参数，并解释一次工具调用怎样完成"}},
+      "baseline": {"summary": "会写 Python 函数，没用过 Agent 框架", "fields": {"experience": "会写 Python 函数和基本单元测试"}},
+      "time": {"summary": "每次约一小时", "fields": {"weekly": "每周三小时", "session": "每次约一小时"}}
+    },
+    "limits": {"chapters": 24, "lessonsPerChapter": 64, "totalLessons": 512, "lessonsPerBatch": 3}
+  },
+  "response": {
+    "status": "ok",
+    "reply": "建议沿用 Python，用 OpenAI Python SDK、JSON Schema 和 SQLite 做一个只读工单助手。直接实现调用循环，便于逐步检查模型请求、参数校验和工具结果。",
+    "result": {
+      "title": "用 Python 搭建工单查询 Agent",
+      "practiceRules": [
+        "模拟模型接口始终区分文本与工具请求。工具请求包含名称、arguments 和 call_id，回传结果用同一个 call_id。离线适配器与 SDK 用相同约定。",
+        "get_ticket 是白名单里的只读工具，只接收非空的 ticket_id。工具结果区分状态值、工单不存在与工具失败；正常结果不能代替错误分支证据。",
+        "使用 session_id 和消息顺序保存会话。示范与独立回放采用不同工单和不同会话。"
+      ],
+      "chapters": [
+        {
+          "title": "模型接口与工具调用结构",
+          "stageGoal": "本路线用 Python 和 OpenAI Python SDK 的 Responses API 直接实现调用循环，JSON Schema 校验参数，SQLite 保存会话。先用可替换的模型适配器区分文本回答与工具请求。",
+          "lessons": [
+            {"title": "用 OpenAI Python SDK 接收工具调用", "focus": "用 client.responses.create 定义 get_ticket 工具；让测试适配器分别返回文本和 function_call，记录调用名称、arguments 与 call_id。"}
+          ]
+        },
+        {
+          "title": "参数校验、工具分发与调用循环",
+          "stageGoal": "能检查模型发来的参数，调用经过允许的只读工具，把结果交回发起请求的模型，并在任务结束时停止循环。",
+          "lessons": [
+            {"title": "用 JSON Schema 校验工单参数", "focus": "用 json.loads 和 jsonschema.validate 检查 ticket_id。运行正常、缺参、额外字段和无效 JSON 样例，记录校验结果。"},
+            {"title": "用白名单分发只读工单工具", "focus": "将校验通过的 get_ticket 请求交给固定工具表，查询本地虚构工单，验证未知工具和缺失工单的处理。"},
+            {"title": "回传工具结果并限制循环次数", "focus": "按 call_id 构造 function_call_output 并送回模型，回放一次查询后结束及持续要求调用时达到上限的两种情况。"}
+          ]
+        },
+        {
+          "title": "会话恢复与智能体执行路径评测",
+          "stageGoal": "能恢复一段工单查询会话，并用可重复的测试还原一次请求走过的步骤，判断工具选择、调用顺序和最终回答是否正确。",
+          "lessons": [
+            {"title": "用 SQLite 恢复同一会话", "focus": "按 session_id 与顺序保存模型和工具消息；模拟重启，恢复同一会话的上一条工单查询并隔离其他会话。"},
+            {"title": "追踪并评测智能体的执行路径", "focus": "用 unittest 和固定模型响应回放正常查询、参数错误及循环上限；依次记录模型请求、校验、工具调用和最终回答，对照预期顺序定位偏差。"}
+          ]
+        }
+      ]
+    },
+    "missing": []
+  }
+}

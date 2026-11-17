@@ -66,6 +66,7 @@ final class AgentLogin {
 
 final class AgentManager {
     static let ids=["codex","claude-code","codebuddy","qoder","openclaw","hermes"]
+    static let sessionProviders: Set<String> = ["codex", "claude-code", "codebuddy"]
     private let runtime:RuntimeDirectory
     private let jobsLock=NSLock(), preferenceLock=NSLock()
     private var jobs:[String:AgentLogin]=[:]
@@ -73,9 +74,11 @@ final class AgentManager {
     private let command: (URL,[String],TimeInterval)->AgentCommandResult
     private let resolverOverride: ((String)->URL?)?
     private let projectWorkspace:((String)throws->URL)?
+    private let projectChoice:((String)throws->String?)?
     private let codebuddy:CodeBuddyAdapter
-    init(runtime:RuntimeDirectory,home:URL=FileManager.default.homeDirectoryForCurrentUser,resolver:((String)->URL?)?=nil,runner:((URL,[String],TimeInterval)->AgentCommandResult)?=nil,projectWorkspace:((String)throws->URL)?=nil) throws {
+    init(runtime:RuntimeDirectory,home:URL=FileManager.default.homeDirectoryForCurrentUser,resolver:((String)->URL?)?=nil,runner:((URL,[String],TimeInterval)->AgentCommandResult)?=nil,projectWorkspace:((String)throws->URL)?=nil,projectChoice:((String)throws->String?)?=nil) throws {
         self.runtime=try runtime.child("agents");self.home=home;self.resolverOverride=resolver;self.projectWorkspace=projectWorkspace
+        self.projectChoice=projectChoice
         self.codebuddy=try CodeBuddyAdapter(runtime:self.runtime,home:home)
         let working=self.runtime.url
         self.command=runner ?? {url,args,timeout in AgentManager.run(url,args:args,timeout:timeout,working:working)}
@@ -198,16 +201,21 @@ final class AgentManager {
     }
     private func validScope(_ scope:String)->Bool {scope=="default" || scope.range(of:"^proj_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$",options:.regularExpression) != nil}
     func choice(_ scope:String)throws->Any {
-        guard validScope(scope) else{throw AgentError.invalid};preferenceLock.lock();defer{preferenceLock.unlock()}
+        guard validScope(scope) else{throw AgentError.invalid}
+        if scope != "default",let saved=try projectChoice?(scope){return saved}
+        preferenceLock.lock();defer{preferenceLock.unlock()}
         return try runtime.locked{ () -> Any in guard let data=try runtime.read("choices.json",maximumBytes:131_072),let values=try JSONSerialization.jsonObject(with:data) as? [String:String] else{return NSNull()};if let value=values[scope] ?? values["default"],Self.ids.contains(value)||value=="manual"{return value};return NSNull()}
     }
+    func validateChoice(_ choice:String)throws {
+        if choice=="manual"{return}
+        guard Self.ids.contains(choice) else{throw AgentError.invalid}
+        let state=try probe(choice)["state"] as? String
+        if state=="login-required"{throw AgentError.auth}
+        guard state=="ready" else{throw AgentError.unavailable}
+    }
     func save(_ scope:String,choice:String)throws {
-        guard validScope(scope),Self.ids.contains(choice)||choice=="manual" else{throw AgentError.invalid}
-        if choice != "manual"{
-            let state=try probe(choice)["state"] as? String
-            if state=="login-required"{throw AgentError.auth}
-            guard state=="ready" else{throw AgentError.unavailable}
-        }
+        guard validScope(scope) else{throw AgentError.invalid}
+        try validateChoice(choice)
         preferenceLock.lock();defer{preferenceLock.unlock()}
         try runtime.locked{
             var values:[String:String]=[:]

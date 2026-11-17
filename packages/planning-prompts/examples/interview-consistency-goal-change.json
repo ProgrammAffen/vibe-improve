@@ -2,41 +2,14 @@
   "name": "interview-consistency-goal-change",
   "task": "interview",
   "input": {
-    "locale": "en",
-    "currentQuestion": "goal",
+    "locale": "zh-CN",
+    "currentQuestion": "purpose",
     "acceptedAnswers": {
       "goal": {
-        "summary": "Train an image classifier.",
+        "summary": "先读懂市场行情，暂不练习交易。",
         "fields": {
-          "topic": "Image classification",
-          "outcome": "Train an image classifier and analyze misclassified images"
-        }
-      },
-      "purpose": {
-        "summary": "Train an image classifier and analyze mistakes.",
-        "fields": {
-          "context": "Personal experiments",
-          "criteria": "Train an image classifier, report accuracy and analyze misclassified images"
-        }
-      },
-      "baseline": {
-        "summary": "Previously trained a small image classifier.",
-        "fields": {
-          "experience": "Trained an image classifier with guidance"
-        }
-      },
-      "time": {
-        "summary": "Five hours each week, one hour per session.",
-        "fields": {
-          "weekly": "Five hours",
-          "session": "One hour"
-        }
-      },
-      "constraints": {
-        "summary": "A laptop and small text data; no hard deadline.",
-        "fields": {
-          "conditions": "Laptop and small text data",
-          "scope": "Small local examples"
+          "topic": "股票市场基础",
+          "outcome": "先读懂市场行情，暂不练习交易"
         }
       }
     },
@@ -44,41 +17,36 @@
       {
         "ref": "U1",
         "role": "user",
-        "text": "I am changing my goal to train a character-level language model on my own text."
+        "text": "做到能在模拟账户独立查看行情、提交委托并检查委托状态。"
+      },
+      {
+        "ref": "A1",
+        "role": "assistant",
+        "text": "前面先选了只读懂行情、暂不练习交易，这次提到了模拟下单。你想把目标扩展为先读懂行情，再练习模拟下单吗？"
+      },
+      {
+        "ref": "U2",
+        "role": "user",
+        "text": "对，把目标改成先读懂行情，再练习模拟下单，两部分都保留，只用模拟账户。"
       }
-    ],
-    "acceptedAnswer": {
-      "summary": "Train an image classifier.",
-      "fields": {
-        "topic": "Image classification",
-        "outcome": "Train an image classifier and analyze misclassified images"
-      }
-    },
-    "currentFields": {}
+    ]
   },
   "response": {
     "status": "ok",
-    "reply": "Please review your new goal. The earlier success criteria also need review if you adopt it.",
+    "reply": "本题的达标表现是看懂基本行情后，在模拟账户独立提交委托并检查状态。确认这次回答时，将一并把第 1 题目标调整为先读懂行情，再练习模拟下单，两部分都保留。是否确认？",
     "result": {
-      "questionId": "goal",
+      "questionId": "purpose",
       "complete": true,
-      "summary": "Train a character-level language model.",
+      "summary": "在读懂基本行情后，用模拟账户独立提交委托并检查状态。",
       "fields": {
-        "topic": "Character-level language models",
-        "outcome": "Train on my text and explain generated samples"
+        "criteria": "读懂基本行情后，在模拟账户独立提交委托并检查状态，不涉及真实资金"
       },
       "evidence": [
         {
-          "field": "topic",
-          "messageRef": "U1",
-          "proposalRef": null,
-          "quote": "The user explicitly chose the new text-generation goal."
-        },
-        {
-          "field": "outcome",
-          "messageRef": "U1",
-          "proposalRef": null,
-          "quote": "The user explicitly chose the new text-generation goal."
+          "field": "criteria",
+          "messageRef": "U2",
+          "proposalRef": "A1",
+          "quote": "用户明确同意保留行情基础，并扩展至模拟下单。"
         }
       ],
       "unresolved": [],
@@ -86,16 +54,16 @@
         "status": "requires_review",
         "issues": [
           {
-            "questionId": "purpose",
+            "questionId": "goal",
             "fields": [
-              "criteria"
+              "outcome"
             ],
             "kind": "incompatible",
-            "reason": "The adopted goal is a character-level language model, while the adopted success criteria still require image classification.",
+            "reason": "原目标明确暂不练习交易，本次回答已明确希望增加模拟操作，并保留行情基础。",
             "suggestion": {
-              "summary": "Train on text, show generated samples, and explain training behavior and limits.",
+              "summary": "先读懂基本行情，再用模拟账户练习下单。",
               "fields": {
-                "criteria": "Show generated text and explain training/validation loss trends and limits without a fabricated score threshold."
+                "outcome": "先读懂基本行情，再用模拟账户练习下单，不涉及真实资金"
               }
             }
           }

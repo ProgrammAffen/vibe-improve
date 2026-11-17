@@ -110,6 +110,80 @@ test('one canonical prompt pack supplies isolated task schemas, valid examples a
   }
 });
 
+test('assembled planning and repair prompts include aligned learning and executable practice rules',async()=>{
+  const pack=await loadPromptPack();
+  const taskRules={
+    outline:['在 practiceRules 约定初始数据','最终表现任务与可观察证据','早期带指导的尝试','案例标识','交接状态','分配总和须满足预算','stageGoal 写给学习者','把目录中每节分配的分钟数实际相加'],
+    lessons:['目录里的章节标题','即使 assessment 为 null','按题面输入推演每项达标证据','按其上限估算','input.priorPractice','练习的数据结构和字段清单写入活动步骤','renameableLessonRefs','两种 mode 都把复算值','公开字段中同一独立题的解答','准备、活动、提交、对账与收尾','公式、形状断言与相关阈值也要随之变化','如何隔离状态并观察不同结果','固定结果不能绕过待验证的组件','以 requestedCandidate 为编辑基线','previousBlockingIssues','可重复的触发条件','准备输入、执行动作、取得回报、提交证据'],
+    review:['外部结果的证据','同层次的达标证据','正确解无法通过','learning_language','result.summary','先只读学习者看到的','用候选提供的证据下结论','沿同一案例检查准备、操作、后续汇总和自查','不同的合法配置','误用示范常量或取到上一条输入','只把候选中所有小节的 estimatedMinutes 相加','最终练习是否调用了要验收的组件','只列真正需要修改的小节','复审要从当前文字验证仍存在的问题','操作后回报是否给出'],
+  };
+  const practiceRules=[
+    '每项核心目标都有练习和达标证据',
+    '最终任务逐项覆盖已确认的结果',
+    '检查所有消费者实际接入上游约定',
+    '练习须有接收方执行接收动作并生成证据',
+    '未照做过的相近任务检验独立应用',
+    '保留解答由学习者得出',
+    '在后续相关小节安排主动回忆或解释',
+    '用题给输入复算',
+    '逐节对照产出方结束状态和使用方起点',
+    '可读取的初始记录',
+    '明确同一操作的判定键、未终结与终结状态',
+    '推演练习与验收',
+    '消费方需要的字段由生产方产出',
+    '存储键在实际表或集合内唯一',
+    '查询、检索、去重和验收沿用完整的键',
+    '按各自的所属对象查询当前版本',
+    '标识和内容指纹分别记录',
+    '返回它实际的标识、当前状态与相关时间戳',
+    '外部结果以可观察证据为准',
+    '每条练习路径各验收它能产生的记录',
+    '学习者能迁移的领域能力',
+  ];
+  for(const task of [...tasks,'edit']){
+    for(const repair of [false,true]){
+      const {system}=assembleTask(pack,task,{repair});
+      const [instructions]=system.split('\n\nPROMPT_VERSION:',1);
+      const rules=['只在协议指定的引用字段','面向学习者的正文使用章节标题','显式 missing=[]'];
+      if(['outline','lessons','review','edit'].includes(task))rules.push(...practiceRules);
+      if(taskRules[task])rules.push(...taskRules[task]);
+      for(const rule of rules)assert.ok(instructions.includes(rule),`${task} (${repair?'repair':'normal'}): missing ${rule}`);
+    }
+  }
+});
+
+test('the knowledge refresh example cites the prior lesson by title and keeps task references structured',async()=>{
+  const pack=await loadPromptPack();
+  const fixture=pack.examples.find(example=>example.name==='lessons-knowledge-refresh');
+  assert.ok(fixture);
+  const {examples,schema}=assembleTask(pack,'lessons');
+  const {input,response}=fixture;
+  assert.deepEqual(examples.find(example=>example.input.currentChapter?.title===input.currentChapter.title),{input,response});
+  assert.equal(matchesSchema(response,schema),true);
+  const [{ref,prerequisites,...learnerFields}]=response.result.nodes;
+  assert.equal(ref,input.requestedLessons[0].ref);
+  assert.deepEqual(prerequisites,input.availablePrerequisites.map(lesson=>lesson.ref));
+  assert.ok(learnerFields.activities.some(activity=>activity.includes(input.availablePrerequisites[0].title)));
+  assert.doesNotMatch(JSON.stringify([response.reply,learnerFields]),/\bL[1-9]\d*\b/);
+});
+
+test('the independent calculation example keeps both baseline results in grading guidance',async()=>{
+  const pack=await loadPromptPack();
+  const {response}=pack.examples.find(example=>example.name==='lessons-independent-calculation');
+  const [{assessment,...lesson}]=response.result.nodes;
+  const {evaluatorPrompt,...visibleAssessment}=assessment;
+  const publicContent=JSON.stringify([response.reply,lesson,visibleAssessment]);
+  const [value,correctBaseline,wrongBaseline]=[190,200,180];
+  const correct=((value-correctBaseline)/correctBaseline*100).toFixed(2);
+  const wrong=((value-wrongBaseline)/wrongBaseline*100).toFixed(2);
+  assert.ok(Number(correct)<0&&Number(wrong)>0);
+  for(const rate of [correct,wrong]){
+    const percentage=Math.abs(Number(rate)).toFixed(2)+'%';
+    assert.ok(evaluatorPrompt.includes(percentage));
+    assert.ok(!publicContent.includes(percentage));
+  }
+});
+
 test('checked-in Swift resources match deterministic generation',async()=>{
   const pack=await loadPromptPack(),path=resolve('apps/macos/PlanningPromptPackResources.swift');
   assert.equal(await readFile(path,'utf8'),renderSwift(pack));
@@ -195,6 +269,8 @@ function canonicalParityCases(pack){
       cases.push({name:task+'-'+status+'-without-gap',task,response:{...outcome,missing:[]},valid:status==='cannot_complete'});
     }
   }
+  add('interview-complete-without-consistency','interview',value=>{value.result.complete=true;value.result.unresolved=[];delete value.result.consistency});
+  add('interview-incomplete-without-consistency','interview',value=>{value.result.complete=false;value.result.unresolved=['Which outcome do you want?'];delete value.result.consistency},true);
   add('interview-numeric-complete','interview',value=>{value.result.complete=1});
   add('interview-field-of-another-question','interview',value=>{value.result.fields={weekly:'an hour'}});
   add('interview-field-value-boolean','interview',value=>{value.result.fields={topic:true}});
@@ -211,6 +287,8 @@ function canonicalParityCases(pack){
   add('review-numeric-ready','review',value=>{value.result.ready=1});
   add('review-numeric-blocking','review',value=>{value.result.issues[0].blocking=1});
   add('review-unknown-issue-code','review',value=>{value.result.issues[0].code='style'});
+  add('review-learning-language-code','review',value=>{value.result.issues[0].code='learning_language'},true);
+  add('review-overlong-summary','review',value=>{value.result.summary='x'.repeat(161)});
   add('review-malformed-target-ref','review',value=>{value.result.issues[0].targetRefs=['host_identifier']});
   return cases;
 }
@@ -311,7 +389,7 @@ for status in ["needs_input","cannot_complete"]{
  if status=="needs_input"{invalid=response;invalid["missing"]=[] as [String];rejected{_ = try PlanningPromptPack.unwrap(invalid,task:"outline")}}
 }
 var interview=examples.first{$0["name"] as? String=="interview-adoption"}!["response"] as! [String:Any]
-for mutation in ["numericBoolean","extraField","wrongQuestionField","missingEvidenceKey","evidenceObject","nonStringField","completeWithUnresolved"]{
+for mutation in ["numericBoolean","extraField","wrongQuestionField","missingEvidenceKey","evidenceObject","nonStringField","completeWithUnresolved","missingConsistency"]{
  var response=try copied(interview),result=response["result"] as! [String:Any]
  if mutation=="numericBoolean"{result["complete"]=1}
  if mutation=="extraField"{result["extra"]=true}
@@ -320,6 +398,7 @@ for mutation in ["numericBoolean","extraField","wrongQuestionField","missingEvid
  if mutation=="evidenceObject"{result["evidence"]=[String:Any]()}
  if mutation=="nonStringField"{result["fields"]=["topic":1]}
  if mutation=="completeWithUnresolved"{result["unresolved"]=["what outcome?"]}
+ if mutation=="missingConsistency"{result.removeValue(forKey:"consistency")}
  response["result"]=result;rejected{_ = try PlanningPromptPack.unwrap(response,task:"interview")}
 }
 let lessons=examples.first{$0["name"] as? String=="lessons-complete"}!["response"] as! [String:Any]
@@ -367,6 +446,13 @@ check(updates.count==1 && updates[0]["id"] as? String=="goal")
 check(evidence[0]["messageId"] as? String=="private_topic" && evidence[0]["proposalMessageId"]==nil)
 check(evidence[1]["messageId"] as? String=="private_assent" && evidence[1]["proposalMessageId"] as? String=="private_suggestion")
 check((updates[0]["missing"] as? [String])?.isEmpty==true)
+var noCheck=try copied(interview),noCheckResult=noCheck["result"] as! [String:Any]
+noCheckResult.removeValue(forKey:"consistency");noCheck["result"]=noCheckResult
+rejected{_ = try PlanningPromptPack.interviewResult(noCheck,context:context)}
+noCheckResult["complete"]=false;noCheckResult["unresolved"]=["Which outcome do you want?"];noCheck["result"]=noCheckResult
+let clarification=try PlanningPromptPack.interviewResult(noCheck,context:context)
+check((clarification["updates"] as! [[String:Any]])[0]["complete"] as? Bool==false,"incomplete clarification unexpectedly required an assessment")
+check(clarification["consistency"]==nil,"host invented a consistency assessment")
 for mutation in ["unknownUser","assistantAsUser","userAsProposal","laterProposal","unknownProposal","oldRealId","otherQuestion","duplicateEvidence","orphanEvidence","missingEvidence"]{
  var response=try copied(interview),bad=response["result"] as! [String:Any],items=bad["evidence"] as! [[String:Any]]
  if mutation=="unknownUser"{items[0]["messageRef"]="U99"}
@@ -381,6 +467,44 @@ for mutation in ["unknownUser","assistantAsUser","userAsProposal","laterProposal
  if mutation=="missingEvidence"{items.removeFirst()}
  bad["evidence"]=items;response["result"]=bad;rejected{_ = try PlanningPromptPack.interviewResult(response,context:context)}
 }
+let purposePrefill=examples.first{$0["name"] as? String=="interview-prefill-purpose"}!["response"] as! [String:Any]
+let baselinePrefill=examples.first{$0["name"] as? String=="interview-prefill-baseline-options"}!["response"] as! [String:Any]
+let firstGoalMessage:[String:Any]=["id":"original_goal","role":"user","questionId":"goal","text":"我想学 SQL，能独立从订单表做业务周报。每周可以学三小时。"]
+var reuseContext:[String:Any]=["locale":"zh-CN","currentQuestion":"purpose","pending":["prefill":true],"questions":[
+ ["id":"goal","status":"complete","summary":"学习 SQL","fields":["topic":"SQL"],"conversationFrom":1],
+ ["id":"purpose","status":"current","summary":"","fields":[String:String]()],
+ ["id":"baseline","status":"pending","summary":"","fields":[String:String]()]],"messages":[
+ ["id":"retired_goal","role":"user","questionId":"goal","text":"RETIRED_TURN"],firstGoalMessage,
+ ["id":"goal_reply","role":"assistant","questionId":"goal","text":"OLD_ASSISTANT_REPLY"],
+ ["id":"future_answer","role":"user","questionId":"baseline","text":"FUTURE_TURN"]]]
+let reuseInput=try PlanningPromptPack.interviewInput(reuseContext)
+let earlierMessages=reuseInput["earlierUserMessages"] as! [[String:Any]]
+check(reuseInput["prefill"] as? Bool==true && (reuseInput["messages"] as! [[String:Any]]).isEmpty)
+check(earlierMessages.count==1 && earlierMessages[0]["ref"] as? String=="B1" && earlierMessages[0]["questionId"] as? String=="goal")
+let reuseJSON=String(decoding:try json(reuseInput),as:UTF8.self)
+for hidden in ["RETIRED_TURN","OLD_ASSISTANT_REPLY","FUTURE_TURN","original_goal"]{check(!reuseJSON.contains(hidden),"non-reusable text or host ID entered the prompt")}
+let reuseResult=try PlanningPromptPack.interviewResult(purposePrefill,context:reuseContext)
+let reuseUpdate=(reuseResult["updates"] as! [[String:Any]])[0]
+let reuseEvidence=(reuseUpdate["evidence"] as! [[String:Any]])[0]
+check(reuseEvidence["messageId"] as? String=="original_goal" && reuseEvidence["reusedFrom"] as? String=="goal")
+for (source,proposal) in [("B2",NSNull() as Any),("B1","A1" as Any),("U1",NSNull() as Any)] {
+ var altered=try copied(purposePrefill),answer=altered["result"] as! [String:Any],links=answer["evidence"] as! [[String:Any]]
+ links[0]["messageRef"]=source;links[0]["proposalRef"]=proposal
+ answer["evidence"]=links;altered["result"]=answer
+ rejected{_ = try PlanningPromptPack.interviewResult(altered,context:reuseContext)}
+}
+var baselineContext=reuseContext
+baselineContext["currentQuestion"]="baseline";baselineContext["messages"]=[firstGoalMessage]
+var baselineQuestions=reuseContext["questions"] as! [[String:Any]]
+baselineQuestions[0]["conversationFrom"]=0
+baselineQuestions[1]=["id":"purpose","status":"complete","summary":"制作周报","fields":["criteria":"制作周报"]]
+baselineQuestions[2]["status"]="current"
+baselineContext["questions"]=baselineQuestions
+let baselineResult=try PlanningPromptPack.interviewResult(baselinePrefill,context:baselineContext)
+check((baselineResult["baselineOptions"] as! [String]).count==3)
+rejected{_ = try PlanningPromptPack.interviewResult(baselinePrefill,context:reuseContext)}
+baselineContext.removeValue(forKey:"pending")
+rejected{_ = try PlanningPromptPack.interviewResult(baselinePrefill,context:baselineContext)}
 // Adopted snapshots survive draft edits and targeted review; IDs/hashes stay host-only.
 var snapshotContext=context,snapshotQuestions=context["questions"] as! [[String:Any]]
 snapshotQuestions[0]["fields"]=["topic":"UNADOPTED_NEW_DRAFT"]

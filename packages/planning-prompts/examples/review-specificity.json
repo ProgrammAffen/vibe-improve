@@ -10,27 +10,47 @@
       "time": "每周四小时，每次约一小时，无硬截止日",
       "constraints": "普通电脑与小型CSV可用；不学机器学习和部署"
     },
-    "knownRefs": [
-      "L1"
-    ],
-    "candidate": [
-      {
-        "ref": "L1",
-        "title": "读取CSV",
-        "objectives": [
-          "掌握基础"
-        ],
-        "activities": [
-          "阅读材料"
-        ]
-      }
-    ]
+    "outline": {
+      "title": "分析销售数据",
+      "chapters": [
+        {
+          "title": "读取与检查数据",
+          "stageGoal": "能检查源数据中的无效金额。",
+          "lessons": [
+            {"ref": "L1", "title": "读取CSV", "focus": "区分正常和无效金额。"}
+          ]
+        }
+      ]
+    },
+    "knownRefs": ["C1", "L1"],
+    "candidate": {
+      "title": "分析销售数据",
+      "chapters": [
+        {
+          "ref": "C1",
+          "title": "读取与检查数据",
+          "stageGoal": "能检查源数据中的无效金额。",
+          "lessons": [
+            {
+              "ref": "L1",
+              "title": "读取CSV",
+              "objectives": ["掌握基础"],
+              "prerequisites": [],
+              "estimatedMinutes": 30,
+              "activities": ["阅读材料"],
+              "assessment": null
+            }
+          ]
+        }
+      ]
+    }
   },
   "response": {
     "status": "ok",
-    "reply": "请核对结果。",
+    "reply": "路线需要补全练习。",
     "result": {
       "ready": false,
+      "summary": "练习只安排阅读，缺少用实际数据找出无效金额的步骤。",
       "issues": [
         {
           "code": "specificity",

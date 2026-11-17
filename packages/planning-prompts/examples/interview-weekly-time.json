@@ -1,0 +1,47 @@
+{
+  "name": "interview-weekly-time",
+  "task": "interview",
+  "input": {
+    "locale": "zh-CN",
+    "currentQuestion": "time",
+    "questionIds": [
+      "goal",
+      "purpose",
+      "baseline",
+      "time"
+    ],
+    "messages": [
+      {
+        "ref": "U1",
+        "role": "user",
+        "text": "一周大概两小时。"
+      }
+    ]
+  },
+  "response": {
+    "status": "ok",
+    "reply": "每周大概能学两小时。是否确认该回答？",
+    "result": {
+      "questionId": "time",
+      "complete": true,
+      "summary": "每周大概能学两小时。",
+      "fields": {
+        "weekly": "每周约两小时"
+      },
+      "evidence": [
+        {
+          "field": "weekly",
+          "messageRef": "U1",
+          "proposalRef": null,
+          "quote": "用户给出了每周可用时间。"
+        }
+      ],
+      "unresolved": [],
+      "consistency": {
+        "status": "consistent",
+        "issues": []
+      }
+    },
+    "missing": []
+  }
+}

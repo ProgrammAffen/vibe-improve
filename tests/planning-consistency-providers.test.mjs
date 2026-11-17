@@ -51,7 +51,11 @@ def answer(text):
   assert context['messages']==[{'ref':'U1','role':'user','text':'I now want to train a character-level language model on my text.'}]
   assert context['currentFields']=={}
   fields={'topic':'Character-level language models','outcome':'Train on my text and explain generated samples'}
-  return envelope({'questionId':'goal','complete':True,'summary':'Train a character-level language model on my text.','fields':fields,'evidence':[{'field':field,'messageRef':'U1','proposalRef':None,'quote':'The user explicitly changed the goal.'} for field in fields],'unresolved':[],'consistency':conflict()},'Please review the new goal and the affected success criteria.')
+  result={'questionId':'goal','complete':True,'summary':'Train a character-level language model on my text.','fields':fields,'evidence':[{'field':field,'messageRef':'U1','proposalRef':None,'quote':'The user explicitly changed the goal.'} for field in fields],'unresolved':[],'consistency':conflict()}
+  if mode=='interview-missing-check' or mode=='interview-repair-check' and 'repair' not in context:del result['consistency']
+  if 'repair' in context:
+   candidate=json.loads(context['repair']['candidate']);assert 'consistency' not in candidate['result']
+  return envelope(result,'Please review the new goal and the affected success criteria.')
  if mode=='late-outline' or task=='lessons' and context['requestedLessons'][0]['ref']=='L1':
   return json.dumps({'status':'needs_input','reply':'Review the success criteria before generating the route.','result':None,'missing':['Success criteria need to match the adopted goal'],'consistency':conflict()})
  if task=='outline':
@@ -89,12 +93,12 @@ func records(_ directory:URL)->[[String:Any]]{guard let text=try? String(content
 let acceptedFields:[String:[String:String]]=["goal":["topic":"ADOPTED_TEXT_TOPIC","outcome":"ADOPTED_TEXT_OUTCOME"],"purpose":["context":"ADOPTED_PERSONAL_CONTEXT","criteria":"ADOPTED_IMAGE_CRITERIA"],"baseline":["experience":"ADOPTED_REAL_IMAGE_HISTORY"],"time":["weekly":"Five hours","session":"One hour"],"constraints":["conditions":"CPU laptop","scope":"Small local experiments"]]
 var systemHashes:[String:String]=[:]
 for provider in ["codex","claude-code","codebuddy"] {
- for mode in ["consistent","requires-review","unknown-target","repair-once","interview-conflict","late-outline","late-lessons"] {
+ for mode in ["consistent","requires-review","unknown-target","repair-once","interview-conflict","interview-missing-check","interview-repair-check","late-outline","late-lessons"] {
   let directory=base.appendingPathComponent(provider+"-"+mode);try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
   let runtime=try RuntimeDirectory(url:directory.appendingPathComponent("runtime")),agents=try AgentManager(runtime:runtime,projectWorkspace:{_ in directory})
   let launch=try AgentSessionLaunch(provider:provider,projectID:project,executable:URL(fileURLWithPath:"/usr/bin/python3"),arguments:[fixture,provider,mode]+(provider=="codex" ? []:["--tools",""]),workspace:directory,environment:ProcessInfo.processInfo.environment)
-  let manager=PlanningAgentManager(agents:agents,timeout:8,prepare:{_ in AgentSessionPreparation(projectID:project,provider:provider,launch:launch)})
-  let intent=mode=="interview-conflict" ? "interview":mode.hasPrefix("late-") ? "generate":"consistency"
+  let manager=PlanningAgentManager(agents:agents,idleTimeout:8,prepare:{_ in AgentSessionPreparation(projectID:project,provider:provider,launch:launch)})
+  let intent=mode.hasPrefix("interview-") ? "interview":mode.hasPrefix("late-") ? "generate":"consistency"
   var questions:[[String:Any]]=[]
   for id in ["goal","purpose","baseline","time","constraints"] {
    var adopted=acceptedFields[id]!
@@ -128,7 +132,7 @@ for provider in ["codex","claude-code","codebuddy"] {
    let task=call["task"] as! String,hash=call["systemHash"] as! String
    if let prior=systemHashes[task]{check(hash==prior,"provider or mode changed the fixed system for "+task)}else{systemHashes[task]=hash}
   }
-  if mode=="unknown-target" {
+  if mode=="unknown-target" || mode=="interview-missing-check" {
    check(final["state"] as? String=="failed" && final["errorCode"] as? String=="PLANNING_AGENT_RESULT_REJECTED","unknown adopted target was accepted: "+provider+" "+String(describing:final))
    check(commits==0 && calls.count==2 && repairs.count==1,"unknown target escaped one-repair budget")
   }else {
@@ -140,11 +144,11 @@ for provider in ["codex","claude-code","codebuddy"] {
     check(repairs.isEmpty,"business conflict triggered repair")
     if mode=="late-outline"{check(calls.count==1 && calls[0]["task"] as? String=="outline","late outline continued into lessons")}
     else{check(calls.first?["task"] as? String=="outline" && calls.contains{$0["task"] as? String=="lessons"},"late lesson fixture never expanded lessons")}
-   }else if mode=="interview-conflict" {
+   }else if mode.hasPrefix("interview-") {
     check((payload?["consistency"] as? [String:Any])?["status"] as? String=="requires_review","interview lost same-call consistency")
     let update=(payload?["updates"] as! [[String:Any]])[0],evidence=update["evidence"] as! [[String:Any]]
     check(update["id"] as? String=="goal" && update["complete"] as? Bool==true && evidence.count==2 && evidence.allSatisfy{$0["messageId"] as? String=="private_original_user"},"interview aliases did not map to actual supporting user")
-    check(calls.count==1 && repairs.isEmpty,"same-call interview assessment made an extra model request")
+    check(calls.count==(mode=="interview-repair-check" ? 2:1) && repairs.count==(mode=="interview-repair-check" ? 1:0),"interview assessment repair budget changed")
    }else {
     check((payload?["consistency"] as? [String:Any])?["status"] as? String==(mode=="consistent" ? "consistent":"requires_review"),"preflight outcome changed")
     check(calls.count==(mode=="repair-once" ? 2:1) && repairs.count==(mode=="repair-once" ? 1:0),"preflight retry count changed")
@@ -162,7 +166,7 @@ check(Set(systemHashes.keys)==Set(["consistency","interview","outline","lessons"
  const run=spawnSync(binary,[join(dir,'data'),fixture],{encoding:'utf8',timeout:75_000});
  await writeFile(join(dir,'run.log'),run.stdout+run.stderr);
  if(run.status!==0){
-  const errors=[];for(const provider of ['codex','claude-code','codebuddy'])for(const mode of ['consistent','requires-review','unknown-target','repair-once','interview-conflict','late-outline','late-lessons']){
+  const errors=[];for(const provider of ['codex','claude-code','codebuddy'])for(const mode of ['consistent','requires-review','unknown-target','repair-once','interview-conflict','interview-missing-check','interview-repair-check','late-outline','late-lessons']){
    try{errors.push(await readFile(join(dir,'data',provider+'-'+mode,'fixture-error.log'),'utf8'))}catch{}
   }
   assert.fail(run.stderr+run.stdout+errors.join('\n'));

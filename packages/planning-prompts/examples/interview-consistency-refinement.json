@@ -1,0 +1,50 @@
+{
+  "name": "interview-consistency-refinement",
+  "task": "interview",
+  "input": {
+    "locale": "zh-CN",
+    "currentQuestion": "purpose",
+    "acceptedAnswers": {
+      "goal": {
+        "summary": "学习股票市场，认识基本操作。",
+        "fields": {
+          "topic": "股票市场",
+          "outcome": "认识股票市场的基本操作"
+        }
+      }
+    },
+    "messages": [
+      {
+        "ref": "U1",
+        "role": "user",
+        "text": "能在模拟账户里独立查看行情、提交模拟委托并检查委托状态就可以，不涉及真实资金。"
+      }
+    ]
+  },
+  "response": {
+    "status": "ok",
+    "reply": "你的达标表现是独立查看行情、提交模拟委托并检查状态，全程使用模拟账户。是否确认该回答？",
+    "result": {
+      "questionId": "purpose",
+      "complete": true,
+      "summary": "在模拟账户独立查看行情、提交委托并检查状态，不涉及真实资金。",
+      "fields": {
+        "criteria": "在模拟账户独立查看行情、提交委托并检查委托状态，不涉及真实资金"
+      },
+      "evidence": [
+        {
+          "field": "criteria",
+          "messageRef": "U1",
+          "proposalRef": null,
+          "quote": "用户明确给出了模拟操作的达标表现。"
+        }
+      ],
+      "unresolved": [],
+      "consistency": {
+        "status": "consistent",
+        "issues": []
+      }
+    },
+    "missing": []
+  }
+}

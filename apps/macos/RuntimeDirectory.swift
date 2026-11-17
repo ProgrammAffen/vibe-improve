@@ -1,7 +1,7 @@
 import Foundation
 import Darwin
 
-enum RuntimeFileError: Error { case unavailable, invalid }
+enum RuntimeFileError: Error { case unavailable, invalid, busy }
 
 final class RuntimeDirectory {
     let url: URL
@@ -89,11 +89,17 @@ final class RuntimeDirectory {
         guard fsync(descriptor) == 0 else { throw RuntimeFileError.unavailable }
     }
     func locked<T>(_ body: () throws -> T) throws -> T {
-        let file = openat(descriptor, "session.lock", O_RDWR | O_CREAT | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC, 0o600)
+        try locked("session.lock", body)
+    }
+    func locked<T>(_ name: String, _ body: () throws -> T) throws -> T {
+        try valid(name)
+        let file = openat(descriptor, name, O_RDWR | O_CREAT | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC, 0o600)
         guard file >= 0 else { throw RuntimeFileError.unavailable }
         defer { close(file) }
         _ = try regular(file)
-        guard flock(file, LOCK_EX | LOCK_NB) == 0 else { throw RuntimeFileError.unavailable }
+        guard flock(file, LOCK_EX | LOCK_NB) == 0 else {
+            throw errno == EWOULDBLOCK ? RuntimeFileError.busy : RuntimeFileError.unavailable
+        }
         defer { flock(file, LOCK_UN) }
         return try body()
     }

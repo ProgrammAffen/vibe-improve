@@ -1,7 +1,8 @@
 import {sha256} from './sha256.mjs';
+import {QUESTION_FIELDS} from './planning-questions.mjs';
+export {QUESTION_FIELDS} from './planning-questions.mjs';
 
 export const CONSISTENCY_VERSION='answer-consistency.v1';
-export const QUESTION_FIELDS=Object.freeze({goal:['topic','outcome'],purpose:['context','criteria','aids'],baseline:['experience','support','strategy'],time:['weekly','session','schedule','deadline','deadlineType'],constraints:['scope','conditions','strategy']});
 const questionIds=Object.keys(QUESTION_FIELDS);
 const record=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const keys=(value,allowed,required=allowed)=>record(value)&&Object.keys(value).every(key=>allowed.includes(key))&&required.every(key=>Object.hasOwn(value,key));
@@ -12,6 +13,7 @@ const canonical=value=>Array.isArray(value)?value.map(canonical):record(value)?O
 // Legacy complete answers remain readable. Their first mutation materializes a
 // stable snapshot; absence of a receipt never counts as a successful check.
 export function acceptedAnswer(question){
+  if(!question)return null;
   if(question.acceptedSnapshot)return question.acceptedSnapshot;
   return question.status==='complete'&&Object.keys(question.fields).length?{revision:0,summary:question.summary,fields:question.fields,evidence:question.evidence}:null;
 }
@@ -29,7 +31,7 @@ export function consistencyReady(state){
   return Boolean(receipt&&receipt.version===CONSISTENCY_VERSION&&receipt.status==='consistent'&&receipt.epoch===(state.backgroundEpoch??0)&&Array.isArray(receipt.issues)&&receipt.issues.length===0&&receipt.factsHash===planningFactsHash(state));
 }
 export function validateConsistencyAssessment(value){
-  if(!keys(value,['status','issues'])||!['consistent','requires_review'].includes(value.status)||!Array.isArray(value.issues)||value.issues.length>5||(value.status==='consistent')!==(value.issues.length===0))fail();
+  if(!keys(value,['status','issues'])||!['consistent','requires_review'].includes(value.status)||!Array.isArray(value.issues)||value.issues.length>questionIds.length||(value.status==='consistent')!==(value.issues.length===0))fail();
   const seen=new Set();
   for(const issue of value.issues){
     if(!keys(issue,['questionId','fields','kind','reason','suggestion'])||!questionIds.includes(issue.questionId)||seen.has(issue.questionId)||!['incompatible','uncertain'].includes(issue.kind)||!text(issue.reason,2000)||!Array.isArray(issue.fields)||!issue.fields.length||issue.fields.length>8||new Set(issue.fields).size!==issue.fields.length||issue.fields.some(field=>!QUESTION_FIELDS[issue.questionId].includes(field)))fail();

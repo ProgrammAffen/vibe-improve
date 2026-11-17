@@ -1,0 +1,55 @@
+.lesson-page {
+  min-block-size: 100dvh;
+  padding: clamp(16px, 3vw, 40px);
+  display: grid;
+  align-content: start;
+  gap: clamp(16px, 3vw, 32px);
+  background: #2d402d;
+  background-image: linear-gradient(150deg, #a9a47a15 0 23%, transparent 23% 74%, #15261e66 74%),
+    linear-gradient(15deg, #253429, #485639);
+  color: #322519;
+}
+
+.lesson-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.lesson-navigation .game-button {
+  position: relative;
+  inset: auto;
+  min-inline-size: 0;
+  min-block-size: 44px;
+  height: auto;
+  padding: 8px 20px 8px 36px;
+  font-size: clamp(13px, 1.5vw, 18px);
+}
+
+.lesson-navigation .game-button-leading-icon { inset-inline-start: 12px; }
+
+.lesson-sheet {
+  justify-self: center;
+  inline-size: min(100%, 920px);
+  padding: clamp(20px, 4.8vw, 62px);
+  border: 1px solid #e6ca91;
+  border-radius: 7px 17px 9px 12px;
+  background: linear-gradient(142deg, #fff2d2 0 48%, #f2dfb4 48% 79%, #edd5a1 79%);
+  box-shadow: inset 0 0 40px #b38a4e38, 0 14px 40px #0c140b72;
+  overflow-wrap: anywhere;
+}
+
+.lesson-sheet h1 { margin: 5px 0 14px; font-size: clamp(23px, 3.6vw, 44px); line-height: 1.2; }
+.lesson-sheet h1:focus { outline: none; }
+.lesson-sheet h2 { margin: 0 0 10px; font-size: clamp(17px, 2vw, 25px); }
+.lesson-sheet p { margin: 0 0 8px; }
+.lesson-chapter { color: #655230; }
+.lesson-sheet section { border-block-start: 1px solid #ad884d61; margin-block-start: 20px; padding-block-start: 16px; }
+.lesson-sheet li { margin-block: 6px; }
+.lesson-sheet ul, .lesson-sheet ol { margin: 0; padding-inline-start: 1.5em; }
+.lesson-duration, .lesson-complete { display: inline-flex; align-items: center; gap: 7px; color: #3f542f; }
+.lesson-duration svg, .lesson-complete svg { inline-size: 1em; block-size: 1em; }
+.lesson-sheet footer { margin-block-start: 22px; display: flex; flex-wrap: wrap; align-items: center; justify-content: end; gap: 12px; }
+.lesson-sheet footer .game-button { height: auto; min-height: 48px; min-width: 0; padding: 10px 26px; }
+.lesson-sheet .game-button-label, .lesson-navigation .game-button-label { white-space: nowrap; }
+.lesson-error { color: #8c3c2c; }

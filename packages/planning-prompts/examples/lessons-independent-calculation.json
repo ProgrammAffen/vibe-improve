@@ -1,0 +1,33 @@
+{
+  "name": "lessons-independent-calculation",
+  "task": "lessons",
+  "input": {
+    "locale": "zh-CN",
+    "requestedLessons": [
+      {"ref": "L1", "title": "选定比较基准并计算变化", "focus": "用能导出相反方向的两种基准练习，按指定基准独立计算。"}
+    ],
+    "availablePrerequisites": []
+  },
+  "response": {
+    "status": "ok",
+    "reply": "先看一个完整算例，再用新数据核对自己选的比较基准。",
+    "result": {
+      "nodes": [
+        {
+          "ref": "L1",
+          "objectives": ["能根据指定的参考时点选取比较基准，算出变化方向和百分比。"],
+          "prerequisites": [],
+          "estimatedMinutes": 25,
+          "activities": ["示范：书店昨天接待 100 人，今天接待 112 人。以昨天为基准，用 (现值 − 基准值) ÷ 基准值计算，访客量增加 12%。比较前先圈出题目指定的参考时点。"],
+          "assessment": {
+            "task": "虚构展馆上午 9 时访客有 200 人，上午 10 时有 180 人，上午 11 时有 190 人。以 9 时为基准，计算 11 时访客量的变化，提交所用基准、方向与保留两位小数的变化率。允许用计算器。",
+            "passCriteria": ["选用题面指定时点的访客量作为分母，方向与变化率符号一致，百分比保留两位小数。"],
+            "mode": "quantitative",
+            "evaluatorPrompt": "以 9 时的 200 人为基准，正确结果是减少 5.00%，接受等价的计算过程。若以 10 时的 180 人为基准，会算成增加 5.56%，应指出基准时点不符并请重算。缺少基准、方向或结果时要求补交。"
+          }
+        }
+      ]
+    },
+    "missing": []
+  }
+}

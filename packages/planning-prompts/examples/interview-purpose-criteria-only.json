@@ -1,0 +1,47 @@
+{
+  "name": "interview-purpose-criteria-only",
+  "task": "interview",
+  "input": {
+    "locale": "zh-CN",
+    "currentQuestion": "purpose",
+    "questionIds": [
+      "goal",
+      "purpose",
+      "baseline",
+      "time"
+    ],
+    "messages": [
+      {
+        "ref": "U1",
+        "role": "user",
+        "text": "能从原始数据算出月总额，并解释异常就够了。"
+      }
+    ]
+  },
+  "response": {
+    "status": "ok",
+    "reply": "能从原始数据算出月总额，并解释异常。是否确认该回答？",
+    "result": {
+      "questionId": "purpose",
+      "complete": true,
+      "summary": "能从原始数据算出月总额，并解释异常。",
+      "fields": {
+        "criteria": "能从原始数据算出月总额并解释异常"
+      },
+      "evidence": [
+        {
+          "field": "criteria",
+          "messageRef": "U1",
+          "proposalRef": null,
+          "quote": "用户描述了可观察的达标表现。"
+        }
+      ],
+      "unresolved": [],
+      "consistency": {
+        "status": "consistent",
+        "issues": []
+      }
+    },
+    "missing": []
+  }
+}

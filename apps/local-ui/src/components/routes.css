@@ -22,7 +22,14 @@
 .route-stone:not(:disabled):active{transform:scale(.985)}
 .route-stone:disabled{cursor:default;opacity:.75}
 .route-source-footer{position:absolute;left:3.7%;right:3.7%;bottom:5.8%;display:flex;justify-content:space-between;gap:24px}
-.route-source-footer .game-button{width:29%;min-width:0;height:auto;min-height:50px;padding:.7cqw 1.5cqw;font-size:clamp(20px,2.65cqw,44px)}
+.route-source-footer .game-button{
+  width:min(29%,320px);
+  min-width:0;
+  height:auto;
+  min-height:50px;
+  padding:clamp(7px,.7cqw,16px) clamp(12px,1.5cqw,32px);
+  font-size:clamp(20px,2.65cqw,44px);
+}
 .route-source-feedback{position:absolute;bottom:18%;left:31%;width:38%;max-height:15%;overflow:auto;text-align:center;font-size:clamp(15px,1.4cqw,22px)}
 .route-source-feedback .text-button{display:block;width:100%;min-inline-size:0;max-width:100%;padding:5px 10px;background:#fff4dce8;color:#3f4e2d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .route-source-feedback p{margin:0}

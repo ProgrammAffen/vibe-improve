@@ -1,0 +1,25 @@
+{
+  "name": "interview-beginner-goal",
+  "task": "interview",
+  "input": {
+    "locale": "zh-CN",
+    "currentQuestion": "goal",
+    "acceptedAnswers": {},
+    "messages": [
+      {"ref": "U1", "role": "user", "text": "我想学习股票市场"},
+      {"ref": "U2", "role": "user", "text": "我完全没基础，不知道要学什么"}
+    ]
+  },
+  "response": {
+    "status": "ok",
+    "reply": "你的学习方向是股票市场。是否确认该回答？",
+    "result": {
+      "questionId": "goal", "complete": true, "summary": "学习股票市场。",
+      "fields": {"topic": "股票市场"},
+      "evidence": [{"field": "topic", "messageRef": "U1", "proposalRef": null, "quote": "用户明确想学习股票市场。"}],
+      "unresolved": [],
+      "consistency": {"status": "consistent", "issues": []}
+    },
+    "missing": []
+  }
+}

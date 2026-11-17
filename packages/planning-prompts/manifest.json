@@ -1,5 +1,6 @@
 {
-  "version": "planning.2",
+  "version": "planning.33",
+  "generationCheckpointVersion": "planning.12",
   "base": [
     "00-core.md"
   ],
