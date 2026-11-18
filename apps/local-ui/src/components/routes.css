@@ -62,6 +62,7 @@
 .route-preview-chapters li{margin-block:10px;line-height:1.6;overflow-wrap:anywhere}
 .route-preview-assessment{color:#62583e;font-size:15px}
 .route-preview-assessment p{line-height:1.6}
+.route-preview-assessment p{white-space:pre-wrap}
 .route-design-pending{text-align:center;font-size:20px;line-height:1.5}
 @media(max-width:700px){
   .route-ai-control{top:19%;padding:8px 18px;gap:10px;min-height:60px}

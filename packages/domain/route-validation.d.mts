@@ -1,6 +1,7 @@
 export interface RouteObjective {id:string;description:string}
-export interface RouteAssessment {task:string;passCriteria:string[];objectiveIds:string[];mode?:'quantitative'|'qualitative';evaluatorPrompt?:string}
-export interface RouteNode {id:string;title:string;objectives:RouteObjective[];prerequisites:string[];estimatedMinutes:number;assessment?:RouteAssessment;activities?:string[]}
+export interface RouteAssessment {task:string;answer?:string;objectiveIds:string[];passCriteria?:string[];mode?:'quantitative'|'qualitative';evaluatorPrompt?:string}
+export interface RouteReview {content:string;passCriteria:string[]}
+export interface RouteNode {id:string;title:string;objectives:RouteObjective[];prerequisites:string[];estimatedMinutes:number;assessment?:RouteAssessment;activities?:string[];requirement?:'required'|'optional';review?:RouteReview}
 export interface RouteChapter {id:string;title:string;nodes:RouteNode[];stageGoal?:string}
 export interface RouteDocument {format:'vibe-improve.route';schemaVersion:1|2;id:string;revision:number;title:string;locale:'zh-CN'|'en';sourceLanguage:'zh-CN'|'en';chapters:RouteChapter[]}
 export const MAX_ROUTE_BYTES:number;

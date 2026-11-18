@@ -1,5 +1,6 @@
 import type {PlanningState} from '../../../../packages/domain/planning.mjs';
 import type {RouteDocument} from '../../../../packages/domain/route-validation.mjs';
+import {learningPrerequisiteIds} from '../../../../packages/domain/route-learning.mjs';
 import {browserProjectTransaction, legacyProgressKey, withProjectLock} from '../planning/browser-store';
 import {currentProgress, emptyProgress, MAX_PROGRESS_REVISION, MAX_SKIP_REASON_LENGTH, parseProgress, prerequisiteMet, recordedNodes, type LearningProgress} from './learning-record';
 
@@ -47,7 +48,7 @@ async function progress(projectId: string, route: RouteDocument, change?: Learni
       if (state.confirmedRevision !== route.revision) throw new Error('PLANNING_CONFLICT');
       const node = nodes.find(item => item.id === change.nodeId);
       const completed = history.completedNodeIds.has(change.nodeId);
-      if (!node || (!completed && node.prerequisites.some(id => !prerequisiteMet(history, id)))) throw new Error('PLANNING_CONFLICT');
+      if (!node || (!completed && learningPrerequisiteIds(current, node.id).some(id => !prerequisiteMet(history, id)))) throw new Error('PLANNING_CONFLICT');
       switch (change.kind) {
         case 'skip': {
           const reason = change.reason.trim();

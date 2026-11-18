@@ -1,4 +1,5 @@
 import type {RouteDocument} from './route-validation.mjs';
+export {learningPrerequisiteIds} from './route-learning.mjs';
 export type QuestionId='goal'|'purpose'|'baseline'|'time'|'deadline'|'scope'|'constraints';
 export type QuestionStatus='pending'|'current'|'needs-detail'|'awaiting-confirmation'|'complete'|'needs-review';
 export interface PlanningMessageEvidence {field:string;messageId:string;quote:string;proposalMessageId?:string;reusedFrom?:QuestionId;acceptanceEventId?:never}
@@ -18,7 +19,8 @@ export interface PlanningQuestion {id:QuestionId;status:QuestionStatus;summary:s
 export interface PlanningTarget {chapterId:string;nodeId?:string}
 export interface PlanningMention {target:PlanningTarget;token:string}
 export interface PlanningAttachment {id:string;name:string;kind:'image'|'document'}
-export interface PlanningMessage {id:string;role:'user'|'assistant';text:string;createdAt:string;questionId?:QuestionId;target?:PlanningTarget;mentions?:PlanningMention[];provider?:string|null;attachments?:PlanningAttachment[]}
+export interface PlanningRouteEdit {routeId:string;requestRevision:number;beforeRevision:number;afterRevision?:number;beforeHash?:string;afterHash?:string}
+export interface PlanningMessage {id:string;role:'user'|'assistant';text:string;createdAt:string;questionId?:QuestionId;target?:PlanningTarget;mentions?:PlanningMention[];provider?:string|null;attachments?:PlanningAttachment[];routeEdit?:PlanningRouteEdit;editOutcome?:'no-changes'}
 export interface PlanningPending {id:string;kind:'interview'|'generate'|'edit'|'consistency';baseRevision:number;questionId:QuestionId|null;backgroundEpoch?:number;factsHash?:string;prefill?:true}
 export interface PlanningProposal {route:RouteDocument;reply:string;baseRevision:number;routeRevision:number}
 export interface AgentOptions {model:string|null;effort:string|null}

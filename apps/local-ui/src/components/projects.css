@@ -49,8 +49,8 @@
 }
 .project-pagination{flex:none;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px 1.5cqw;padding:1.2cqw .5cqw 0;border-top:1px solid #73856445;font-size:clamp(16px,1.15cqw,21px);line-height:1.4;color:#536347}
 .project-page-size{display:flex;align-items:center;gap:.6cqw;white-space:nowrap}
-.project-page-size select{min-height:44px;min-width:65px;padding:6px 9px;background:#fbfcf5cc;color:#405037;border:1px solid #a0ad92;border-radius:4px;cursor:pointer;font:inherit}
-.project-page-size select:focus{background:#e6ebd9}
+.project-page-size .game-select{min-inline-size:4.5em;font:inherit}
+
 .project-page-navigation{display:flex;align-items:center;gap:1cqw;max-width:100%;flex-wrap:wrap;justify-content:center}
 .project-page-navigation .game-button{
   width:min(9cqw,164px);

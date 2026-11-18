@@ -188,14 +188,14 @@ def emit(v):print(json.dumps(v),flush=True)
 def issue(refs):return {'code':'alignment','targetRefs':refs,'message':'The fourth concept needs an executable practice input.','fixHint':'Give the learner a concrete practice input.','blocking':True}
 def sequence_issue():return {**issue([]),'code':'practice_sequence','message':'The account changes before position_before is recorded. ' * 7 + 'Record the starting balance first.','fixHint':'Prepare the account, record its cash and holdings, then place the practice order.'}
 def rename_issue():return {**issue(['L4']),'code':'learning_language','message':'The lesson title does not communicate which data analysis skill is practiced.','fixHint':'Name the independent skill of verifying a median.'}
-def second_issue():return {**issue(['L6']),'code':'assessment_invalid','message':'The final report uses an inconsistent baseline.','fixHint':'Use the baseline stated in the question.'}
-def assessment_issue(remaining):
- return {**issue(['L4']),'code':'assessment_invalid',
-  'message':'The public criterion supplies the median.' if remaining else 'There is no independent criterion for the median.',
-  'fixHint':'Move the expected value into grading.' if remaining else 'Add an independent check with fresh input.'}
+def second_issue():return {**issue(['L6']),'code':'practice_sequence','message':'The final activity uses an inconsistent baseline.','fixHint':'Use the baseline stated in the practice input.'}
+def remaining_issue(remaining):
+ return {**issue(['L4']),'code':'practice_sequence' if remaining else 'specificity',
+  'message':'The activity reads a hardcoded result instead of the actual input.' if remaining else 'The activity does not explain how to obtain the median.',
+  'fixHint':'Derive the middle value from the actual input.' if remaining else 'Explain how to sort and select the middle value.'}
 practice=['Calculate the median of the supplied CSV values 3, 5 and 7.']
-leaked_criterion='Reports the median of 5.'
-private_criterion='Computes the middle value of the given input and shows the calculation.'
+incomplete_activity='Read the median from a hardcoded value of 5.'
+corrected_activity='Sort the actual input, then select the middle value.'
 new_title='Verify the median independently'
 for line in sys.stdin:
  m=json.loads(line)
@@ -214,7 +214,7 @@ for line in sys.stdin:
    assert all(n['activities']==['Verify the concept against the supplied input.'] for n in nodes) == reviewed
    value={'ready':reviewed,'issues':[] if reviewed else [issue(['C1'])]}
   elif phase=='wide-repair' and stage=='revision':
-   fields=['ref','objectives','prerequisites','estimatedMinutes','assessment']
+   fields=['ref','objectives','prerequisites','estimatedMinutes']
    value={'nodes':[{**{key:n[key] for key in fields},'activities':['Verify the concept against the supplied input.']} for n in c['qualityRevision']['requestedCandidate']]}
   elif phase in ['pause-repair','resume-repair'] and stage=='review':
    nodes=[n for chapter in c['candidate']['chapters'] for n in chapter['lessons']]
@@ -240,10 +240,9 @@ for line in sys.stdin:
    assert set(c['knownRefs'])=={'C1','C2','L1','L2','L3','L4','L5','L6'}
    assert all(n['activities']==['Study a worked example.','Solve a new case and compare.'] for n in nodes if n['ref']!='L4' and not (phase=='second-blocker' and review_count==2 and n['ref']=='L6'))
    if phase=='remaining-blocker' and reviewed:
-    assert nodes[3]['activities']==practice
-    assert c['previousBlockingIssues']==[assessment_issue(review_count==2)]
-    assert nodes[3]['assessment']['passCriteria']==[private_criterion if review_count==2 else leaked_criterion]
-    if review_count==2:assert 'median is 5' in nodes[3]['assessment']['evaluatorPrompt']
+    assert nodes[3]['activities']==practice+[corrected_activity if review_count==2 else incomplete_activity]
+    assert c['previousBlockingIssues']==[remaining_issue(review_count==2)]
+    assert all('assessment' not in node and 'review' not in node for node in nodes)
    elif phase in ['repeat','summary','unsafe-summary','long-summary','rename','second-blocker'] and reviewed:
     assert nodes[3]['activities']==practice
     if c.get('localizeBlockingIssues'):assert c['previousBlockingIssues']==[sequence_issue(),issue([])]
@@ -265,7 +264,7 @@ for line in sys.stdin:
     value={'ready':False,'summary':summary,'issues':[sequence_issue(),issue([]),{**issue(['L2']),'blocking':False}]}
    elif phase=='rename' and not reviewed:value={'ready':False,'issues':[rename_issue()]}
    elif phase=='second-blocker' and review_count<2:value={'ready':False,'issues':[issue(['L4']) if not reviewed else second_issue()]}
-   elif phase=='remaining-blocker' and review_count<2:value={'ready':False,'issues':[assessment_issue(reviewed)]}
+   elif phase=='remaining-blocker' and review_count<2:value={'ready':False,'issues':[remaining_issue(reviewed)]}
    elif phase in ['repeat','invalid-revision','invalid-rename','no-op'] or phase in ['summary','unsafe-summary','long-summary'] and not reviewed:value={'ready':False,'issues':[issue(['L4'])]}
    else:value={'ready':True,'issues':[]}
   elif stage=='revision':
@@ -273,19 +272,18 @@ for line in sys.stdin:
    assert 'TASK: lessons' in system and record['refs']==[target]
    assert 'node_' not in json.dumps(c) and 'route_' not in json.dumps(c) and 'proj_' not in json.dumps(c)
    revision=c['qualityRevision']
-   assert revision['blockingIssues']==[rename_issue() if phase=='rename' else second_issue() if target=='L6' else assessment_issue(review_count==2) if phase=='remaining-blocker' else issue(['L4'])]
+   assert revision['blockingIssues']==[rename_issue() if phase=='rename' else second_issue() if target=='L6' else remaining_issue(review_count==2) if phase=='remaining-blocker' else issue(['L4'])]
    assert revision.get('renameableLessonRefs')==(['L4'] if phase=='rename' else None)
    assert [n['ref'] for n in revision['requestedCandidate']]==[target]
    repeated=phase in ['repeat','remaining-blocker'] and review_count==2
-   assert revision['requestedCandidate'][0]['activities']==(practice if repeated else ['Study a worked example.','Solve a new case and compare.'])
-   previous_issue=assessment_issue(False) if phase=='remaining-blocker' else issue(['L4'])
+   expected_practice=practice+[incomplete_activity] if phase=='remaining-blocker' and repeated else practice
+   assert revision['requestedCandidate'][0]['activities']==(expected_practice if repeated else ['Study a worked example.','Solve a new case and compare.'])
+   previous_issue=remaining_issue(False) if phase=='remaining-blocker' else issue(['L4'])
    starts=sum(row['phase']==phase and row['stage']=='revision' and not row['repair'] for row in earlier)
    retry=phase in ['no-op','invalid-revision','invalid-rename'] and starts >= (2 if 'repair' in c else 1)
    assert revision.get('previousBlockingIssues')==([previous_issue] if repeated or retry else None)
    value={'nodes':[{'ref':'L4','objectives':['Apply the named concept in a practice case.'],'prerequisites':['L3'],'estimatedMinutes':30,'activities':practice,'assessment':None}]}
-   if phase=='remaining-blocker':
-    value['nodes'][0]['assessment']={'task':'Submit the median and explain how you found it.',
-     'passCriteria':[private_criterion if repeated else leaked_criterion],'mode':'quantitative','evaluatorPrompt':'The median is 5. Require evidence of the middle position.'}
+   if phase=='remaining-blocker':value['nodes'][0]['activities']=practice+[corrected_activity if repeated else incomplete_activity]
    if target=='L6':value['nodes'][0].update(ref='L6',prerequisites=['L5'],activities=['Calculate the result using the stated baseline.'])
    if phase=='invalid-revision':value['nodes'][0]['ref']='L5'
    if phase in ['rename','invalid-rename']:value['nodes'][0]['title']=new_title
@@ -431,9 +429,9 @@ try files.write(id+".json",data:JSONSerialization.data(withJSONObject:complete))
 let remainingBlockerStore=try store(),remainingBlockerBefore=try remainingBlockerStore.read(projectID:id)!
 let remainingBlocker=try run("remaining-blocker",remainingBlockerStore,remainingBlockerBefore)
 check(remainingBlocker["state"] as? String=="completed","the review blocked a scoped repair of a remaining problem")
-let finalAssessmentRoute=try remainingBlockerStore.read(projectID:id)!["routeDraft"] as! [String:Any]
-let assessmentNodes=(finalAssessmentRoute["chapters"] as! [[String:Any]]).flatMap{$0["nodes"] as! [[String:Any]]}
-check(assessmentNodes.indices.filter{!NSDictionary(dictionary:assessmentNodes[$0]).isEqual(to:cachedNodes[$0])}==[3],"a second scoped repair changed unrelated lessons")
+let finalPracticeRoute=try remainingBlockerStore.read(projectID:id)!["routeDraft"] as! [String:Any]
+let practiceNodes=(finalPracticeRoute["chapters"] as! [[String:Any]]).flatMap{$0["nodes"] as! [[String:Any]]}
+check(practiceNodes.indices.filter{!NSDictionary(dictionary:practiceNodes[$0]).isEqual(to:cachedNodes[$0])}==[3],"a second scoped repair changed unrelated lessons")
 try files.write(id+".json",data:JSONSerialization.data(withJSONObject:complete))
 let pausedStore=try store(),beforePause=try pausedStore.read(projectID:id)!,paused=try run("pause-repair",pausedStore,beforePause)
 check(paused["errorCode"] as? String=="PLANNING_AGENT_QUALITY_REVIEW","the unresolved repair did not pause")

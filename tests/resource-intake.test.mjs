@@ -259,7 +259,7 @@ precondition(started == 40 && repeated == 0)
 let ready = try awaitItems(nil)
 let local = try awaitItems(scope)
 precondition(ready.count == 40 && ready.allSatisfy { $0["status"] as? String == "ready" })
-precondition(local.count == 2 && local.allSatisfy { $0["planning"] as? Bool == false && $0["status"] as? String == "ready" })
+precondition(local.count == 2 && local.allSatisfy { $0["planning"] as? Bool == false && $0["status"] as? String == "attachment" && $0["segmentCount"] as? Int == 0 })
 let webRow = ready.first { $0["format"] as? String == "web" }!
 let webRef = ResourceSelection(id: webRow["id"] as! String, version: webRow["version"] as! String)
 let overview = try library.item(project, ref: webRef).display(details: true)["overview"] as? String

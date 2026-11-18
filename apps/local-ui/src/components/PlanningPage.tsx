@@ -15,17 +15,18 @@ import BackHomeButton from './BackHomeButton';
 import PlanningNavigation from './PlanningNavigation';
 import PlanningConsistencyReview from './PlanningConsistencyReview';
 import PlanningAnswerReview from './PlanningAnswerReview';
+import PlanningAnswerFields from './PlanningAnswerFields';
 import PlanningGenerationDialog from './PlanningGenerationDialog';
 import {mergeGenerationOutput,type GenerationEntry} from '../planning/output';
 import {generateWithConsistency,generationStage,type GenerationStage} from '../planning/generation';
-import type {PlanningAttachment} from '../../../../packages/domain/planning.mjs';
+import type {MaterialLink,PlanningAttachment} from '../../../../packages/domain/planning.mjs';
 import {quickAnswers} from '../planning/quick-answers';
 import PlanningModelControls,{PlanningAgentControl} from './PlanningModelControls';
 import Modal from './Modal';
 import {PlanningComposer as Composer,PlanningMessages} from './PlanningConversation';
 import {RouteEditorSurface} from './RouteEditor';
 import PlanningResourcesDialog from './PlanningResourcesDialog';
-import ResourceAttachments,{attachmentsFrom,ResourcePicker} from './ResourceAttachments';
+import ResourceAttachments,{attachmentsFrom,LessonBackpack,ResourcePicker} from './ResourceAttachments';
 export {PlanningMessages} from './PlanningConversation';
 export {RouteEditorSurface} from './RouteEditor';
 import './planning.css';
@@ -116,6 +117,7 @@ export function PlanningIntakeSurface({language,state,busy=false,working=false,w
      <PlanningConsistencyReview state={state} language={language} busy={busy} onAccept={onAdoptSuggestion} onReanswer={onReanswer}/>
      <PlanningAnswerReview state={state} questionId={current} language={language} busy={busy} onAccept={()=>onAccept(current,selected.answerProposal!.messageId)} onClarify={()=>composerInput.current?.focus()}/>
      {selected.status==='complete'&&<p className="planning-answer-collected"><CheckCircle2 aria-hidden="true"/>{t('已采集','Collected')} · {selected.summary}</p>}
+     {!selected.answerProposal&&Object.keys(selected.fields).length>0&&<PlanningAnswerFields fields={selected.status==='complete'?(acceptedAnswer(selected)?.fields??selected.fields):selected.fields} questionId={current} language={language}/>}
      {options.length>0&&<div className="planning-quick-answers" role="group" aria-label={t('快捷回答','Quick answers')}>
       {options.map(option=><button className="text-button" key={option.label} type="button" title={option.label} disabled={busy||!state.provider} onClick={()=>void onSend(option.reply)}>{option.label}</button>)}
      </div>}
@@ -386,10 +388,16 @@ export default function PlanningPage({language,project,entryMode='resume',onPrev
  return <>{state.step==='editor'&&draft?<RouteEditorSurface language={language} state={state} route={draft} busy={busy} working={working} workingLabel={workingLabel} partialReply={partialReply} partialProviderId={partialProviderId} activity={activity} dirty={dirty} error={error} conversationError={conversationError} notice={notice} onOptions={updateOptions} onProvider={updateProvider} onRoute={setRoute} onSave={()=>void action(async()=>{await save();setNotice(translate(language,'草稿已保存','Draft saved'))})} onConfirm={()=>void action(confirm)} onSend={(text,mentions,target,files)=>ai('edit',text,mentions,target,false,'new',[],files)} onCancel={cancel} onApply={()=>void action(async()=>{if(stateRef.current)accept(await planningService.applyProposal(stateRef.current))})} onDiscard={()=>void action(async()=>{if(stateRef.current)accept(await planningService.discardProposal(stateRef.current))})} onUndo={()=>void action(async()=>{const current=dirtyRef.current?await save():stateRef.current;if(current)accept(await planningService.undo(current))})} onRedo={()=>void action(async()=>{if(stateRef.current)accept(await planningService.redo(stateRef.current))})} onRemoveImport={()=>void action(async()=>{const route=await routeService.read(project.id);setRemoveImport(route.revision)})} onPrevious={previous} onHome={()=>leave(onHome)}
   studiedNodeIds={learningProgress?.startedNodeIds} learningRead={learningRead} onRetryLearning={()=>setProgressRetry(value=>value+1)}
   onResetLearning={onResetLearning&&savedRoute&&learningProgress&&learningProgress.recordedNodeCount>0?()=>onResetLearning(savedRoute,learningProgress):undefined}
-  renderMaterials={resources.enabled?(target,locked)=><ResourceAttachments projectId={project.id} language={language}
-    items={attachmentsFrom(linkedTo(target),[...resources.items,...(materialData?.items??[])])}
-    onChoose={locked?undefined:()=>setAttachmentTarget(target)}
-    onRemove={locked?undefined:link=>void updateMaterial(target,link,false,link.segmentId)}/>:undefined}
+  renderMaterials={resources.enabled?(target,locked)=>{
+    const items=attachmentsFrom(linkedTo(target),[...resources.items,...(materialData?.items??[])]);
+    const onRemove=locked?undefined:(link:MaterialLink)=>void updateMaterial(target,link,false,link.segmentId);
+    return target.kind==='lesson'?<LessonBackpack key={draft.id+'/'+target.targetId} projectId={project.id} language={language}
+      scope={{routeId:draft.id,nodeId:target.targetId}} chapterId={draft.chapters.find(chapter=>chapter.nodes.some(node=>node.id===target.targetId))?.id??''}
+      provided={items} editor disabled={locked||busy} onRemove={onRemove}
+      beforeAdd={()=>action(async()=>{if(dirtyRef.current)await save()})}/>
+      :<ResourceAttachments projectId={project.id} language={language} items={items}
+        onChoose={locked?undefined:()=>setAttachmentTarget(target)} onRemove={onRemove}/>;
+  }:undefined}
  />:<PlanningIntakeSurface language={language} state={state} busy={busy||preparingGeneration||generationRunning} working={working&&!generationOpen} workingLabel={generationOpen?undefined:workingLabel} partialReply={generationOpen?undefined:partialReply} partialProviderId={partialProviderId} activity={generationOpen?undefined:activity} error={generationOpen?'':conversationError||error} notice={notice}
   generationStatus={generationRunning?workingLabel??t('正在准备生成…','Preparing generation…'):undefined}
   generationFailed={Boolean(generationError)} onOptions={updateOptions} onProvider={updateProvider} onSend={(text,files)=>ai('interview',text,undefined,undefined,false,'new',[],files)} onCancel={cancel}

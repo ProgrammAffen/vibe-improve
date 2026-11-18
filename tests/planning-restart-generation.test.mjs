@@ -119,7 +119,7 @@ test('generation terminal views show only the learner-facing reason while runnin
   assert.doesNotMatch(blocked,/2 \/ 2/);assert.match(interrupted,/2 \/ 2/);
   assert.ok(interrupted.includes(resume)&&interrupted.includes('Connection interrupted')&&!interrupted.includes(restart));
   assert.ok(unfinished.includes(resume)&&!unfinished.includes(restart)&&notStarted.includes(restart));
-  for(const terminal of [blocked,interrupted,stopped])assert.doesNotMatch(terminal,/<details|Private intermediate chapter text|role="log"/);
+  for(const terminal of [blocked,interrupted,stopped]){assert.doesNotMatch(terminal,/Private intermediate chapter text|role="log"/);assert.match(terminal,/planning-generation-result-output/);assert.ok(terminal.includes(language==='en'?'View generation record':'查看生成记录'));}
   assert.match(active,/Private intermediate chapter text/);
  }
 });

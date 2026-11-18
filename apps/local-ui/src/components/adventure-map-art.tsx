@@ -57,10 +57,10 @@ export function PawArt({terrain, placement}: {terrain: MapTerrain; placement: Pa
   return <span ref={host} className="adventure-marker-art" aria-hidden="true"/>;
 }
 
-export function TerrainTrail({page}: {page: MapPage}) {
+export function TerrainTrail({page, height = HEIGHT}: {page: MapPage; height?: number}) {
   const host = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    host.current?.replaceChildren(createTerrainTrail(page.themeId, page.paths, {seed: page.seed, width: WIDTH, height: HEIGHT}));
-  }, [page]);
+    host.current?.replaceChildren(createTerrainTrail(page.themeId, page.paths, {seed: page.seed, width: WIDTH, height}));
+  }, [page, height]);
   return <div ref={host} className="adventure-trail" aria-hidden="true"/>;
 }

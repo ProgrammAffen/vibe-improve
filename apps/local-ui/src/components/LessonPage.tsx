@@ -1,6 +1,7 @@
 import {ArrowLeft, Check, Clock3} from 'lucide-react';
 import {useEffect, useRef} from 'react';
 import type {RouteChapter, RouteNode} from '../../../../packages/domain/route-validation.mjs';
+import {assessmentAnswer} from '../../../../packages/domain/assessment.mjs';
 import {translate, type Language} from '../i18n';
 import BackHomeButton from './BackHomeButton';
 import GameButton from './GameButton';
@@ -36,6 +37,7 @@ export default function LessonPage({chapter, node, language, projectId, routeId,
         <p className="lesson-chapter">{chapter.title}</p>
         <h1 ref={title} tabIndex={-1}>{node.title}</h1>
         <span className="lesson-duration"><Clock3 aria-hidden="true"/>{t(`${node.estimatedMinutes} 分钟`, `${node.estimatedMinutes} min`)}</span>
+        <span className="lesson-requirement">{node.requirement==='optional'?t('选学','Elective'):t('必学','Required')}</span>
       </header>
       <section>
         <h2>{t('学习目标', 'Learning goals')}</h2>
@@ -46,10 +48,19 @@ export default function LessonPage({chapter, node, language, projectId, routeId,
         <h2>{t('学习活动', 'Learning activities')}</h2>
         <ol>{node.activities.map((activity, index) => <li key={index}>{activity}</li>)}</ol>
       </section>}
-      {node.assessment && <section>
-        <h2>{t('验收标准', 'Completion criteria')}</h2>
-        <p>{node.assessment.task}</p>
-        <ul>{node.assessment.passCriteria.map((criterion, index) => <li key={index}>{criterion}</li>)}</ul>
+      {node.assessment && <section className="lesson-assessment">
+        <h2>{t('验收测验', 'Assessment quiz')}</h2>
+        <p className="lesson-assessment-text">{node.assessment.task}</p>
+        <details key={node.id} className="lesson-assessment-answer">
+          <summary>{t('查看测验答案／评判标准', 'Show quiz answers / grading criteria')}</summary>
+          <p className="lesson-assessment-text">{assessmentAnswer(node.assessment,language)}</p>
+        </details>
+      </section>}
+      {node.review && <section className="lesson-review">
+        <h2>{t('复习内容', 'Review content')}</h2>
+        <p>{node.review.content}</p>
+        <h3>{t('回答正确的指标', 'Criteria for a correct answer')}</h3>
+        <ul>{node.review.passCriteria.map((criterion, index) => <li key={index}>{criterion}</li>)}</ul>
       </section>}
       <footer>
         {error && <p role="alert" className="lesson-error">{error}</p>}

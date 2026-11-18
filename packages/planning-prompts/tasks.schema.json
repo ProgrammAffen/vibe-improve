@@ -513,7 +513,7 @@
         "task": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 2000,
+          "maxLength": 4000,
           "pattern": "\\S"
         },
         "passCriteria": {
@@ -546,13 +546,16 @@
               "type": "null"
             }
           ]
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000,
+          "pattern": "\\S"
         }
       },
       "required": [
-        "task",
-        "passCriteria",
-        "mode",
-        "evaluatorPrompt"
+        "task"
       ],
       "additionalProperties": false,
       "allOf": [
@@ -562,7 +565,10 @@
               "mode": {
                 "const": "qualitative"
               }
-            }
+            },
+            "required": [
+              "mode"
+            ]
           },
           "then": {
             "properties": {
@@ -573,6 +579,44 @@
                 "pattern": "\\S"
               }
             }
+          }
+        }
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "answer"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "passCriteria"
+                ]
+              },
+              {
+                "required": [
+                  "mode"
+                ]
+              },
+              {
+                "required": [
+                  "evaluatorPrompt"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "passCriteria",
+            "mode",
+            "evaluatorPrompt"
+          ],
+          "not": {
+            "required": [
+              "answer"
+            ]
           }
         }
       ]
@@ -626,14 +670,7 @@
           "maxItems": 24
         },
         "assessment": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/assessment"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "null"
         }
       },
       "required": [
@@ -641,8 +678,7 @@
         "objectives",
         "prerequisites",
         "estimatedMinutes",
-        "activities",
-        "assessment"
+        "activities"
       ],
       "additionalProperties": false
     },
@@ -663,10 +699,19 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["lessonRef", "excerptRef"],
+            "required": [
+              "lessonRef",
+              "excerptRef"
+            ],
             "properties": {
-              "lessonRef": {"type": "string", "pattern": "^L[1-9][0-9]{0,2}$"},
-              "excerptRef": {"type": "string", "pattern": "^R[1-9][0-9]?_s[1-9][0-9]{0,4}$"}
+              "lessonRef": {
+                "type": "string",
+                "pattern": "^L[1-9][0-9]{0,2}$"
+              },
+              "excerptRef": {
+                "type": "string",
+                "pattern": "^R[1-9][0-9]?_s[1-9][0-9]{0,4}$"
+              }
             }
           }
         }
@@ -752,10 +797,19 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["targetRef", "excerptRef"],
+            "required": [
+              "targetRef",
+              "excerptRef"
+            ],
             "properties": {
-              "targetRef": {"type": "string", "pattern": "^[CL][1-9][0-9]{0,2}$"},
-              "excerptRef": {"type": "string", "pattern": "^R[1-9][0-9]?_s[1-9][0-9]{0,4}$"}
+              "targetRef": {
+                "type": "string",
+                "pattern": "^[CL][1-9][0-9]{0,2}$"
+              },
+              "excerptRef": {
+                "type": "string",
+                "pattern": "^R[1-9][0-9]?_s[1-9][0-9]{0,4}$"
+              }
             }
           }
         }
@@ -774,7 +828,7 @@
               }
             }
           },
-            "then": {
+          "then": {
             "properties": {
               "issues": {
                 "items": {

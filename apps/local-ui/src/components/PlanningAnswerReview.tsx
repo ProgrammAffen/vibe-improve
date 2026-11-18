@@ -1,6 +1,7 @@
 import {answerConfirmation,intakeQuestions,questionLabel,type PlanningState,type QuestionId} from '../../../../packages/domain/planning.mjs';
 import {translate,type Language} from '../i18n';
 import GameButton from './GameButton';
+import PlanningAnswerFields from './PlanningAnswerFields';
 
 export default function PlanningAnswerReview({state,questionId,language,busy=false,onAccept,onClarify}:{state:PlanningState;questionId:QuestionId;language:Language;busy?:boolean;onAccept:()=>void;onClarify:()=>void}){
  const t=(zh:string,en:string)=>translate(language,zh,en);
@@ -11,6 +12,7 @@ export default function PlanningAnswerReview({state,questionId,language,busy=fal
  const questions=intakeQuestions(state);
  return <section className="planning-answer-review" aria-label={t('回答总结','Answer summary')} data-confirmation={confirmation.kind}>
   <h3>{t('回答总结','Answer summary')}{question.evidence.some(item=>'reusedFrom' in item)&&<small>{t('参考了之前的回答','Based on earlier answers')}</small>}</h3><p>{proposal.summary}</p>
+  <PlanningAnswerFields fields={question.fields} questionId={questionId} language={language}/>
   {confirmation.changes.map(change=>{
    const number=questions.findIndex(question=>question.id===change.questionId)+1;
    const fields=Object.keys(change.after.fields).filter(field=>change.after.fields[field]!==change.before.fields[field]);

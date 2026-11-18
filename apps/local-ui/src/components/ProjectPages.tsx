@@ -1,6 +1,7 @@
 import {useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode} from 'react';
 import {FolderOpen, RefreshCw} from 'lucide-react';
 import GameButton from './GameButton';
+import GameSelect from './GameSelect';
 import BackHomeButton from './BackHomeButton';
 import Modal from './Modal';
 import {translate, type Language} from '../i18n';
@@ -75,7 +76,7 @@ export function ProjectListSurface({language,records,loading=false,busy=false,er
       </div>
       <footer className="project-pagination" aria-label={t('项目分页','Project pagination')}>
         <span className="project-total">{t(`共 ${records.length} 个项目`,`${records.length} projects`)}</span>
-        <label className="project-page-size">{t('每页','Per page')}<select aria-label={t('每页项目数','Projects per page')} value={pageSize} disabled={loading||busy} onChange={event=>{setPageSize(Number(event.target.value));setPage(1)}}>{[5,10,20].map(value=><option key={value} value={value}>{value}</option>)}</select></label>
+        <label className="project-page-size">{t('每页','Per page')}<GameSelect aria-label={t('每页项目数','Projects per page')} value={String(pageSize)} disabled={loading||busy} onChange={value=>{setPageSize(Number(value));setPage(1)}} options={[5,10,20].map(value=>({value:String(value),label:String(value)}))}/></label>
         <div className="project-page-navigation"><ProjectButton variant="secondary" disabled={loading||busy||currentPage===1} onClick={()=>setPage(currentPage-1)}>{t('上一页','Previous')}</ProjectButton><span className="project-page-count" aria-live="polite">{t(`第 ${currentPage} / ${pageCount} 页`,`${currentPage} / ${pageCount}`)}</span><ProjectButton variant="secondary" disabled={loading||busy||currentPage===pageCount} onClick={()=>setPage(currentPage+1)}>{t('下一页','Next')}</ProjectButton></div>
       </footer>
     </Panel>

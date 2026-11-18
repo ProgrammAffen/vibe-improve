@@ -1,12 +1,15 @@
 import {useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent} from 'react';
 import {createPortal} from 'react-dom';
-import {ArrowLeft, ArrowRight, Check, ChevronDown, Clock3, LockKeyhole, MapPin, Pencil, SkipForward, X} from 'lucide-react';
+import {ArrowLeft, ArrowRight, Check, Clock3, LockKeyhole, MapPin, Pencil, SkipForward, X} from 'lucide-react';
 import type {RouteChapter, RouteDocument, RouteNode} from '../../../../packages/domain/route-validation.mjs';
+import {isRequiredLesson, learningPrerequisiteIds, learningProgressSummary} from '../../../../packages/domain/route-learning.mjs';
 import {createRouteMapPages, HEIGHT, pawPlacement, WIDTH, type MapNode} from '../../../../packages/map-layout/index.mjs';
 import {translate, type Language} from '../i18n';
 import {MAX_SKIP_REASON_LENGTH} from '../routes/learning';
 import BackHomeButton from './BackHomeButton';
-import GameButton from './GameButton';
+import GameButton, {GameButtonArt} from './GameButton';
+import GameSelect from './GameSelect';
+import {projectMapPage, type MapViewport} from './adventure-map-viewport';
 import {LandmarkArt, mapAsset, PawArt, terrainName, TerrainTrail, type MapTerrain} from './adventure-map-art';
 import './adventure-map.css';
 
@@ -155,7 +158,7 @@ function LandmarkCard({selection, chapter, lesson, unmet, status, completed, ski
     };
   }, [skipMode, startPending]);
 
-  const count = chapter.nodes.filter(node => completed.has(node.id)).length;
+  const chapterProgress = learningProgressSummary(chapter.nodes, completed);
   const style = {
     left: placement?.x,
     top: placement?.y,
@@ -182,6 +185,7 @@ function LandmarkCard({selection, chapter, lesson, unmet, status, completed, ski
             {skipFailed && <p className="adventure-card-skip-error" role="alert">{translate(language, '保存失败，请重试。', 'Could not save. Try again.')}</p>}
           </form> : lesson ? <>
             <p className="adventure-card-meta"><Clock3 size={16} aria-hidden="true"/>{translate(language, `${lesson.estimatedMinutes} 分钟`, `${lesson.estimatedMinutes} min`)}
+              <span className="adventure-card-state">{isRequiredLesson(lesson)?translate(language, '必学', 'Required'):translate(language, '选学', 'Elective')}</span>
               {status === 'complete' && <span className="adventure-card-state"><Check size={16} aria-hidden="true"/>{translate(language, '已完成', 'Completed')}</span>}
               {status === 'locked' && <span className="adventure-card-state"><LockKeyhole size={14} aria-hidden="true"/>{translate(language, '未解锁', 'Locked')}</span>}
               {status === 'skipped' && <span className="adventure-card-state adventure-card-skipped" role="status"><SkipForward size={16} aria-hidden="true"/>{translate(language, '已跳过', 'Skipped')}</span>}
@@ -201,7 +205,7 @@ function LandmarkCard({selection, chapter, lesson, unmet, status, completed, ski
             {startError&&<p className="adventure-card-skip-error" role="alert">{startError}</p>}
           </> : <>
             {chapter.stageGoal && <p className="adventure-card-goal">{chapter.stageGoal}</p>}
-            <p className="adventure-card-meta"><Check size={16} aria-hidden="true"/>{translate(language, `${count} / ${chapter.nodes.length} 节已完成`, `${count} / ${chapter.nodes.length} lessons completed`)}</p>
+            <p className="adventure-card-meta"><Check size={16} aria-hidden="true"/>{chapterProgress.optionalOnly ? translate(language, `选学 ${chapterProgress.completed} / ${chapterProgress.total} 节已完成`, `${chapterProgress.completed} / ${chapterProgress.total} elective lessons completed`) : translate(language, `必学 ${chapterProgress.completed} / ${chapterProgress.total} 节已完成`, `${chapterProgress.completed} / ${chapterProgress.total} required lessons completed`)}</p>
           </>}
         </div>
         {lesson && <div className="adventure-card-actions">
@@ -230,24 +234,47 @@ export function AdventureMap({route, language, onStartLesson, startPending=false
   }), [route.chapters]);
   const pages = useMemo(() => createRouteMapPages(route), [route]);
   const handled = (id: string) => completedNodeIds.has(id) || skippedReasons.has(id);
-  const isNext = (node: RouteNode) => !handled(node.id) && node.prerequisites.every(handled);
+  const dependencies = useMemo(() => new Map([...lessons.values()].map(({node}) => [node.id, learningPrerequisiteIds(route, node.id)])), [route, lessons]);
+  const isNext = (node: RouteNode) => !handled(node.id) && (dependencies.get(node.id) ?? []).every(handled);
   const current = currentNodeId ? lessons.get(currentNodeId)?.node : undefined;
-  const suggested = current && isNext(current) ? current.id : Array.from(lessons.values()).find(({node}) => isNext(node))?.node.id;
+  const available = Array.from(lessons.values()).filter(({node}) => isNext(node));
+  const suggested = current && isNext(current) ? current.id : (available.find(({node}) => isRequiredLesson(node)) ?? available[0])?.node.id;
   const initialLesson = initialNodeId ?? suggested;
   const startingIndex = initialLesson ? Math.max(0, pages.findIndex(page => page.lessonIds.includes(initialLesson))) : 0;
   const [pageChoice, setPageChoice] = useState<number>();
   const [selection, setSelection] = useState<Selection>();
   const [startingLessonId,setStartingLessonId]=useState<string>();
   const scroller = useRef<HTMLDivElement>(null);
+  const board = useRef<HTMLDivElement>(null);
+  const header = useRef<HTMLElement>(null);
+  const pagination = useRef<HTMLElement>(null);
+  const [viewport, setViewport] = useState<MapViewport>({width: WIDTH, height: HEIGHT, top: 128, bottom: 96});
+  useLayoutEffect(() => {
+    const element = board.current;
+    if (!element) return;
+    const measure = () => {
+      const rect = element.getBoundingClientRect();
+      const next = {width: rect.width, height: rect.height,
+        top: Math.max(0, (header.current?.getBoundingClientRect().bottom ?? rect.top) - rect.top) + 14,
+        bottom: Math.max(0, rect.bottom - (pagination.current?.getBoundingClientRect().top ?? rect.bottom)) + 18};
+      setViewport(previous => Object.keys(next).every(key => previous[key as keyof MapViewport] === next[key as keyof MapViewport]) ? previous : next);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    if (header.current) observer.observe(header.current);
+    if (pagination.current) observer.observe(pagination.current);
+    return () => observer.disconnect();
+  }, [pages.length]);
   const pageIndex = Math.min(pageChoice ?? startingIndex, Math.max(0, pages.length - 1));
-  const page = pages[pageIndex];
+  const projected = useMemo(() => pages[pageIndex] ? projectMapPage(pages[pageIndex], viewport) : undefined, [pages, pageIndex, viewport]);
+  const page = projected?.page;
   const markers = useMemo(() => page?.nodes.map(node => ({node, placement: pawPlacement(page, node)})) ?? [], [page]);
   const terrain = page?.themeId ?? 'grassland';
-  const lastChapter = page?.continuesToNextPage ? page.nodes.at(-1)?.chapter : undefined;
-  const totalCompleted = Array.from(completedNodeIds).filter(id => lessons.has(id)).length;
+  const progress = learningProgressSummary([...lessons.values()].map(({node}) => node), completedNodeIds);
   const selectedLesson = selection?.node.kind === 'lesson' ? lessons.get(selection.node.id) : undefined;
   const selectedChapter = selectedLesson?.chapter ?? (selection?.node.kind === 'chapter' ? chapters.get(selection.node.id) : undefined);
-  const unmet = (lesson: RouteNode) => lesson.prerequisites.flatMap(id => {
+  const unmet = (lesson: RouteNode) => (dependencies.get(lesson.id) ?? []).flatMap(id => {
     const prerequisite = lessons.get(id);
     return prerequisite && !handled(id) ? [prerequisite] : [];
   });
@@ -269,14 +296,15 @@ export function AdventureMap({route, language, onStartLesson, startPending=false
   }
 
   return <section className="adventure-map" data-map-terrain={terrain}>
-    <header className="adventure-map-header">
+    <header ref={header} className="adventure-map-header">
       <BackHomeButton language={language} onClick={onBack} disabled={startPending}/>
       <div className="adventure-map-heading">
+        <GameButtonArt variant="secondary"/>
         <h1 title={route.title}>{route.title}</h1>
         <div className="adventure-map-progress">
-          <span>{translate(language, '学习进度', 'Progress')}</span>
-          <progress max={Math.max(1, lessons.size)} value={totalCompleted} aria-label={translate(language, '学习进度', 'Progress')}/>
-          <span>{totalCompleted} / {lessons.size}</span>
+          <span>{progress.optionalOnly ? translate(language, '选学进度', 'Elective progress') : translate(language, '必学进度', 'Required progress')}</span>
+          <progress max={Math.max(1, progress.total)} value={progress.completed} aria-label={progress.optionalOnly ? translate(language, '选学进度', 'Elective progress') : translate(language, '必学进度', 'Required progress')}/>
+          <span>{progress.completed} / {progress.total}</span>
         </div>
       </div>
       <div className="adventure-map-actions">
@@ -286,9 +314,9 @@ export function AdventureMap({route, language, onStartLesson, startPending=false
     </header>
     {page ? <>
       <div className="adventure-board-scroller" ref={scroller}>
-        <div className="adventure-board" role="region" aria-label={terrainName(terrain, language)}>
+        <div ref={board} className="adventure-board" role="region" aria-label={terrainName(terrain, language)}>
           <img className="adventure-background" src={mapAsset(`${terrain}-background`)} alt="" draggable={false}/>
-          <TerrainTrail page={page}/>
+          <TerrainTrail page={page} height={projected!.height}/>
           {markers.map(({node, placement}) => {
             const lesson = node.kind === 'lesson' ? lessons.get(node.id)?.node : undefined;
             const chapter = node.kind === 'chapter' ? chapters.get(node.id) : undefined;
@@ -298,9 +326,9 @@ export function AdventureMap({route, language, onStartLesson, startPending=false
             const chapterTitle = translate(language, `第${node.chapter}章`, `Chapter ${node.chapter}`);
             const style = {
               left: `${placement.left / WIDTH * 100}%`,
-              top: `${placement.top / HEIGHT * 100}%`,
+              top: `${placement.top / projected!.height * 100}%`,
               width: `${node.width / WIDTH * 100}%`,
-              height: `${node.height / HEIGHT * 100}%`,
+              height: `${node.height / projected!.height * 100}%`,
               zIndex: Math.round(node.y),
             };
             return <button key={node.key} type="button" className="adventure-marker" style={style} disabled={startPending}
@@ -323,22 +351,14 @@ export function AdventureMap({route, language, onStartLesson, startPending=false
           })}
         </div>
       </div>
-      <nav className="adventure-map-pages" aria-label={translate(language, '地图分页', 'Map pages')}>
-        <GameButton variant="secondary" leadingIcon={<ArrowLeft/>} disabled={startPending || pageIndex === 0} onClick={() => changePage(pageIndex - 1)}>{translate(language, '上一张地图', 'Previous map')}</GameButton>
-        <div className="adventure-map-page-location">
-          <label className="adventure-map-page-select">
-            <select aria-label={translate(language, '跳转地图', 'Go to map')} disabled={startPending} value={pageIndex} onChange={event => changePage(Number(event.target.value))}>
-              {pages.map((item, index) => <option key={index} value={index}>{index + 1} / {pages.length} · {terrainName(item.themeId, language)}</option>)}
-            </select>
-            <ChevronDown size={15} aria-hidden="true"/>
-          </label>
-          {page.continuedChapter && <span title={page.continuedChapter.title}>{translate(language,
-            `续接第${page.continuedChapter.number}章 · 第${page.continuedChapter.firstLesson}–${page.continuedChapter.lastLesson}节`,
-            `Chapter ${page.continuedChapter.number} continued · Lessons ${page.continuedChapter.firstLesson}–${page.continuedChapter.lastLesson}`)}</span>}
-          {lastChapter !== undefined && <span>{translate(language,
-            `第${lastChapter}章在下一张地图继续`, `Chapter ${lastChapter} continues on the next map`)}</span>}
-        </div>
-        <GameButton variant="secondary" leadingIcon={<ArrowRight/>} disabled={startPending || pageIndex >= pages.length - 1} onClick={() => changePage(pageIndex + 1)}>{translate(language, '下一张地图', 'Next map')}</GameButton>
+      <nav ref={pagination} className="adventure-map-pages" aria-label={translate(language, '地图分页', 'Map pages')}>
+        <GameButton variant="secondary" leadingIcon={<ArrowLeft/>} disabled={startPending || pageIndex === 0} onClick={() => changePage(pageIndex - 1)}>{translate(language, '上一页', 'Previous page')}</GameButton>
+        <GameSelect className="adventure-map-page-select" menuClassName="adventure-map-page-options"
+          aria-label={translate(language, '跳转到指定页', 'Go to page')}
+          valueLabel={translate(language, `第${pageIndex + 1}页`, `Page ${pageIndex + 1}`)}
+          disabled={startPending} value={String(pageIndex)} onChange={value => changePage(Number(value))}
+          options={pages.map(item => ({value: String(item.pageIndex), label: String(item.pageNumber)}))}/>
+        <GameButton variant="secondary" leadingIcon={<ArrowRight/>} disabled={startPending || pageIndex >= pages.length - 1} onClick={() => changePage(pageIndex + 1)}>{translate(language, '下一页', 'Next page')}</GameButton>
       </nav>
     </> : <p className="adventure-map-empty">{translate(language, '暂无学习小节', 'No lessons yet')}</p>}
     {selection && selectedChapter && <LandmarkCard key={selection.node.key} selection={selection} chapter={selectedChapter}

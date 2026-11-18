@@ -12,6 +12,11 @@
 }
 .stone-dialog.resource-dialog h2 { margin-block-end: 15px; }
 .resource-dialog-content { min-block-size: 0; overflow: auto; padding: 2px; }
+.stone-dialog.lesson-resource-dialog { block-size: min(650px, calc(100dvh - 24px)); }
+.lesson-resource-dialog .stone-dialog-inner { block-size: 100%; }
+.lesson-resource-dialog .resource-dialog-content { flex: 1; margin-block-start: 12px; }
+.lesson-resource-dialog :is(h2, .resource-toolbar, .resource-link-form, .resource-feedback, .form-message) { flex: none; }
+.lesson-resource-list { display: grid; align-content: start; gap: 7px; list-style: none; padding: 0; margin: 0; }
 .resource-toolbar, .resource-dialog-footer, .resource-detail-header, .resource-detail-actions, .resource-detail-bottom {
   display: flex;
   align-items: center;
@@ -149,16 +154,11 @@
 .resource-snippet p { margin-block-start: 5px; font-size: 14px; line-height: 1.45; max-block-size: 135px; overflow: auto; }
 .resource-overview p { white-space: pre-line; }
 .resource-snippet label { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 7px; font-size: 13px; }
-.resource-snippet select, .resource-detail-actions select, .resource-picker select {
+.resource-snippet .game-select, .resource-detail-actions .game-select, .resource-picker .game-select {
   min-inline-size: 0;
-  padding: 4px 8px;
-  border: 1px solid #b4976c;
-  border-radius: 4px;
-  color: #443023;
-  background: #f9edd4;
+  max-inline-size: 100%;
   font: inherit;
 }
-:is(.resource-snippet, .resource-detail-actions, .resource-picker) select:focus { background: #ead8b4; }
 .resource-link-button {
   border: 0;
   padding: 4px 0;
@@ -216,7 +216,7 @@
 .stone-dialog.resource-picker { width: min(670px, calc(100vw - 28px)); }
 .resource-picker-list { padding-inline-end: 3px; }
 .resource-picker-list .resource-attachment-row { grid-template-columns: auto minmax(0, 1fr) minmax(0, auto); }
-.resource-picker select { max-width: 145px; font-size: 12px; }
+.resource-picker .game-select { max-inline-size: 145px; font-size: 14px; }
 .stone-dialog.resource-preview-dialog { width: min(660px, calc(100vw - 28px)); }
 .resource-excerpt-copy { padding: 12px; background: #faf2dc; border-radius: 5px; line-height: 1.65; }
 .resource-excerpt-location { color: #675337; margin-block: 0 8px; }

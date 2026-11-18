@@ -1,5 +1,6 @@
-import {useEffect,useId,useRef,useState,type KeyboardEvent} from 'react';
-import {Check,ChevronDown,RefreshCw} from 'lucide-react';
+import {useEffect,useState} from 'react';
+import {RefreshCw} from 'lucide-react';
+import GameSelect from './GameSelect';
 import type {AgentOptions,PlanningState} from '../../../../packages/domain/planning.mjs';
 import {PROVIDERS,type ProviderId} from '../agents/domain';
 import {planningService,planningMessage,type ModelCatalog} from '../planning/service';
@@ -10,66 +11,11 @@ type Option={id:string;label:string;icon?:string;disabled?:boolean};
 type DropdownProps={label:string;options:Option[];value:string;onSelect:(id:string)=>void;placeholder?:string;disabled?:boolean;hint?:string;showLabel?:boolean;above?:boolean};
 
 function PlanningDropdown({label,options,value,onSelect,placeholder='',disabled=false,hint,showLabel=true,above=false}:DropdownProps){
- const id=useId(),listId=id+'-choices',root=useRef<HTMLDivElement>(null),list=useRef<HTMLUListElement>(null);
- const [open,setOpen]=useState(false),[active,setActive]=useState(-1);
- const expanded=open&&!disabled,selected=options.find(option=>option.id===value);
- const enabled=options.flatMap((option,index)=>option.disabled?[]:[index]);
- const optionId=(index:number)=>`${listId}-${index}`;
- useEffect(()=>{if(disabled)setOpen(false)},[disabled]);
- useEffect(()=>{
-  if(!expanded)return;
-  const dismiss=(event:PointerEvent)=>{if(event.target instanceof Node&&!root.current?.contains(event.target))setOpen(false)};
-  document.addEventListener('pointerdown',dismiss,true);
-  return()=>document.removeEventListener('pointerdown',dismiss,true);
- },[expanded]);
- useEffect(()=>{
-  const menu=list.current,row=menu?.children.item(active);
-  if(row instanceof HTMLElement)row.scrollIntoView({block:'nearest',inline:'nearest'});
- },[expanded,active]);
- function show(last=false){
-  const current=options.findIndex(option=>option.id===value&&!option.disabled);
-  setActive(current>=0?current:(last?enabled.at(-1):enabled[0])??-1);
-  setOpen(true);
- }
- function choose(index:number){
-  const option=options[index];
-  if(!option||option.disabled)return;
-  setOpen(false);
-  if(option.id!==value)onSelect(option.id);
- }
- function onKeyDown(event:KeyboardEvent<HTMLButtonElement>){
-  const {key}=event;
-  if(disabled)return;
-  if(key==='Tab'){setOpen(false);return}
-  if(key==='Escape'&&expanded){event.preventDefault();event.stopPropagation();setOpen(false);return}
-  if(key==='Enter'||key===' '){
-   event.preventDefault();
-   if(expanded)choose(active);else show();
-  }else if(key==='ArrowDown'||key==='ArrowUp'||key==='Home'||key==='End'){
-   event.preventDefault();
-   if(!expanded){show(key==='ArrowUp'||key==='End');return}
-   const position=enabled.indexOf(active);
-   if(key==='Home')setActive(enabled[0]??-1);
-   else if(key==='End')setActive(enabled.at(-1)??-1);
-   else setActive(enabled[Math.max(0,Math.min(enabled.length-1,position+(key==='ArrowDown'?1:-1)))]??-1);
-  }
- }
- return <div className={`planning-dropdown${above?' planning-dropdown--above':''}`} ref={root}>
+ return <div className="planning-dropdown">
   {showLabel&&<span className="planning-dropdown-label" aria-hidden="true">{label}</span>}
-  <button type="button" className="planning-dropdown-trigger" role="combobox" aria-label={label} aria-expanded={expanded}
-   aria-controls={expanded?listId:undefined} aria-activedescendant={expanded&&active>=0?optionId(active):undefined}
-   aria-disabled={disabled||undefined} tabIndex={disabled?-1:0} title={hint??selected?.label??placeholder}
-   onBlur={()=>setOpen(false)} onKeyDown={onKeyDown}
-   onClick={event=>{if(!disabled){event.currentTarget.focus();if(expanded)setOpen(false);else show()}}}>
-   {selected?.icon&&<img src={selected.icon} alt=""/>}<span>{selected?.label??placeholder}</span><ChevronDown aria-hidden="true"/>
-  </button>
-  {expanded&&<ul className="planning-dropdown-choices" id={listId} ref={list} role="listbox" aria-label={label}>
-   {options.map((option,index)=><li key={option.id} id={optionId(index)} role="option" aria-selected={option.id===value}
-    aria-disabled={option.disabled||undefined} data-active={index===active||undefined} title={option.label}
-    onMouseDown={event=>event.preventDefault()} onClick={()=>choose(index)}>
-    {option.icon&&<img src={option.icon} alt=""/>}<span>{option.label}</span>{option.id===value&&<Check aria-hidden="true"/>}
-   </li>)}
-  </ul>}
+  <GameSelect value={value} options={options.map(option=>({value:option.id,label:option.label,disabled:option.disabled,icon:option.icon}))}
+   onChange={onSelect} aria-label={label} placeholder={placeholder} disabled={disabled} title={hint}
+   triggerClassName="planning-dropdown-trigger" menuClassName="planning-dropdown-choices" preferredPlacement={above?'above':'below'}/>
  </div>;
 }
 

@@ -335,7 +335,12 @@ final class ResourceLibrary {
             } else {
                 admitted.planning = true
             }
-            if (draft != nil || scope != nil) && admitted.status == .pending {
+            // Lesson additions keep the original only. A later explicit planning
+            // import can promote an unparsed attachment into the parsing workflow.
+            if scope == nil && admitted.status == .attachment && admitted.reason == nil && admitted.segments.isEmpty {
+                admitted.status = .pending
+            }
+            if draft != nil && admitted.status == .pending {
                 admitted.beginParsing()
                 jobs.append(admitted)
             }
@@ -349,6 +354,16 @@ final class ResourceLibrary {
         return jobs
     }
 
+    func addExisting(_ project: String, ref: ResourceSelection, scope: ResourceScope) throws -> [String: Any] {
+        try transaction(project, update: true) { document in
+            guard let item = document.items.first(where: { $0.ref == ref && !$0.removed && $0.draftID == nil })
+            else { throw ResourceError.unavailable }
+            var report = ImportReport()
+            _ = try admit([item], into: &document, scope: scope, report: &report)
+            return report.json
+        }
+    }
+
     private func local(_ url: URL, scope: ResourceScope?) -> LearningResource? {
         let resolved = url.standardizedFileURL.resolvingSymlinksInPath()
         guard let stamp = ResourceExtractors.stamp(resolved), !url.hasDirectoryPath,
@@ -356,7 +371,8 @@ final class ResourceLibrary {
         let format = ResourceExtractors.format(resolved.pathExtension)
         return LearningResource(id: Self.token(), version: Self.token(), format: format,
                                 name: String(resolved.lastPathComponent.prefix(230)), origin: resolved.path, stamp: stamp,
-                                planning: scope == nil, lessons: scope.map { [$0] } ?? [])
+                                planning: scope == nil, lessons: scope.map { [$0] } ?? [],
+                                status: scope == nil ? .pending : .attachment)
     }
 
     func addFiles(_ project: String, urls: [URL], folder: Bool, scope: ResourceScope?, draftID: String? = nil) throws -> [String: Any] {
@@ -435,7 +451,8 @@ final class ResourceLibrary {
         let name = suffix.isEmpty || suffix == "/" ? host : host + " / " + suffix
         return LearningResource(id: token(), version: token(), format: "web",
                                 name: String(name.prefix(230)), origin: url.absoluteString,
-                                planning: scope == nil, lessons: scope.map { [$0] } ?? [])
+                                planning: scope == nil, lessons: scope.map { [$0] } ?? [],
+                                status: scope == nil ? .pending : .attachment)
     }
 
     func prepareTutorialSearch(_ project: String, draftID: String, restart: Bool) throws -> (slots: Int, excluded: [String]) {

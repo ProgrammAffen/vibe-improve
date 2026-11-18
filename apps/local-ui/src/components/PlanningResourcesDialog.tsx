@@ -7,6 +7,7 @@ import {
   type ResourceDraft, type ResourceItem, type ResourceLimits
 } from '../resources/service';
 import GameButton from './GameButton';
+import GameSelect from './GameSelect';
 import Modal from './Modal';
 import {reportMessage, ResourceBadge, resourceFormatLabels, ResourceIcon, resourceReasons} from './ResourceDialog';
 
@@ -59,9 +60,8 @@ function ResourceContents({projectId, item, language, busy, onAction}: {
       {(segments.length > 1 || detail?.overview?.trim() !== segment.text.trim()) && <div className="resource-snippet">
         <label>{t('正文摘录', 'Excerpt')}
           {segments.length > 1
-            ? <select value={segment.id} onChange={event => setSegmentId(event.target.value)}>
-                {segments.map(part => <option key={part.id} value={part.id}>{resourceLocation(part.location, language)}</option>)}
-              </select>
+            ? <GameSelect aria-label={t('正文摘录', 'Excerpt')} value={segment.id} onChange={setSegmentId}
+                options={segments.map(part => ({value: part.id, label: resourceLocation(part.location, language)}))}/>
             : <span>{resourceLocation(segment.location, language)}</span>}
         </label>
         <p>{segment.text}</p>

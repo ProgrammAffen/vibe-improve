@@ -1,0 +1,36 @@
+{
+  "name": "lessons-guided-practice",
+  "task": "lessons",
+  "input": {
+    "locale": "zh-CN",
+    "requestedLessons": [
+      {
+        "ref": "L1",
+        "title": "理解智能体如何选择工具",
+        "focus": "根据任务选择合适工具，解释为何要读取真实结果。"
+      }
+    ],
+    "availablePrerequisites": []
+  },
+  "response": {
+    "status": "ok",
+    "reply": "已整理本节目标和学习活动。",
+    "result": {
+      "nodes": [
+        {
+          "ref": "L1",
+          "objectives": [
+            "能根据任务选择合适的只读工具，并解释回答为何应依据实际返回结果。"
+          ],
+          "prerequisites": [],
+          "estimatedMinutes": 20,
+          "activities": [
+            "先用查询天气的例子识别用户目标、可用工具、输入参数和返回结果，再换一个任务独立选择工具。"
+          ],
+          "assessment": null
+        }
+      ]
+    },
+    "missing": []
+  }
+}

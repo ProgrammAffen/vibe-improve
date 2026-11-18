@@ -175,6 +175,10 @@ final class ResourceBridge {
             return ["links": links, "items": try library.describe(project, refs: links.map(reference))]
         case "resources.detail":
             return try library.item(project, ref: reference(value["ref"])).display(details: true)
+        case "resources.attachLesson":
+            guard Set(value.keys) == ["projectId", "ref", "scope"],
+                  let target = try scope(value["scope"], project: project) else { throw ResourceError.invalid }
+            return try library.addExisting(project, ref: reference(value["ref"]), scope: target)
         case "resources.transcribe":
             guard Set(value.keys) == ["projectId", "ref", "locale"], let locale = value["locale"] as? String
             else { throw ResourceError.invalid }
@@ -267,7 +271,7 @@ final class ResourceBridge {
         guard let fields = value as? [String: String], Set(fields.keys) == ["routeId", "nodeId"], let routeId = fields["routeId"],
               let nodeID = fields["nodeId"] else { throw ResourceError.invalid }
         let (state, route) = try route(project, value: ["routeId": routeId])
-        guard state["confirmedRevision"] as? Int == route["revision"] as? Int,
+        guard (state["step"] as? String == "editor" || state["confirmedRevision"] as? Int == route["revision"] as? Int),
               let chapters = route["chapters"] as? [[String: Any]],
               chapters.contains(where: { ($0["nodes"] as? [[String: Any]])?.contains(where: { $0["id"] as? String == nodeID }) == true })
         else { throw ResourceError.changed }

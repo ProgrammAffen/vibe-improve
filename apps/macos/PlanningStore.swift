@@ -136,8 +136,8 @@ final class PlanningStore {
                     case .start(let id), .complete(let id), .skip(let id, _): nodeID = id
                     case .reset: throw PlanningError.invalid
                     }
-                    guard let node = nodes.first(where: { $0["id"] as? String == nodeID }),
-                          let required = node["prerequisites"] as? [String],
+                    guard nodes.contains(where: { $0["id"] as? String == nodeID }),
+                          let required = try invoke("learningPrerequisiteIds", [route, nodeID])?.toArray() as? [String],
                           completed.contains(nodeID) || required.allSatisfy({ completed.contains($0) || skipped[$0] != nil })
                           else { throw PlanningError.conflict }
                     switch change {

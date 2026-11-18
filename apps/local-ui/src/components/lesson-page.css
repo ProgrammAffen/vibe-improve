@@ -53,3 +53,10 @@
 .lesson-sheet footer .game-button { height: auto; min-height: 48px; min-width: 0; padding: 10px 26px; }
 .lesson-sheet .game-button-label, .lesson-navigation .game-button-label { white-space: nowrap; }
 .lesson-error { color: #8c3c2c; }
+.lesson-requirement { display: inline-block; margin-inline-start: 14px; padding: 3px 10px; border-radius: 4px; background: #6f81552b; color: #3f542f; font-size: .9em; }
+.lesson-review p { white-space: pre-wrap; }
+.lesson-review h3 { font-size: 1em; margin-block: 14px 8px; }
+.lesson-assessment-text { white-space: pre-wrap; }
+.lesson-assessment-answer { margin-block-start: 16px; border: 1px solid #ad884d61; border-radius: 5px; }
+.lesson-assessment-answer summary { padding: 12px 14px; cursor: pointer; font-weight: 650; }
+.lesson-assessment-answer > p { padding: 0 14px 14px; }

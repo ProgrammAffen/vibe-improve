@@ -338,6 +338,40 @@
           "items": {
             "$ref": "#/$defs/description"
           }
+        },
+        "requirement": {
+          "enum": [
+            "required",
+            "optional"
+          ]
+        },
+        "review": {
+          "$ref": "#/$defs/review"
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "content",
+        "passCriteria"
+      ],
+      "properties": {
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "pattern": "\\S"
+        },
+        "passCriteria": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 24,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/description"
+          }
         }
       }
     },
@@ -346,7 +380,6 @@
       "additionalProperties": false,
       "required": [
         "task",
-        "passCriteria",
         "objectiveIds"
       ],
       "properties": {
@@ -385,9 +418,29 @@
           "minLength": 1,
           "maxLength": 4000,
           "pattern": "\\S"
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64000,
+          "pattern": "\\S"
         }
       },
       "allOf": [
+        {
+          "if": {
+            "not": {
+              "required": [
+                "passCriteria"
+              ]
+            }
+          },
+          "then": {
+            "required": [
+              "answer"
+            ]
+          }
+        },
         {
           "if": {
             "properties": {
@@ -402,6 +455,38 @@
           "then": {
             "required": [
               "evaluatorPrompt"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "answer"
+            ]
+          },
+          "then": {
+            "allOf": [
+              {
+                "not": {
+                  "required": [
+                    "passCriteria"
+                  ]
+                }
+              },
+              {
+                "not": {
+                  "required": [
+                    "mode"
+                  ]
+                }
+              },
+              {
+                "not": {
+                  "required": [
+                    "evaluatorPrompt"
+                  ]
+                }
+              }
             ]
           }
         }

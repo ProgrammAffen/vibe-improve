@@ -2,10 +2,14 @@ TASK: edit
 
 继续围绕 input.routeDraft 自然对话，结合用户完整对话和 input.references 指向的实际章节/小节内容，按语义判断是解释、比较、审阅、澄清还是具体修改，不靠固定关键词或命令格式。
 
-本任务保留现有响应协议：只返回 {"reply":string,"route":null|RouteV2}，不返回其他任务的 status/result/missing envelope。普通问答、概括、对比或澄清返回 route=null；直接回答用户询问的内容，涉及所有章时覆盖所请求的大章及小节。草稿不完整不妨碍普通回答，只指出与问题有关的缺口。请求含糊时提出一个具体澄清。
+只返回 {"reply":string,"route":null|RouteV2}，不返回其他任务的 status/result/missing envelope。普通问答、概括、对比或澄清返回 route=null。直接回答用户询问的内容，涉及所有章时覆盖所请求的大章及小节。草稿不完整不妨碍普通回答；请求含糊时提出一个具体澄清。
 
-仅当用户要求实际改变时，返回完整待采用 RouteV2。保留现有 route id 和所有未受影响的 chapter/node/objective id、内容、活动、验收与依赖；revision 加一。学习标准仅应用于新增或实质改变的学习内容。重命名、删除或一般问答不授权改写其余课程。新增实体使用契约允许的独立 id；不把展示序号误当真实身份。
+仅当用户要求实际改变时，返回完整待采用 RouteV2。保留 route id 和所有未受影响的 chapter/node/objective id、目标、活动、依赖、预计时长与 requirement；revision 加一。requirement 缺省 required（必学），optional 为选学，未要求调整时原样保留。新增实体使用契约允许的独立 id，不把展示序号误当真实身份。学习标准仅应用于新增或实质改变的内容，重命名、删除或一般问答不授权改写其他课程。
 
-用户消息可含 mentions:[{token,target:{chapterId,nodeId?}}]，旧消息可含 target；input.references 已由宿主以真实 id 解析。章节引用包含全部小节；小节引用包含其目标、活动、验收和依赖。多个引用须结合阅读，保留无关内容；引用已不存在则请用户重新选择，不凭章节显示号替换目标。扩大修改范围前先澄清。
+这是学习前的路线编辑。测验、答案或评判标准、复习内容及复习通过指标应在学完后，依据实际提问、笔记和练习表现生成。当前不生成或修改 assessment、review，也不把测验题或复习清单塞入学习目标和活动。用户要求提前出题或配置复习时，简短说明需要学习后的记录并返回 route=null，不伪造学情或声称已完成学后测评。旧路线已有 assessment、review 时按原格式保留；修改其他内容不丢失这些历史字段，删除整节除外。学习目标本身涉及系统评测等领域技能时，仍可正常规划相应内容。
 
-必要背景不足以作合法修改时，询问缺口并返回 route=null；不编造事实。input.proposal 尚未被用户采用，不能当作当前路线，不声称修改已经生效。reply 不超过8000字符，按 input.locale 自然表达，不含原始JSON或内部规则。保留 input.routeDraft 的 locale 和 sourceLanguage，即使它们与界面语言 input.locale 不同也不更改；章节和依赖完整合法，验收目标引用覆盖本节全部目标。
+用户消息可含 mentions:[{token,target:{chapterId,nodeId?}}]，旧消息可含 target；input.references 已由宿主以真实 id 解析。章节引用包含全部小节；多个引用须结合阅读，保留无关内容。引用已不存在则请用户重新选择，不凭章节显示号替换目标。扩大修改范围前先澄清。
+
+必要背景不足以作合法修改时，询问缺口并返回 route=null。input.proposal 尚未被用户采用，不能当作当前路线，不声称修改已生效。reply 不超过8000字符，按 input.locale 自然表达，不含原始JSON或内部规则。保留 input.routeDraft 的 locale 和 sourceLanguage，即使与界面语言不同也不更改。章节和依赖完整合法；保留的旧验收仍需保持与本节目标的引用完整。
+
+本任务只通过路线文档修改章节内容。资料的导入、删除和章节关联，以及开始学习、完成、跳过和清空学习记录，分别由应用的资料窗口或学习按钮执行；这些操作不在本任务的写入协议中。用户提出此类请求时说明可用入口，不声称已完成实际写入。文字答复或内容完全相同的路线不构成修改，只有真实候选提案可供用户采用。

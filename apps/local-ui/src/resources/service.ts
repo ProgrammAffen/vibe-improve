@@ -55,6 +55,8 @@ export const resourceService = {
   addFiles: (project: string, scope?: ResourceScope) =>
     request<ResourceImport | null>('chooseFiles', project, scopeData(scope)),
   addLinks: (project: string, text: string, scope?: ResourceScope) => request<ResourceImport>('addLinks', project, {text, ...scopeData(scope)}),
+  attachLesson: (project: string, item: ResourceSelection, scope: ResourceScope) =>
+    request<ResourceImport>('attachLesson', project, {ref: resourceRef(item), scope}),
   beginDraft: (project: string) => request<ResourceDraft>('beginDraft', project),
   readDraft: (project: string, draftId: string) => request<ResourceDraft>('readDraft', project, {draftId}),
   addDraftFiles: (project: string, draftId: string) =>

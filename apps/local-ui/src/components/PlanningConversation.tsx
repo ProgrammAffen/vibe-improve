@@ -35,7 +35,7 @@ function ChatFiles({files,language,disabled,onRemove}:{files:PlanningAttachment[
   </li>;
  })}</ul>;
 }
-export function PlanningMessages({messages,providerId,language,busy=false,workingLabel,partialReply,partialProviderId=providerId,activity,route,children,autoFollow=true}:{messages:PlanningMessage[];providerId:string|null;language:Language;busy?:boolean;workingLabel?:string;partialReply?:string;partialProviderId?:string|null;activity?:PlanningActivity;route?:RouteDocument;children?:ReactNode;autoFollow?:boolean}){
+export function PlanningMessages({messages,providerId,language,busy=false,workingLabel,partialReply,partialProviderId=providerId,activity,route,children,renderMessageExtra,autoFollow=true}:{messages:PlanningMessage[];providerId:string|null;language:Language;busy?:boolean;workingLabel?:string;partialReply?:string;partialProviderId?:string|null;activity?:PlanningActivity;route?:RouteDocument;children?:ReactNode;renderMessageExtra?:(message:PlanningMessage)=>ReactNode;autoFollow?:boolean}){
  const list=useRef<HTMLDivElement>(null),content=useRef<HTMLDivElement>(null);
  const bottom=()=>{if(autoFollow&&list.current)list.current.scrollTop=list.current.scrollHeight};
  useLayoutEffect(bottom);
@@ -58,6 +58,7 @@ export function PlanningMessages({messages,providerId,language,busy=false,workin
        <MentionText text={message.text} mentions={message.mentions} route={route} language={language}/>
       </p>
       {message.attachments?.length?<ChatFiles files={message.attachments} language={language}/>:null}
+      {renderMessageExtra?.(message)}
      </div>
     </article>;
    })}

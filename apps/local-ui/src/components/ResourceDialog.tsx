@@ -2,8 +2,8 @@ import {useEffect, useRef, useState} from 'react';
 import {AlertTriangle, CircleCheck, Clock, File, FileText, Film, Headphones, Link2, LoaderCircle, LockKeyhole, Paperclip} from 'lucide-react';
 import {translate, type Language} from '../i18n';
 import {
-  isResourceParseFailed, resourceKey, resourceLocation, resourceMessage, resourceService, timecode, useResourceList,
-  type ResourceImport, type ResourceItem, type ResourceScope, type SpeechLocale
+  isResourceParseFailed, resourceKey, resourceMessage, resourceService, useResourceList,
+  type ResourceImport, type ResourceItem, type ResourceScope
 } from '../resources/service';
 import GameButton from './GameButton';
 import Modal from './Modal';
@@ -84,45 +84,27 @@ type ResourceDialogProps = {
   projectId: string;
   language: Language;
   onClose: () => void;
+  onChooseLibrary: () => void;
   list: ReturnType<typeof useResourceList>;
   scope: ResourceScope;
   inherited?: ResourceItem[];
 };
-export default function ResourceDialog({projectId, language, list, scope, inherited = [], onClose}: ResourceDialogProps) {
+export default function ResourceDialog({projectId, language, list, scope, inherited = [], onChooseLibrary, onClose}: ResourceDialogProps) {
   const t = (zh: string, en: string) => translate(language, zh, en);
-  const [selected, setSelected] = useState<string>();
-  const [details, setDetails] = useState<ResourceItem>();
-  const [segmentId, setSegmentId] = useState('');
   const [linksOpen, setLinksOpen] = useState(false);
   const [links, setLinks] = useState('');
   const linkInput = useRef<HTMLTextAreaElement>(null);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
-  const [speechLanguage, setSpeechLanguage] = useState<{key: string; locale: SpeechLocale}>();
   const items = [...list.items, ...inherited.filter(item => !list.items.some(value => resourceKey(value) === resourceKey(item)))];
-  const item = items.find(value => resourceKey(value) === selected) ?? items[0];
-  const key = item ? resourceKey(item) : undefined;
-  const currentDetails = details && resourceKey(details) === key && details.status === item?.status ? details : undefined;
-  const segments = currentDetails?.segments ?? [];
-  const segment = segments.find(part => part.id === segmentId) ?? segments[0];
-  const direct = list.items.some(value => resourceKey(value) === key);
-
-  useEffect(() => {
-    if (!item || !key) return;
-    let active = true;
-    void resourceService.detail(projectId, item).then(value => {if (active) setDetails(value);}, () => {});
-    return () => {active = false;};
-  }, [projectId, key, item?.status, item?.segmentCount]);
 
   useEffect(() => {
     if (linksOpen) linkInput.current?.focus();
   }, [linksOpen]);
 
   async function run<T>(work: () => Promise<T>, completed?: (value: T) => void, refresh = true) {
-    setBusy(true);
-    setError('');
-    setFeedback('');
+    setBusy(true);setError('');setFeedback('');
     try {
       const outcome = await work();
       if (refresh) await list.refresh();
@@ -137,115 +119,58 @@ export default function ResourceDialog({projectId, language, list, scope, inheri
     if (!links.trim()) return;
     void run(() => resourceService.addLinks(projectId, links, scope), report => {
       added(report);
-      if (!report.invalidLines.length && !report.overLimit) {setLinks(''); setLinksOpen(false);}
+      if (!report.invalidLines.length && !report.overLimit) {setLinks('');setLinksOpen(false);}
     });
   }
   const linksCount = list.items.filter(value => value.format === 'web').length;
   const fileCount = list.items.length - linksCount;
-  const fileLimit = list.limits?.lessonFiles;
-  const linkLimit = list.limits?.lessonLinks;
+  const fileLimit = list.limits?.lessonFiles, linkLimit = list.limits?.lessonLinks;
   const filesFull = fileLimit !== undefined && fileCount >= fileLimit;
   const linksFull = linkLimit !== undefined && linksCount >= linkLimit;
-  const media = item?.format === 'audio' || item?.format === 'video';
-  const captionsAllowed = media && !item.segmentCount && item.status !== 'processing' && item.status !== 'pending' && item.reason !== 'moved';
-  const transcribing = item?.status === 'processing' && item.reason === 'transcribing';
-  const savedLanguage = item?.hasTranscript !== undefined ? item.speechLocale : undefined;
-  const resuming = item?.reason === 'speechPaused' || item?.status === 'partial' && item.reason === 'speechFailed';
-  const canTranscribe = item && (captionsAllowed || media && item.status === 'partial' && item.speechLocale) &&
-    item.reason !== 'moved' && (!savedLanguage || !['noAudio', 'noSpeech', 'speechUnavailable'].includes(item.reason ?? ''));
-  const locale = savedLanguage ?? (speechLanguage?.key === key ? speechLanguage?.locale : undefined) ?? 'auto';
-  const metadata = item?.read !== undefined && item.total !== undefined
-    ? item.format === 'pdf' || item.format === 'web'
-      ? t(item.read + ' / ' + item.total + ' 页可读', item.read + ' / ' + item.total + ' pages readable')
-      : t('已转写 ', 'Transcribed ') + timecode(item.read * 1_000) + ' / ' + timecode(item.total * 1_000)
-    : undefined;
 
-  return <Modal title={t('背包资料', 'Backpack resources')}
-    className="resource-dialog" closeLabel={t('关闭', 'Close')} onClose={onClose} busy={busy} focusHeading>
-    <div className="resource-dialog-content">
+  return <Modal title={t('小节资料', 'Lesson resources')} className="resource-dialog lesson-resource-dialog"
+    closeLabel={t('关闭', 'Close')} onClose={onClose} busy={busy} focusHeading>
     <div className="resource-toolbar">
       <GameButton variant="secondary" leadingIcon={<File aria-hidden="true"/>} disabled={busy || filesFull}
         onClick={() => void run(() => resourceService.addFiles(projectId, scope), added)}>{t('添加文件', 'Add files')}</GameButton>
       <GameButton variant="secondary" leadingIcon={<Link2 aria-hidden="true"/>} disabled={busy || (linksFull && !linksOpen)}
         aria-expanded={linksOpen} onClick={() => setLinksOpen(value => !value)}>{t('添加链接', 'Add links')}</GameButton>
+      <GameButton variant="secondary" leadingIcon={<FileText aria-hidden="true"/>} disabled={busy}
+        onClick={onChooseLibrary}>{t('从项目资料库添加', 'Add from project')}</GameButton>
       {fileLimit !== undefined && linkLimit !== undefined && <span className="resource-counts">
         {t('文件', 'Files')} {fileCount}/{fileLimit} · {t('链接', 'Links')} {linksCount}/{linkLimit}
       </span>}
     </div>
-    {linksOpen && <form className="resource-link-form" onSubmit={event => {event.preventDefault(); submitLinks();}}>
-      <label htmlFor="resource-urls">{t('每行一个网页链接', 'One web link per line')}</label>
-      <textarea ref={linkInput} id="resource-urls" value={links} onChange={event => setLinks(event.target.value)} maxLength={48_000}
+    {linksOpen && <form className="resource-link-form" onSubmit={event => {event.preventDefault();submitLinks();}}>
+      <label htmlFor="lesson-resource-urls">{t('每行一个网页链接', 'One web link per line')}</label>
+      <textarea ref={linkInput} id="lesson-resource-urls" value={links} onChange={event => setLinks(event.target.value)} maxLength={48_000}
         rows={3} placeholder={'https://example.org/guide\nhttps://example.org/notes'} readOnly={busy}/>
-      <GameButton type="submit" disabled={busy || linksFull || !links.trim()}>{t('加入清单', 'Add to list')}</GameButton>
+      <GameButton type="submit" disabled={busy || linksFull || !links.trim()}>{t('添加', 'Add')}</GameButton>
     </form>}
     {feedback && <p className="resource-feedback" role="status">{feedback}</p>}
     {error && <p role="alert" className="form-message is-error">{error}</p>}
     {Boolean(list.error) && <div className="resource-retry"><p role="alert">{resourceMessage(list.error, language)}</p>
       <button className="resource-link-button" type="button" onClick={() => void list.refresh().catch(() => {})}>{t('重试', 'Retry')}</button>
     </div>}
-    {items.length ? <div className="resource-grid">
-      <div className="resource-list" aria-label={t('资料列表', 'Resource list')}>
-        {items.map(value => {
-          const valueKey = resourceKey(value);
-          const info = <>
-            <ResourceIcon format={value.format}/>
-            <span className="resource-name-group"><strong title={value.name}>{value.name}</strong>
-              <small>{value.fromTutorialSearch ? t('网上找到的教程', 'Online tutorial') : t(...resourceFormatLabels[value.format])}</small>
-            </span>
-            <ResourceBadge item={value} language={language} planning={false}/>
-          </>;
-          return <button type="button" className="resource-list-row" key={valueKey} aria-pressed={key === valueKey}
-            onClick={() => {setSelected(valueKey); setSegmentId('');}}>{info}</button>;
-        })}
-      </div>
-      {item && <section className="resource-detail">
-        <div className="resource-detail-header"><h3>{t('解析结果', 'Parse result')}</h3><ResourceBadge item={item} language={language} planning={false}/></div>
-        <strong className="resource-detail-name">{item.name}</strong>
-        {metadata && <p>{metadata}</p>}
-        {item.reason && resourceReasons[item.reason] && <p>{t(...resourceReasons[item.reason])}</p>}
-        {canTranscribe && !savedLanguage && <p>{t('Whisper 在本机转写完整音轨，分段保存进度。',
-          'Whisper transcribes the full audio track on this Mac and saves progress as it goes.')}</p>}
-        {segment && <div className="resource-snippet">
-          {segments.length > 1 && <label>{t('摘录位置', 'Excerpt location')}
-            <select value={segment.id} onChange={event => setSegmentId(event.target.value)}>
-              {segments.map(part => <option key={part.id} value={part.id}>{resourceLocation(part.location, language)}</option>)}
-            </select>
-          </label>}
-          {segments.length === 1 && <strong>{resourceLocation(segment.location, language)}</strong>}
-          <p>{segment.text}</p>
-        </div>}
-        <div className="resource-detail-actions">
-          <button className="resource-link-button" type="button" disabled={busy}
-            onClick={() => void run(() => resourceService.open(projectId, item, segment?.id), undefined, false)}>{t('打开原件', 'Open original')}</button>
-          {item.hasTranscript && <button className="resource-link-button" type="button" disabled={busy}
-            onClick={() => void run(() => resourceService.openTranscript(projectId, item), undefined, false)}>{t('查看转写', 'View transcript')}</button>}
-          {transcribing && <button className="resource-link-button" type="button" disabled={busy}
-            onClick={() => void run(() => resourceService.pauseTranscription(projectId, item))}>{t('暂停转写', 'Pause transcription')}</button>}
-          {item.status === 'needsAttention' && !item.speechLocale && !['requiresLogin', 'moved', 'encrypted'].includes(item.reason ?? '') &&
-            <button className="resource-link-button" type="button" disabled={busy} onClick={() => void run(() => resourceService.change(projectId, 'retry', item))}>{t('重试', 'Retry')}</button>}
-          {captionsAllowed && <button type="button" className="resource-link-button" disabled={busy}
-            onClick={() => void run(() => resourceService.change(projectId, 'chooseCaptions', item))}>{t('添加字幕', 'Add captions')}</button>}
-          {canTranscribe && <>
-            {!savedLanguage && <select aria-label={t('音频语言', 'Audio language')} value={locale} disabled={busy}
-              onChange={event => setSpeechLanguage({key: resourceKey(item), locale: event.target.value as SpeechLocale})}>
-              <option value="auto">{t('自动识别', 'Detect language')}</option>
-              <option value="zh-CN">{t('中文', 'Chinese')}</option><option value="en-US">{t('英语', 'English')}</option>
-            </select>}
-            <button type="button" className="resource-link-button" disabled={busy}
-              onClick={() => void run(() => resourceService.transcribe(projectId, item, locale))}>
-              {resuming ? t('继续转写', 'Resume transcription') : t('本机转写', 'Transcribe locally')}
-            </button>
-          </>}
-        </div>
-        {direct && <div className="resource-detail-bottom">
-          <button className="resource-link-button is-danger" type="button" disabled={busy}
-            onClick={() => void run(() => resourceService.change(projectId, 'detach', item, scope))}>{t('移除', 'Remove')}</button>
-        </div>}
-      </section>}
-    </div> : <div className="resource-empty">{list.loaded ? t('尚未添加资料', 'No resources added') : t('正在读取资料…', 'Loading resources…')}</div>}
+    <div className="resource-dialog-content">
+      {items.length ? <ul className="lesson-resource-list">
+        {items.map(item => <li className="resource-attachment-row" key={resourceKey(item)}>
+          <ResourceIcon format={item.format}/>
+          <span className="resource-name-group"><strong title={item.name}>{item.name}</strong>
+            <small>{t(...resourceFormatLabels[item.format])}</small></span>
+          <div className="resource-detail-actions">
+            <button className="resource-link-button" type="button" disabled={busy || item.removed}
+              aria-label={t('打开原件 ', 'Open original ') + item.name}
+              onClick={() => void run(() => resourceService.open(projectId, item), undefined, false)}>{t('打开原件', 'Open original')}</button>
+            {list.items.some(value => resourceKey(value) === resourceKey(item)) && <button className="resource-link-button is-danger" type="button" disabled={busy}
+              aria-label={t('移除 ', 'Remove ') + item.name}
+              onClick={() => void run(() => resourceService.change(projectId, 'detach', item, scope))}>{t('移除', 'Remove')}</button>}
+          </div>
+        </li>)}
+      </ul> : <div className="resource-empty">{list.loaded ? t('尚未添加资料', 'No resources added') : t('正在读取资料…', 'Loading resources…')}</div>}
     </div>
     <footer className="resource-dialog-footer">
-      <div className="resource-footer-status"><span role="status">{t(items.length + ' 项资料', items.length + ' resources')}</span></div>
+      <span className="resource-footer-status" role="status">{t(items.length + ' 项资料', items.length + ' resources')}</span>
       <GameButton variant="secondary" onClick={onClose} disabled={busy}>{t('完成', 'Done')}</GameButton>
     </footer>
   </Modal>;

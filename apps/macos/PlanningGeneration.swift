@@ -336,7 +336,6 @@ enum PlanningGeneration {
                 value["prerequisites"]=(node["prerequisites"] as! [String]).compactMap{nodeRefs[$0]}
                 value["estimatedMinutes"]=node["estimatedMinutes"]
                 value["activities"]=node["activities"]
-                value["assessment"]=(node["assessment"] as? [String:Any]).map{$0.filter{$0.key != "objectiveIds"}} as Any? ?? NSNull()
                 return value
             }
             return ["ref":chapterRef(index),"title":chapter.title,"stageGoal":chapter.stageGoal,"lessons":lessons]
@@ -448,10 +447,6 @@ enum PlanningGeneration {
                       let activities=node["activities"] as? [String] else{continue}
                 var entry=lesson.prerequisite
                 entry["activities"]=activities
-                if let assessment=node["assessment"] as? [String:Any]{
-                    entry["task"]=assessment["task"]
-                    entry["passCriteria"]=assessment["passCriteria"]
-                }
                 guard let bytes=try? JSONSerialization.data(withJSONObject:entry).count,bytes+1<=remaining else{continue}
                 remaining-=bytes+1;selected.append(entry)
             }
@@ -475,8 +470,8 @@ enum PlanningGeneration {
         var wordingPaths:[String]=[]
         for (offset,raw) in rawNodes.enumerated(){
             let lessonIndex=requested.lowerBound+offset,expected=chapter.lessons[lessonIndex],nodePath=path+".nodes.\(lessonIndex)"
-            let fields:Set<String>=["ref","objectives","prerequisites","estimatedMinutes","activities","assessment"]
-            guard fields.isSubset(of:Set(raw.keys)),Set(raw.keys).isSubset(of:fields.union(["title"])) else{throw issue(nodePath,"invalid")}
+            let fields:Set<String>=["ref","objectives","prerequisites","estimatedMinutes","activities"]
+            guard fields.isSubset(of:Set(raw.keys)),Set(raw.keys).isSubset(of:fields.union(["title","assessment"])) else{throw issue(nodePath,"invalid")}
             guard raw["ref"] as? String==expected.ref else{throw issue(nodePath+".id","identity")}
             var lesson=expected
             if let title=raw["title"]{
@@ -493,13 +488,7 @@ enum PlanningGeneration {
                 }
             }
             let objectives=descriptions.enumerated().map{["id":expected.id+"_o\($0.offset+1)","description":$0.element]}
-            var node:[String:Any]=["id":expected.id,"title":lesson.title,"objectives":objectives,"prerequisites":prerequisites.map{plan.aliasToNodeID[$0]!},"estimatedMinutes":try integer(raw["estimatedMinutes"],path:nodePath+".estimatedMinutes"),"activities":try texts(raw["activities"],path:nodePath+".activities",count:1...24,limit:2000)]
-            if !(raw["assessment"] is NSNull){
-                guard var assessment=raw["assessment"] as? [String:Any],Set(assessment.keys)==["task","passCriteria","mode","evaluatorPrompt"] else{throw issue(nodePath+".assessment","invalid")}
-                assessment["objectiveIds"]=objectives.map{$0["id"]!}
-                if assessment["evaluatorPrompt"] is NSNull{assessment.removeValue(forKey:"evaluatorPrompt")}
-                node["assessment"]=assessment
-            }
+            let node:[String:Any]=["id":expected.id,"title":lesson.title,"objectives":objectives,"prerequisites":prerequisites.map{plan.aliasToNodeID[$0]!},"estimatedMinutes":try integer(raw["estimatedMinutes"],path:nodePath+".estimatedMinutes"),"activities":try texts(raw["activities"],path:nodePath+".activities",count:1...24,limit:2000)]
             try validateNativeNode(node,lesson:lesson,available:nativeAvailable,path:nodePath)
             nodes.append(node);available.insert(expected.ref);nativeAvailable.insert(expected.id)
         }
@@ -590,8 +579,14 @@ enum PlanningGeneration {
         _ = try integer(node["estimatedMinutes"],path:path+".estimatedMinutes")
         _ = try texts(node["activities"],path:path+".activities",count:1...24,limit:2000)
         if let value=node["assessment"]{
+            if let assessment=value as? [String:Any],assessment["answer"] != nil{
+                guard Set(assessment.keys)==["task","answer","objectiveIds"],let actual=assessment["objectiveIds"] as? [String],actual==objectiveIDs else{throw issue(path+".assessment","invalid")}
+                _ = try text(assessment["task"],path:path+".assessment.task",limit:4000)
+                _ = try text(assessment["answer"],path:path+".assessment.answer",limit:64000)
+                return
+            }
             guard let assessment=value as? [String:Any],Set(assessment.keys).isSubset(of:["task","passCriteria","objectiveIds","mode","evaluatorPrompt"]),Set(["task","passCriteria","objectiveIds","mode"]).isSubset(of:Set(assessment.keys)),let mode=assessment["mode"] as? String,["quantitative","qualitative"].contains(mode),let actual=assessment["objectiveIds"] as? [String],actual==objectiveIDs else{throw issue(path+".assessment","invalid")}
-            _ = try text(assessment["task"],path:path+".assessment.task",limit:2000)
+            _ = try text(assessment["task"],path:path+".assessment.task",limit:4000)
             let criteria=try texts(assessment["passCriteria"],path:path+".assessment.passCriteria",count:1...24,limit:2000)
             guard Set(criteria).count==criteria.count else{throw issue(path+".assessment.passCriteria","duplicate")}
             if let prompt=assessment["evaluatorPrompt"]{_ = try text(prompt,path:path+".assessment.evaluatorPrompt",limit:4000)}

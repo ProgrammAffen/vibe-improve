@@ -4,8 +4,10 @@ import {GENERATION_POLICY,validateGenerationDraft,generationDraftMatches,generat
 import {CONSISTENCY_VERSION,QUESTION_FIELDS,acceptedAnswer,planningFacts,planningFactsHash,consistencyReady,validateConsistencyAssessment,materializeAccepted,dirtyConsistency,bumpBackground,applyAssessment} from './planning-consistency.mjs';
 import {DEFAULT_QUESTION_IDS,QUESTION_IDS,LEGACY_QUESTION_IDS} from './planning-questions.mjs';
 import {materialKey,materialTargetExists,retainRouteMaterials,validMaterialLink,validResourceSnapshot,validRouteMaterials} from './route-materials.mjs';
+import {routeEditHash} from './route-changes.mjs';
 export {DEFAULT_QUESTION_IDS,QUESTION_IDS,questionLabel,questionText,questionHelp,questionExample} from './planning-questions.mjs';
 export {validatePlanningTarget} from './planning-references.mjs';
+export {learningPrerequisiteIds} from './route-learning.mjs';
 export {CONSISTENCY_VERSION,acceptedAnswer,planningFacts,planningFactsHash,consistencyReady} from './planning-consistency.mjs';
 
 export const MAX_PLANNING_BYTES=8_388_608;
@@ -178,8 +180,16 @@ export function validateEditorDraft(route){
       if(node.objectives.length===0)node.objectives=[{id:'draftObjective',description:'Draft'}];
       for(const objective of node.objectives)if(record(objective))fill(objective,'description');
       if(node.assessment&&record(node.assessment)){
+        if(Object.hasOwn(node.assessment,'answer'))fill(node.assessment,'answer');
         fill(node.assessment,'task');if(Array.isArray(node.assessment.passCriteria)){if(node.assessment.passCriteria.length===0)node.assessment.passCriteria=['Draft'];else node.assessment.passCriteria=node.assessment.passCriteria.map(c=>typeof c==='string'&&!c.trim()?'Draft':c)}
         if(node.assessment.mode==='qualitative')fill(node.assessment,'evaluatorPrompt');
+      }
+      if(node.review&&record(node.review)){
+        fill(node.review,'content');
+        if(Array.isArray(node.review.passCriteria)){
+          const criteria=node.review.passCriteria.filter(c=>typeof c!=='string'||c.trim());
+          node.review.passCriteria=criteria.length?criteria:['Draft'];
+        }
       }
       if(Array.isArray(node.activities))node.activities=node.activities.map(c=>typeof c==='string'&&!c.trim()?'Draft':c);
     }
@@ -221,10 +231,17 @@ export function validatePlanning(value){
   }
   const ids=new Set();
   for(const message of value.messages){
-    if(!keys(message,['id','role','text','createdAt','questionId','target','mentions','provider','attachments'],['id','role','text','createdAt'])||!token(message.id)||ids.has(message.id)||!['user','assistant'].includes(message.role)||!string(message.text,8000)||!date(message.createdAt)||(message.questionId!==undefined&&!QUESTION_IDS.includes(message.questionId))||(message.target!==undefined&&(message.role!=='user'||message.questionId!==undefined||message.mentions!==undefined||!targetShape(message.target))))fail();
+    if(!keys(message,['id','role','text','createdAt','questionId','target','mentions','provider','attachments','routeEdit','editOutcome'],['id','role','text','createdAt'])||!token(message.id)||ids.has(message.id)||!['user','assistant'].includes(message.role)||!string(message.text,8000)||!date(message.createdAt)||(message.questionId!==undefined&&!QUESTION_IDS.includes(message.questionId))||(message.target!==undefined&&(message.role!=='user'||message.questionId!==undefined||message.mentions!==undefined||!targetShape(message.target))))fail();
     if(message.provider!==undefined&&(message.role!=='assistant'||(message.provider!==null&&!providers.includes(message.provider))))fail();
     if(message.mentions!==undefined){if(message.role!=='user'||message.questionId!==undefined)fail();validatePlanningMentions(undefined,message.text,message.mentions,false)}
     if(message.attachments!==undefined&&(message.role!=='user'||!validPlanningAttachments(message.attachments)))fail();
+    if(message.editOutcome!==undefined&&(message.role!=='assistant'||message.questionId!==undefined||message.routeEdit!==undefined||message.editOutcome!=='no-changes'))fail();
+    if(message.routeEdit!==undefined){
+      const edit=message.routeEdit,hash=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
+      if(message.role!=='assistant'||message.questionId!==undefined||!keys(edit,['routeId','requestRevision','beforeRevision','afterRevision','beforeHash','afterHash'],['routeId','requestRevision','beforeRevision'])||!token(edit.routeId)||edit.routeId.length>64||!integer(edit.requestRevision)||edit.requestRevision>value.revision||!integer(edit.beforeRevision,1,1_000_000))fail();
+      if(edit.afterRevision!==undefined&&(!integer(edit.afterRevision,1,1_000_000)||edit.afterRevision<=edit.beforeRevision))fail();
+      if(edit.beforeHash!==undefined&&!hash(edit.beforeHash)||edit.afterHash!==undefined&&(edit.afterRevision===undefined||!hash(edit.afterHash)))fail();
+    }
     ids.add(message.id);
   }
   for(let index=0;index<value.questions.length;index++){
@@ -602,11 +619,11 @@ export function applyEdit(state,result,requestId,baseRevision,now=new Date().toI
   }
   const next=clone(state);
   if(modified)next.proposal={route:clone(result.route),reply:result.reply,baseRevision,routeRevision:state.routeDraft.revision};
-  addMessage(next,{id:'assistant_'+requestId,role:'assistant',text:result.reply,createdAt:now});delete next.pending;
+  addMessage(next,{id:'assistant_'+requestId,role:'assistant',text:result.reply,createdAt:now,...(modified?{routeEdit:{routeId:state.routeDraft.id,requestRevision:baseRevision,beforeRevision:state.routeDraft.revision,beforeHash:routeEditHash(state.routeDraft)}}:{editOutcome:'no-changes'})});delete next.pending;
   return modified?changed(next):progressed(next);
 }
 export function agentRouteDiagnostics(state,route){
-  const issues=routeIssues(route).filter(x=>/^(?:format|schemaVersion|id|revision|title|locale|sourceLanguage|chapters|nodes|stageGoal|objectives|description|prerequisites|estimatedMinutes|activities|assessment|task|passCriteria|objectiveIds|mode|evaluatorPrompt|\d+)(?:\.(?:format|schemaVersion|id|revision|title|locale|sourceLanguage|chapters|nodes|stageGoal|objectives|description|prerequisites|estimatedMinutes|activities|assessment|task|passCriteria|objectiveIds|mode|evaluatorPrompt|\d+))*$/.test(x.path));
+  const issues=routeIssues(route).filter(x=>/^(?:format|schemaVersion|id|revision|title|locale|sourceLanguage|chapters|nodes|stageGoal|objectives|description|prerequisites|estimatedMinutes|activities|assessment|task|passCriteria|objectiveIds|mode|evaluatorPrompt|answer|requirement|review|content|\d+)(?:\.(?:format|schemaVersion|id|revision|title|locale|sourceLanguage|chapters|nodes|stageGoal|objectives|description|prerequisites|estimatedMinutes|activities|assessment|task|passCriteria|objectiveIds|mode|evaluatorPrompt|answer|requirement|review|content|\d+))*$/.test(x.path));
   if(state.pending?.kind!=='generate'&&state.routeDraft&&route)for(const key of ['id','locale','sourceLanguage'])if(route[key]!==state.routeDraft[key])issues.push({path:key,code:'identity'});
   return {issues:issues.slice(0,24).map(({path,code})=>({path,code}))};
 }
@@ -655,7 +672,10 @@ export function confirmRoute(state,expectedRevision){
 }
 export function applyProposal(state,expectedRevision){
   expectRevision(state,expectedRevision);idle(state);if(!state.proposal||!state.routeDraft||state.proposal.routeRevision!==state.routeDraft.revision)fail('PLANNING_CONFLICT');
-  const route=state.proposal.route;return saveEditor(state,route,expectedRevision);
+  const route=state.proposal.route,next=saveEditor(state,route,expectedRevision);
+  const message=next.messages.find(message=>message.routeEdit?.requestRevision===state.proposal.baseRevision);
+  if(message){message.routeEdit.afterRevision=next.routeDraft.revision;message.routeEdit.afterHash=routeEditHash(next.routeDraft)}
+  return validatePlanning(next);
 }
 export function discardProposal(state,expectedRevision){expectRevision(state,expectedRevision);idle(state);const next=clone(state);delete next.proposal;return changed(next)}
 function travelEditor(state,expectedRevision,forward){expectRevision(state,expectedRevision);idle(state);const history=editorHistory(state),from=forward?history.future:history.past,to=forward?history.past:history.future;if(!from.length||!state.routeDraft)fail();const next=clone(state),route=from.pop();to.push(clone(state.routeDraft));keepHistory(next,history);next.routeDraft=route;next.routeDraft.revision=state.routeDraft.revision+1;delete next.proposal;return changed(next)}

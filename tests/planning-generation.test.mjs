@@ -153,7 +153,7 @@ rejected{_ = try PlanningGeneration.chapterPrompt(context:context,plan:plan,inde
 rejected{_ = try PlanningGeneration.chapterPrompt(context:context,plan:plan,index:1,completed:[batch1],plannedPrerequisites:true)}
 var forgedPrefix=batch1,forgedNodes=batch1["nodes"] as! [[String:Any]];forgedNodes[0]["prerequisites"]=["node_2_1"];forgedPrefix["nodes"]=forgedNodes
 rejected{_ = try PlanningGeneration.chapterPrompt(context:context,plan:plan,index:0,completed:[forgedPrefix],range:3..<4,plannedPrerequisites:true)}
-for mutation in ["missing","extra","order","identity","title","hostID","objectiveID","future","unknown","duplicateDependency","self","missingActivities","emptyActivity","noObjectives","timeZero","timeFraction","timeBool","missingAssessment","badAssessment","badEvaluator","duplicateCriteria","badObjectiveIds"]{
+for mutation in ["missing","extra","order","identity","title","hostID","objectiveID","future","unknown","duplicateDependency","self","missingActivities","emptyActivity","noObjectives","timeZero","timeFraction","timeBool","badAssessment","badEvaluator","duplicateCriteria","badObjectiveIds"]{
  var value=mutatedNodes(payload(0,0..<3)){nodes in
   if mutation=="missing"{nodes.removeLast()}
   if mutation=="extra"{nodes[0]["extra"]="SENSITIVE_EXTRA"}
@@ -182,14 +182,12 @@ for mutation in ["missing","extra","order","identity","title","hostID","objectiv
  rejected{_ = try PlanningGeneration.chapter(value,plan:plan,index:0,range:0..<3)}
 }
 let quantitative=mutatedNodes(payload(0,0..<1)){nodes in nodes[0]["assessment"]=["task":"Trace two named examples","passCriteria":["The dimensions match each operation"],"mode":"quantitative","evaluatorPrompt":NSNull()]}
-let quantitativeNode=(try PlanningGeneration.chapter(quantitative,plan:plan,index:0,range:0..<1)["nodes"] as! [[String:Any]])[0],qa=quantitativeNode["assessment"] as! [String:Any]
-check(qa["evaluatorPrompt"]==nil && qa["objectiveIds"] as! [String]==["node_1_1_o1","node_1_1_o2"])
-let independent=mutatedNodes(payload(0,0..<1)){nodes in nodes[0]["assessment"]=["task":"Compare with the specified baseline","passCriteria":["Report the correct direction and rate"],"mode":"quantitative","evaluatorPrompt":"Reference result: -1.05%."]}
+rejected{_ = try PlanningGeneration.chapter(quantitative,plan:plan,index:0,range:0..<1)}
+let independent=mutatedNodes(payload(0,0..<1)){nodes in nodes[0].removeValue(forKey:"assessment")}
 let independentChapter=try PlanningGeneration.chapter(independent,plan:plan,index:0,range:0..<1)
 let independentNode=(independentChapter["nodes"] as! [[String:Any]])[0]
-check((independentNode["assessment"] as! [String:Any])["evaluatorPrompt"] as? String=="Reference result: -1.05%.","grading guidance was lost")
-let publicPreview=PlanningGeneration.displayChapter(independentChapter,plan:plan,index:0,count:1)
-check(publicPreview.contains("Compare with the specified baseline") && publicPreview.contains("Report the correct direction and rate") && !publicPreview.contains("-1.05%"),"generation preview exposed the answer")
+check(independentNode["assessment"]==nil && independentNode["review"]==nil,"new planning set assessment or review content")
+
 let codeObjective=mutatedNodes(payload(0,0..<1)){nodes in nodes[0]["objectives"]=["能填写 question_id 与 standard_answer。"]}
 let objectiveChapter=try PlanningGeneration.chapter(codeObjective,plan:plan,index:0,range:0..<1)
 do{
@@ -202,8 +200,7 @@ let approved=envelope(["ready":true,"issues":[] as [[String:Any]]])
 let localReview=try PlanningGeneration.review(approved,plan:plan,chapters:[objectiveChapter,["nodes":[] as [[String:Any]]]])
 check(localReview.reason=="learning_language" && localReview.targets(in:plan).first?.range==0..<1,"a passed model review missed a code identifier in a learning goal")
 check(try PlanningGeneration.review(approved,plan:plan,chapters:[practiceChapter,["nodes":[] as [[String:Any]]]]).reason==nil,"an identifier used only in an exercise triggered a blocker")
-let qualitative=mutatedNodes(payload(0,3..<4)){nodes in nodes[0]["assessment"]=["task":"Explain gradient correction","passCriteria":["Identify the cause and justify the correction"],"mode":"qualitative","evaluatorPrompt":"Inspect the attempted gradient and correction. Require the cause and corrected operation; request missing evidence."]}
-let batch2=try PlanningGeneration.chapter(qualitative,plan:plan,index:0,range:3..<4)
+let batch2=try PlanningGeneration.chapter(payload(0,3..<4),plan:plan,index:0,range:3..<4)
 var completeFirst=batch1;completeFirst["nodes"]=(batch1["nodes"] as! [[String:Any]])+(batch2["nodes"] as! [[String:Any]])
 _ = try PlanningGeneration.chapterPrompt(context:context,plan:plan,index:1,completed:[completeFirst])
 let secondPayload=mutatedNodes(payload(1,0..<1)){nodes in nodes[0]["prerequisites"]=["L1","L3","L4"]}
@@ -211,7 +208,7 @@ let completeSecond=try PlanningGeneration.chapter(secondPayload,plan:plan,index:
 let inherited=try promptData(PlanningGeneration.chapterPrompt(context:context,plan:plan,index:1,completed:[],plannedPrerequisites:true,earlierChapters:[completeFirst,completeSecond]))
 let inheritedPractice=inherited["priorPractice"] as! [[String:Any]]
 check(inheritedPractice.map{$0["ref"] as! String}==["L1","L2","L3","L4"],"missing earlier practice or leaked requested lesson")
-check(inheritedPractice.last?["passCriteria"] as? [String]==["Identify the cause and justify the correction"])
+check(inheritedPractice.last?["passCriteria"]==nil && inheritedPractice.last?["task"]==nil)
 var largeChapter=completeFirst,largeNodes=largeChapter["nodes"] as! [[String:Any]]
 largeNodes[3]["activities"]=Array(repeating:String(repeating:"示",count:1800),count:5);largeChapter["nodes"]=largeNodes
 let boundedPractice=try promptData(PlanningGeneration.chapterPrompt(context:context,plan:plan,index:1,completed:[],plannedPrerequisites:true,earlierChapters:[largeChapter]))["priorPractice"] as! [[String:Any]]
@@ -234,7 +231,26 @@ for mutation in ["missingNode","wrongObjectiveID","noActivities","futureDependen
  if mutation=="missingChapterGoal"{chapters[0].removeValue(forKey:"stageGoal")}
  chapters[0]["nodes"]=nodes;rejected{_ = try plan.completeRoute(chapters)}
 }
-let final=try plan.completeRoute([completeFirst,completeSecond])
+let quizPayload=mutatedNodes(payload(0,0..<1)){nodes in nodes[0]["assessment"]=["task":"Which tool reads the current state?","answer":"A read-only query."]}
+rejected{_ = try PlanningGeneration.chapter(quizPayload,plan:plan,index:0,range:0..<1)}
+let reviewPayload=mutatedNodes(payload(0,0..<1)){nodes in nodes[0]["review"]=["content":"Recall the tools.","passCriteria":["Choose correctly."]]}
+rejected{_ = try PlanningGeneration.chapter(reviewPayload,plan:plan,index:0,range:0..<1)}
+var canonicalFirst=completeFirst,canonicalNodes=completeFirst["nodes"] as! [[String:Any]]
+let legacyObjectives=canonicalNodes[0]["objectives"] as! [[String:String]]
+canonicalNodes[0]["assessment"]=["task":"An older saved quiz.","answer":"Legacy private answer.","objectiveIds":legacyObjectives.compactMap{$0["id"]}]
+canonicalFirst["nodes"]=canonicalNodes
+var checkpoint=plan.progress([canonicalFirst,completeSecond])
+checkpoint["schemaVersion"]=1;checkpoint["locale"]="zh-CN";checkpoint["policyVersion"]=PlanningPromptPack.generationCheckpointVersion
+let (legacyRestored,legacyParts)=try PlanningGeneration.restore(checkpoint,locale:"zh-CN")
+let legacyRoute=try legacyRestored.completeRoute(legacyParts.compactMap{$0})
+let retainedNode=(((legacyRoute["chapters"] as! [[String:Any]])[0]["nodes"] as! [[String:Any]])[0])
+check((retainedNode["assessment"] as? [String:Any])?["answer"] as? String=="Legacy private answer.","legacy checkpoint lost its saved quiz")
+let learningReview=try promptData(PlanningGeneration.reviewPrompt(context:context,plan:plan,chapters:[canonicalFirst,completeSecond]))
+let reviewText=String(decoding:try JSONSerialization.data(withJSONObject:learningReview["candidate"]!),as:UTF8.self)
+check(!reviewText.contains("An older saved quiz.") && !reviewText.contains("Legacy private answer."),"route review included deferred assessment content")
+let legacyPrior=try promptData(PlanningGeneration.chapterPrompt(context:context,plan:plan,index:1,completed:[],plannedPrerequisites:true,earlierChapters:[canonicalFirst]))
+check(!String(decoding:try JSONSerialization.data(withJSONObject:legacyPrior["priorPractice"]!),as:UTF8.self).contains("An older saved quiz."),"learning plan included a legacy quiz")
+let final=try plan.completeRoute([canonicalFirst,completeSecond])
 check(final["locale"] as? String=="zh-CN" && final["sourceLanguage"] as? String=="zh-CN" && final["revision"] as? Int==1)
 check((final["chapters"] as! [[String:Any]])[0]["stageGoal"] as? String==first["stageGoal"] as? String)
 try JSONSerialization.data(withJSONObject:final).write(to:output)

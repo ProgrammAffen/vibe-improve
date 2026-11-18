@@ -67,7 +67,7 @@ enum PlanningRepair {
         let fixed=String(original[..<split.lowerBound]),originalData=String(original[split.upperBound...])
         guard let task=["interview","outline","lessons","review","edit","consistency"].first(where:{fixed.contains("TASK: "+$0+"\n")}),var data=try? PlanningStrictJSON.object(originalData) else{return nil}
         guard let candidate=bounded(candidate) else{return try? PlanningPromptPack.make(task:task,data:data,repair:true)}
-        let fields="status|reply|result|missing|updates|fields|evidence|messageRef|proposalRef|questionId|complete|summary|unresolved|consistency|issues|kind|reason|suggestion|route|format|schemaVersion|id|revision|title|locale|sourceLanguage|chapters|lessons|nodes|stageGoal|practiceRules|prerequisiteChapters|objectives|description|prerequisites|estimatedMinutes|activities|assessment|task|passCriteria|objectiveIds|mode|evaluatorPrompt|ready|targetRefs|[0-9]+"
+        let fields="status|reply|result|missing|updates|fields|evidence|messageRef|proposalRef|questionId|complete|summary|unresolved|consistency|issues|kind|reason|suggestion|route|format|schemaVersion|id|revision|title|locale|sourceLanguage|chapters|lessons|nodes|stageGoal|practiceRules|prerequisiteChapters|objectives|description|prerequisites|estimatedMinutes|activities|assessment|task|passCriteria|objectiveIds|mode|evaluatorPrompt|answer|requirement|review|content|ready|targetRefs|[0-9]+"
         let safe=issues.filter{issue in
             guard Set(issue.keys)==["path","code"],let path=issue["path"],path.utf8.count<=256,let code=issue["code"],["required","invalid","count","duplicate","dependencies","identity","learning_language"].contains(code) else{return false}
             return path.range(of:"^(?:"+fields+")(?:\\.(?:"+fields+"))*$",options:.regularExpression) != nil
@@ -87,6 +87,7 @@ enum PlanningAgentPrompt {
         if intent=="generate"{return try PlanningGeneration.outlinePrompt(context:context)}
         var data:[String:Any]=[:]
         for key in ["locale","currentQuestion","questions","messages","routeDraft","proposal","resources"]{if let value=context[key]{data[key]=value}}
+        if let messages=data["messages"] as? [[String:Any]]{data["messages"]=messages.map{$0.filter{$0.key != "routeEdit" && $0.key != "editOutcome"}}}
         if let questions=data["questions"] as? [[String:Any]]{data["questions"]=questions.map{$0.filter{["id","status","summary","fields","missing"].contains($0.key)}}}
         if let draft=context["routeDraft"] as? [String:Any],let chapters=draft["chapters"] as? [[String:Any]],let last=(context["messages"] as? [[String:Any]])?.last,last["role"] as? String=="user" {
             var mentions=last["mentions"] as? [[String:Any]] ?? []

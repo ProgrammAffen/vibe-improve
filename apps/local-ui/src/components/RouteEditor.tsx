@@ -1,22 +1,24 @@
 import type {PlanningActivity} from '../planning/service';
-import {useEffect,useRef,useState,type ReactNode} from 'react';
+import {useEffect,useMemo,useRef,useState,type ReactNode} from 'react';
 import {ArrowDown,ArrowUp,ChevronDown,ChevronRight,FileText,LockKeyhole,MessageSquarePlus,Move,ArrowRight,Plus,Redo2,Trash2,Undo2} from 'lucide-react';
 import {assertStudiedRouteUnchanged,type AgentOptions,type PlanningState,type PlanningTarget,type PlanningMention} from '../../../../packages/domain/planning.mjs';
 import {planningMentionToken,refreshPlanningMentions} from '../../../../packages/domain/planning-references.mjs';
 import {routeIssues,type RouteDocument,type RouteChapter,type RouteNode} from '../../../../packages/domain/route-validation.mjs';
+import {messageEditRoutes,routeChanges} from '../../../../packages/domain/route-changes.mjs';
 import {routeOutline,routeTargetPosition,moveRouteItem,moveRouteItemBy} from '../../../../packages/domain/route-order.mjs';
 import {PROVIDERS,type ProviderId} from '../agents/domain';
 import {translate,type Language} from '../i18n';
 import type {AttachmentTarget} from '../resources/service';
 import PlanningNavigation from './PlanningNavigation';
 import GameButton from './GameButton';
-import GameToggle from './GameToggle';
+import GameSelect from './GameSelect';
 import Modal from './Modal';
 import EditorMenu,{type EditorMenuItem} from './RouteEditorMenu';
 import RouteMoveDialog from './RouteMoveDialog';
 import PlanningModelControls,{PlanningAgentControl} from './PlanningModelControls';
 import {PlanningComposer,PlanningMessages} from './PlanningConversation';
-import type {PlanningAttachment} from '../../../../packages/domain/planning.mjs';
+import type {PlanningAttachment,PlanningMessage} from '../../../../packages/domain/planning.mjs';
+import RouteChangePreview from './RouteChangePreview';
 
 type EditorProps={language:Language;state:PlanningState;route:RouteDocument;busy?:boolean;working?:boolean;workingLabel?:string;partialReply?:string;partialProviderId?:string|null;activity?:PlanningActivity;dirty?:boolean;error?:string;conversationError?:string;notice?:string;onOptions?:(options:AgentOptions)=>void;onProvider?:(provider:ProviderId)=>void;onRoute:(route:RouteDocument)=>void;onSave:()=>void;onConfirm:()=>void;onSend:(text:string,mentions?:PlanningMention[],target?:PlanningTarget,files?:PlanningAttachment[])=>void|boolean|Promise<boolean>;onCancel:()=>void;onApply:()=>void;onDiscard:()=>void;onUndo:()=>void;onRedo?:()=>void;onPrevious:()=>void;onHome:()=>void;onRemoveImport?:()=>void;studiedNodeIds?:ReadonlySet<string>;learningRead?:'loading'|'failed';onRetryLearning?:()=>void;onResetLearning?:()=>void;renderMaterials?:(target:AttachmentTarget,locked:boolean)=>ReactNode};
 const ASSET=import.meta.env.BASE_URL+'assets/images/';
@@ -63,6 +65,20 @@ export function RouteEditorSurface({language,state,route,busy=false,working=fals
   return route.chapters.find(ch=>ch.id===target.chapterId)?.nodes.some(lesson=>protectedPrerequisites.has(lesson.id))??false;
  }
  const editorMessages=state.messages.filter(message=>!message.questionId),lastMessage=editorMessages.at(-1),answeredMessage=lastMessage?.role==='assistant'?editorMessages.slice(0,-1).reverse().find(message=>message.role==='user'):undefined;
+ const messageEdits=useMemo(()=>new Map(state.messages.filter(message=>message.routeEdit).map(message=>[message.id,messageEditRoutes(state,message)])),[state]);
+ const legacyBefore=!proposal&&!working&&!editorMessages.some(message=>message.routeEdit)&&lastMessage?.role==='assistant'&&!lastMessage.editOutcome?(state.history?.past.at(-1)??state.undoRoute):undefined;
+ const legacySavedBefore=legacyBefore&&state.routeDraft&&legacyBefore.id===state.routeDraft.id&&routeChanges(legacyBefore,state.routeDraft,language).length?legacyBefore:undefined;
+ function pendingPreview(){return proposal&&state.routeDraft?<RouteChangePreview key={'pending-'+proposal.baseRevision} before={state.routeDraft} after={proposal.route} language={language} status="pending" warning={proposalLocked?t('这项修改涉及已学章节。清空学习记录后可采用。','This change affects studied lessons. Clear learning progress to apply it.'):undefined}>
+  <GameButton disabled={editingDisabled||dirty||proposalLocked} onClick={onApply}>{t('采用修改','Apply')}</GameButton><GameButton variant="secondary" disabled={busy} onClick={onDiscard}>{t('放弃','Discard')}</GameButton>
+ </RouteChangePreview>:null}
+ function messageChanges(message:PlanningMessage){
+  if(message.editOutcome==='no-changes')return <span className="route-edit-message-status" data-edit-outcome="no-changes">{t('路线未修改','Route unchanged')}</span>;
+  const edit=messageEdits.get(message.id);
+  if(!edit)return null;
+  if(edit.status==='pending')return pendingPreview();
+  if(edit.status==='applied'&&edit.before&&edit.after)return <RouteChangePreview key={'applied-'+message.id} before={edit.before} after={edit.after} language={language} status="applied"/>;
+  return <span className="route-edit-message-status">{edit.status==='applied'?t('修改已采用','Changes applied'):t('修改未采用','Changes not applied')}</span>;
+ }
  const unanswered=lastMessage?.role==='user'&&!state.pending&&!busy&&!working;
  const conversationFeedback=conversationError||(unanswered?t('上一条消息未收到回复，可重试。','The last message has no reply. Retry when ready.'):'');
  useEffect(()=>{
@@ -87,7 +103,6 @@ export function RouteEditorSurface({language,state,route,busy=false,working=fals
  }
  function moveBy(source:PlanningTarget,offset:-1|1){if(!editingDisabled&&!targetLocked(source))moved(moveRouteItemBy(route,source,offset),source)}
  function moveTo(source:PlanningTarget,destination:PlanningTarget){if(!editingDisabled&&!targetLocked(source))moved(moveRouteItem(route,source,destination),source);setMoving(null)}
- function moveToChapter(id:string){if(chapter&&node&&id!==chapter.id)moveTo({chapterId:chapter.id,nodeId:node.id},{chapterId:id})}
  function movementMenu(source:PlanningTarget,index:number,count:number):EditorMenuItem{
   const item={label:t('移动','Move'),icon:<Move/>};
   if(editingDisabled||targetLocked(source))return {...item,disabled:true};
@@ -100,8 +115,30 @@ export function RouteEditorSurface({language,state,route,busy=false,working=fals
  }
  function removeObjective(id:string){editNode(n=>{n.objectives=n.objectives.filter(o=>o.id!==id);if(n.assessment){n.assessment.objectiveIds=n.assessment.objectiveIds.filter(key=>key!==id);if(!n.assessment.objectiveIds.length)n.assessment.objectiveIds=n.objectives.map(o=>o.id)}})}
  const issues=routeIssues(route);
- function issueLabel(path:string){const parts=path.split('.'),ci=parts[0]==='chapters'?Number(parts[1]):-1,ni=parts[2]==='nodes'?Number(parts[3]):-1,key=parts.at(-1)??'';const names:Record<string,string>={title:t('名称','Name'),stageGoal:t('大章目标','Stage goal'),nodes:t('小章节','Lessons'),chapters:t('章节与依赖','Chapters and dependencies'),description:t('学习目标','Learning goal'),objectives:t('学习目标','Learning goals'),task:t('验收任务','Assessment task'),passCriteria:t('达标条件','Pass criteria'),evaluatorPrompt:t('评判提示词','Evaluation prompt'),estimatedMinutes:t('预计时长','Estimated time'),prerequisites:t('前置章节','Prerequisites'),activities:t('学习活动','Learning activities')};return (ci>=0?ni>=0?`${ci+1}.${ni+1} · `:t('大章 ','Chapter ')+(ci+1)+' · ':'')+(names[key]??names[parts.at(-2)??'']??t('章节内容','Chapter content'))}
- useEffect(()=>{if(issuePath===null)return;const parts=issuePath.split('.'),key=parts.at(-1)??'',field=/^[0-9]+$/.test(key)?parts.at(-2)??key:key;const host=detailRef.current;if(issuePath==='title'){titleRef.current?.focus()}else if(host){const section=host.querySelector<HTMLDetailsElement>(issuePath.includes('.assessment')?'[data-route-section="assessment"]':'[data-route-section="more"]');if(issuePath.includes('.assessment')||['prerequisites','activities'].includes(field)){if(section)section.open=true}const targets=host.querySelectorAll<HTMLElement>('[data-route-field="'+CSS.escape(field)+'"]'),target=targets[field==='description'?Number(parts[parts.indexOf('objectives')+1])||0:0];const control=target?.matches('input,textarea,select,button')?target:target?.querySelector<HTMLElement>('input,textarea,select,button');control?.focus();control?.scrollIntoView({block:'nearest'})}setIssuePath(null)},[issuePath,selection.chapterId,selection.nodeId]);
+ function issueLabel(path:string){const parts=path.split('.'),ci=parts[0]==='chapters'?Number(parts[1]):-1,ni=parts[2]==='nodes'?Number(parts[3]):-1,key=parts.at(-1)??'';const names:Record<string,string>={title:t('名称','Name'),stageGoal:t('大章目标','Stage goal'),nodes:t('小章节','Lessons'),chapters:t('章节与依赖','Chapters and dependencies'),description:t('学习目标','Learning goal'),objectives:t('学习目标','Learning goals'),task:t('验收测验','Assessment quiz'),answer:t('测验答案／评判标准','Quiz answers / grading criteria'),passCriteria:t('测验答案／评判标准','Quiz answers / grading criteria'),evaluatorPrompt:t('测验答案／评判标准','Quiz answers / grading criteria'),estimatedMinutes:t('预计时长','Estimated time'),prerequisites:t('前置章节','Prerequisites'),activities:t('学习活动','Learning activities'),requirement:t('小节性质','Lesson requirement'),review:t('复习设置','Review settings'),content:t('复习内容','Review content')};return (ci>=0?ni>=0?`${ci+1}.${ni+1} · `:t('大章 ','Chapter ')+(ci+1)+' · ':'')+(parts.includes('review')&&(key==='passCriteria'||parts.at(-2)==='passCriteria')?t('回答正确的指标','Criteria for a correct answer'):(names[key]??names[parts.at(-2)??'']??t('章节内容','Chapter content')))}
+ useEffect(()=>{
+  if(issuePath===null)return;
+  const parts=issuePath.split('.'),key=parts.at(-1)??'',field=/^[0-9]+$/.test(key)?parts.at(-2)??key:key;
+  const host=detailRef.current;
+  if(issuePath==='title')titleRef.current?.focus();
+  else if(host){
+   const sectionName=issuePath.includes('.assessment')||issuePath.includes('.review')||field==='requirement'?'settings':undefined;
+   if(sectionName){
+    const section=host.querySelector<HTMLDetailsElement>('[data-route-section="'+sectionName+'"]');
+    if(section)section.open=true;
+   }
+   const fieldName=issuePath.includes('.review')||issuePath.includes('.assessment')?'legacyFollowup':field;
+   const targets=host.querySelectorAll<HTMLElement>('[data-route-field="'+CSS.escape(fieldName)+'"]');
+   const target=targets[field==='description'?Number(parts[parts.indexOf('objectives')+1])||0:0];
+   const control=(target?.matches('input,textarea,select,button')?target:target?.querySelector<HTMLElement>('input,textarea,select,button'))
+    ??host.querySelector<HTMLElement>('[data-route-field="title"] input');
+   control?.focus();
+   control?.scrollIntoView({block:'nearest'});
+  }
+  setIssuePath(null);
+ },[issuePath,selection.chapterId,selection.nodeId]);
+ const selectedNodePath=chapter&&node?`chapters.${route.chapters.indexOf(chapter)}.nodes.${chapter.nodes.indexOf(node)}`:undefined;
+ const incompleteFollowup=(['assessment','review'] as const).filter(field=>selectedNodePath&&issues.some(issue=>issue.path===selectedNodePath+'.'+field||issue.path.startsWith(selectedNodePath+'.'+field+'.')));
  function locateIssue(path:string){const parts=path.split('.'),ch=route.chapters[Number(parts[1])];if(parts[0]==='chapters'&&ch)select(ch,parts[2]==='nodes'?ch.nodes[Number(parts[3])]??null:null);setIssuesOpen(false);setIssuePath(path)}
  return <section className="planning-page planning-page--editor"><PlanningNavigation language={language} busy={busy} onHome={onHome} onPrevious={onPrevious}/><div className={`planning-stage planning-stage--editor route-editor ${state.provider?'has-assistant':'is-manual'}`}>
   <img className="planning-scene" src={ASSET+'route-editor-scroll-cutout-v2.png'} alt="" draggable={false}/>
@@ -141,28 +178,12 @@ export function RouteEditorSurface({language,state,route,busy=false,working=fals
       {renderMaterials?.({kind:'lesson',targetId:node.id},detailDisabled)}
       <label data-route-field="estimatedMinutes" className="route-editor-duration"><span>{t('预计时长','Estimated time')}</span><input type="number" min={1} max={1440} aria-label={t('预计时长（分钟）','Estimated time (minutes)')} value={node.estimatedMinutes} disabled={editingDisabled} readOnly={detailLocked} onChange={event=>editNode(n=>{n.estimatedMinutes=Math.max(1,Math.min(1440,Number(event.target.value)||1))})}/><span>{t('分钟','min')}</span></label>
       <div className="route-editor-disclosures">
-       <details data-route-section="assessment"><summary>{t('验收标准（可选）','Assessment (optional)')}<ChevronRight/></summary><div className="route-editor-disclosure-body">
-        <div className="route-editor-assessment-control"><span>{t('启用验收','Enable assessment')}</span><GameToggle label={t('启用验收','Enable assessment')} checked={Boolean(node.assessment)} disabled={detailDisabled} onChange={checked=>editNode(n=>{if(checked)n.assessment={task:'',passCriteria:[''],objectiveIds:n.objectives.map(o=>o.id),mode:'quantitative'};else delete n.assessment})}/></div>
-        {node.assessment&&<><label className="route-editor-field"><span>{t('验收方式','Assessment mode')}</span><select value={node.assessment.mode??'quantitative'} disabled={detailDisabled} onChange={event=>editNode(n=>{
-         if(!n.assessment)return;
-         n.assessment.mode=event.target.value as 'quantitative'|'qualitative';
-         if(n.assessment.mode==='qualitative')n.assessment.evaluatorPrompt??='';
-         else if(!n.assessment.evaluatorPrompt?.trim())delete n.assessment.evaluatorPrompt;
-        })}><option value="quantitative">{t('量化标准','Quantitative')}</option><option value="qualitative">{t('AI评判','AI evaluation')}</option></select></label>
-         <label data-route-field="task" className="route-editor-field"><span>{t('验收任务','Assessment task')}</span><textarea value={node.assessment.task} disabled={editingDisabled} readOnly={detailLocked} maxLength={4000} onChange={event=>editNode(n=>{if(n.assessment)n.assessment.task=event.target.value})}/></label>
-         <label data-route-field="passCriteria" className="route-editor-field"><span>{t('达标条件','Pass criteria')}</span><textarea value={node.assessment.passCriteria.join('\n')} placeholder={t('每行一项','One per line')} disabled={editingDisabled} readOnly={detailLocked} maxLength={6000} onChange={event=>editNode(n=>{if(n.assessment)n.assessment.passCriteria=event.target.value.split('\n').slice(0,24)})} onBlur={()=>{if(node.assessment?.passCriteria.some(line=>!line.trim()))editNode(n=>{if(n.assessment)n.assessment.passCriteria=n.assessment.passCriteria.filter(line=>line.trim())})}}/></label>
-         <label data-route-field="evaluatorPrompt" className="route-editor-field"><span>{node.assessment.mode==='qualitative'?t('评判依据','Grading guidance'):t('评判依据（可选）','Grading guidance (optional)')}</span><textarea value={node.assessment.evaluatorPrompt??''} disabled={editingDisabled} readOnly={detailLocked} maxLength={4000} onChange={event=>editNode(n=>{
-          if(!n.assessment)return;
-          const value=event.target.value;
-          if(n.assessment.mode==='qualitative'||value.trim())n.assessment.evaluatorPrompt=value;
-          else delete n.assessment.evaluatorPrompt;
-         })}/></label>
-        </>}
-       </div></details>
-       <details data-route-section="more"><summary>{t('更多设置','More settings')}<ChevronRight/></summary><div className="route-editor-disclosure-body">
-        <label className="route-editor-field"><span>{t('所属大章','Chapter')}</span><select value={chapter.id} disabled={detailDisabled} onChange={event=>moveToChapter(event.target.value)}>{route.chapters.map(ch=><option key={ch.id} value={ch.id} disabled={ch.id!==chapter.id&&ch.nodes.length>=64}>{ch.title||t('新大章节','New chapter')}</option>)}</select></label>
-        <details className="route-editor-prerequisites"><summary>{t('前置章节','Prerequisites')}<ChevronRight/></summary><div>{nodes.filter(n=>n.id!==node.id).map(n=><label key={n.id}><input type="checkbox" checked={node.prerequisites.includes(n.id)} disabled={detailDisabled||!node.prerequisites.includes(n.id)&&node.prerequisites.length>=64} onChange={event=>editNode(item=>{item.prerequisites=event.target.checked?[...item.prerequisites,n.id]:item.prerequisites.filter(id=>id!==n.id)})}/><span>{n.title||t('未命名小章','Untitled lesson')}</span></label>)}{nodes.length<2&&<span>{t('暂无其他小章','No other lessons')}</span>}</div></details>
-        <label data-route-field="activities" className="route-editor-field"><span>{t('学习活动','Learning activities')}</span><textarea aria-label={t('学习活动，每行一项','Learning activities, one per line')} placeholder={t('每行一项','One per line')} value={(node.activities??[]).join('\n')} disabled={editingDisabled} readOnly={detailLocked} maxLength={6000} onChange={event=>editNode(n=>{if(event.target.value.trim())n.activities=event.target.value.split('\n').slice(0,24);else delete n.activities})} onBlur={()=>{if(node.activities?.some(line=>!line.trim()))editNode(n=>{if(n.activities){n.activities=n.activities.filter(line=>line.trim());if(!n.activities.length)delete n.activities}})}}/></label>
+       <details data-route-section="settings"><summary>{t('其他设置','Other settings')}<ChevronRight/></summary><div className="route-editor-disclosure-body">
+        <div data-route-field="requirement" className="route-editor-field"><span>{t('小节性质','Lesson requirement')}</span><GameSelect aria-label={t('小节性质','Lesson requirement')} value={node.requirement??'required'} disabled={detailDisabled} onChange={value=>editNode(n=>{n.requirement=value as 'required'|'optional'})} options={[{value:'required',label:t('必学','Required')},{value:'optional',label:t('选学','Elective')}]}/></div>
+        {incompleteFollowup.length>0&&<div data-route-field="legacyFollowup" className="route-editor-legacy-followup">
+         <p>{t('旧测验或复习配置尚未填写完整。','A legacy quiz or review configuration is incomplete.')}</p>
+         <button type="button" className="text-button" disabled={detailDisabled} onClick={()=>editNode(n=>{for(const field of incompleteFollowup)delete n[field]})}>{t('移除未完成的旧配置','Remove incomplete legacy configuration')}</button>
+        </div>}
        </div></details>
       </div>
      </>:<>
@@ -178,8 +199,9 @@ export function RouteEditorSurface({language,state,route,busy=false,working=fals
       :<span><img src={ASSET+(selectedProvider?.icon??'agent-codex.png')} alt=""/>{selectedProvider?.name??state.provider}</span>}
     </header>
     {onOptions&&<PlanningModelControls key={state.provider} state={state} language={language} busy={busy} onOptions={onOptions}/>}
-    <PlanningMessages messages={state.messages.filter(message=>!message.questionId)} providerId={state.provider} language={language} busy={working} workingLabel={workingLabel} partialReply={partialReply} partialProviderId={partialProviderId} activity={activity} route={route}>
-    {proposal&&<details key={proposal.baseRevision} className="route-editor-proposal"><summary><FileText/>{t('查看修改','Review changes')}<ChevronRight/></summary><p>{proposal.reply}</p>{proposalLocked&&<p className="route-editor-proposal-warning">{t('这项修改涉及已学章节。清空学习记录后可采用。','This change affects studied lessons. Clear learning progress to apply it.')}</p>}<div><GameButton disabled={editingDisabled||dirty||proposalLocked} onClick={onApply}>{t('采用修改','Apply')}</GameButton><GameButton variant="secondary" disabled={busy} onClick={onDiscard}>{t('放弃','Discard')}</GameButton></div></details>}
+    <PlanningMessages messages={editorMessages} providerId={state.provider} language={language} busy={working} workingLabel={workingLabel} partialReply={partialReply} partialProviderId={partialProviderId} activity={activity} route={route} renderMessageExtra={messageChanges}>
+    {proposal&&!editorMessages.some(message=>message.routeEdit?.requestRevision===proposal.baseRevision)&&pendingPreview()}
+    {legacySavedBefore&&state.routeDraft&&<RouteChangePreview key={'saved-'+state.routeDraft.revision} before={legacySavedBefore} after={state.routeDraft} language={language} status="saved"/>}
     </PlanningMessages>
     {conversationFeedback&&<div className="route-editor-conversation-feedback"><p role={conversationError?'alert':'status'}>{conversationFeedback}</p>{lastMessage?.role==='user'&&<GameButton variant="secondary" disabled={busy||working||Boolean(state.pending)} onClick={()=>void sendMessage(lastMessage.text,lastMessage.mentions,lastMessage.target,lastMessage.attachments)}>{t('重试','Retry')}</GameButton>}</div>}
     <PlanningComposer attachmentProject={state.projectId} inputRef={composerRef} route={route} referenceRequest={referenceRequest} language={language} busy={working} disabled={busy&&!working} onSend={(text,mentions,files)=>sendMessage(text,mentions,undefined,files)} onCancel={onCancel} answeredMessage={answeredMessage} placeholder={t('提问或描述想调整的内容…','Ask about or adjust your route…')}/>
