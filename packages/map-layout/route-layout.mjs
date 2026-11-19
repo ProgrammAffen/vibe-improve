@@ -1,12 +1,14 @@
 import { cubicSlopes, monotoneSlopes } from './curve-slopes.mjs';
 import { chapterSignBounds } from './chapter-sign.mjs';
 import { newThemes, originalThemes } from './map-themes.mjs';
-import { curvePoint, pathRecord, placeRouteMarkers } from './route-spacing.mjs';
+import { curvePoint, pathRecord, placeRouteMarkers, routeMarkerGap } from './route-spacing.mjs';
+import { randomRouteCurves } from './random-curves.mjs';
 
 export const WIDTH = 1672;
 export const HEIGHT = 941;
 export const MAX_PAGE_NODES = 10;
 const MIN_PAGE_NODES = 9;
+const DEFAULT_MARKER_GAP = 140;
 const LAST_ANCHOR_ROW = 790;
 const FIRST_ANCHOR_ROW = 240;
 const SIDE_INSET = 205;
@@ -22,7 +24,8 @@ const UPPER_ROW_LIMIT = 518;
 const LOWER_ROW_LIMIT = 557;
 const MIN_TURN_HEIGHT = 251;
 const FINGERPRINT_POINTS = 13;
-const MARKER = { chapter: { width: 198, height: 191 }, lesson: { width: 94, height: 78 } };
+const SHAPE_HISTORY_PAGES = 4;
+const MARKER = { chapter: { width: 198, height: 191 }, lesson: { width: 94, height: 78 }, finish: { width: 92, height: 130 } };
 
 export function random(seed) {
   let state = seed >>> 0;
@@ -42,6 +45,16 @@ function mixSeed(seed, page) {
 }
 
 const themes = [...originalThemes, ...newThemes];
+
+function planTurnCounts(count, seed) {
+  const rng = random(seed), planned = [];
+  while (planned.length < count) {
+    const choices = [3, 4, 5, 6, 7].filter(turns =>
+      turns !== planned.at(-1) && turns !== planned[planned.length - themes.length]);
+    planned.push(choices[Math.floor(rng() * choices.length)]);
+  }
+  return planned;
+}
 
 function buildNodes(chapters) {
   return chapters.flatMap((source, chapterIndex) => {
@@ -159,7 +172,7 @@ function markerBoxes(point, { width, height, kind }, themeId, padding = 11) {
   const top = point.y - (centered ? height / 2 : height) - 10 - padding;
   const bottom = point.y + (centered ? height / 2 : 0) + 24 + padding;
   const artwork = rectangle(point.x - x, top, point.x + x, bottom);
-  if (centered) return [artwork];
+  if (kind !== 'chapter') return [artwork];
   const sign = chapterSignBounds(point, themeId);
   const clearance = Math.min(padding, 9);
   return [artwork, rectangle(sign.left - clearance, sign.top - clearance, sign.right + clearance, sign.bottom + clearance)];
@@ -189,7 +202,7 @@ function playable({ x, y }) {
 
 function markerOnTerrain(point, kind, themeId) {
   if (!playable(point)) return false;
-  if (kind === 'lesson') return true;
+  if (kind !== 'chapter') return true;
   const sign = chapterSignBounds(point, themeId);
   return sign.right <= WIDTH - 75 && sign.bottom <= HEIGHT - 100;
 }
@@ -199,6 +212,12 @@ function markerGaps(nodes, padding = 23) {
 }
 
 const sum = values => values.reduce((total, value) => total + value, 0);
+
+function profileHeight(knots, progress) {
+  const at = Math.max(0, Math.min(knots.length - 1, progress * (knots.length - 1)));
+  const index = Math.min(knots.length - 2, Math.floor(at)), t = at - index;
+  return knots[index] + (knots[index + 1] - knots[index]) * t * t * (3 - 2 * t);
+}
 
 function needsFold(nodes) {
   return nodes.length === MAX_PAGE_NODES || sum(markerGaps(nodes, 30)) > WIDTH - 540;
@@ -216,21 +235,15 @@ function samplePoints(source, rng, themeId) {
   const advances = gaps.map((gap, index) => spareWidth >= 0
     ? clearance[index] + spareWidth * gap / totalGap
     : routeWidth * gap / totalGap);
-  const phase = rng() * Math.PI * 2;
-  const waves = .62 + rng() * 1.02;
-  const stretch = (rng() - .5) * 1.7;
   const height = 188 + 73 * rng();
   const offset = 524 + (rng() - .5) * 75;
-  const accent = rng() * Math.PI * 2;
+  const knots = Array.from({length: 3 + Math.floor(rng() * 4)}, () => offset + height * (rng() * 2 - 1));
   const points = [];
   const boxes = [];
   let travel = 0;
   for (const [index, marker] of source.entries()) {
     const x = startX + (finishX - startX) * travel;
-    const progress = travel * waves + stretch * travel * (1 - travel);
-    const angle = phase + progress * Math.PI * 2;
-    const envelope = .63 + .37 * Math.sin(Math.PI * travel);
-    const targetY = offset + envelope * (height * Math.sin(angle) + 25 * Math.sin(2 * angle + accent));
+    const targetY = profileHeight(knots, travel);
     const last = points.at(-1);
     const before = points.at(-2);
     const approach = before && unit(last.x - before.x, last.y - before.y);
@@ -270,7 +283,7 @@ function fallbackPoints(count, rng) {
   const points = [];
   for (let index = 0; index < count; index++) {
     const progress = index / (count - 1);
-    points.push(rounded({ x, y: centerY + side * height / 2 + shift * Math.sin(progress * Math.PI) }));
+    points.push(rounded({ x, y: centerY + side * height / 2 + shift * 4 * progress * (1 - progress) }));
     if (index === wideAfter) x += wideGap;
     else {
       x += gap;
@@ -280,24 +293,25 @@ function fallbackPoints(count, rng) {
   return points;
 }
 
-function foldedRow(source, fromX, toX, lower, rng) {
+function foldedRow(source, fromX, toX, lower, rng, crowded = false) {
   const direction = Math.sign(toX - fromX);
   const length = Math.abs(toX - fromX);
   const gaps = markerGaps(source);
   const spare = length - sum(gaps);
   const weights = gaps.map(() => .72 + .56 * rng());
   const totalWeight = sum(weights);
-  const center = lower ? 691 + (rng() - .5) * 70 : 385 + (rng() - .5) * 94;
-  const amplitude = lower ? 18 + 60 * rng() : 27 + 70 * rng();
-  const phase = rng() * Math.PI * 2;
-  const sweep = Math.PI * (1 + 1.4 * rng());
+  const center = crowded
+    ? (lower ? 734 : 349) + (rng() - .5) * 30
+    : lower ? 691 + (rng() - .5) * 70 : 385 + (rng() - .5) * 94;
+  const amplitude = crowded ? 18 + 30 * rng() : lower ? 18 + 60 * rng() : 27 + 70 * rng();
+  const knots = Array.from({length: 3 + Math.floor(rng() * 3)}, () => center + amplitude * (rng() * 2 - 1));
   let traveled = 0;
   return source.map((_, index) => {
     const x = index === source.length - 1 ? toX : fromX + direction * traveled;
     const { top, bottom } = anchorLimits(x);
-    const minY = lower ? Math.max(top, 592) : top;
-    const maxY = lower ? bottom : Math.min(bottom, 474);
-    const y = center + amplitude * Math.sin(phase + sweep * traveled / length);
+    const minY = lower ? Math.max(top, crowded ? 710 : 592) : top;
+    const maxY = lower ? bottom : Math.min(bottom, crowded ? 395 : 474);
+    const y = profileHeight(knots, traveled / length);
     if (index < gaps.length) traveled += gaps[index] + spare * weights[index] / totalWeight;
     return rounded({ x, y: Math.max(minY, Math.min(maxY, y)) });
   });
@@ -316,11 +330,14 @@ function sampleFold(source, rng, fallback) {
   }
   if (!splits.length) return null;
 
-  const boundaries = splits.filter(split => source[split].kind === 'chapter');
+  // A dense terminal page also contains the finish flag. Let its turn fall
+  // between any adjacent markers so a landmark is not forced into the bend.
+  const crowded = source.length > MAX_PAGE_NODES;
+  const boundaries = crowded ? [] : splits.filter(split => source[split].kind === 'chapter');
   const choices = boundaries.length ? boundaries : splits;
   const foldAt = choices[Math.floor(rng() * choices.length)];
-  const upper = foldedRow(source.slice(0, foldAt), startX, turnX, false, rng);
-  const lower = foldedRow(source.slice(foldAt), turnX, finishX, true, rng);
+  const upper = foldedRow(source.slice(0, foldAt), startX, turnX, false, rng, crowded);
+  const lower = foldedRow(source.slice(foldAt), turnX, finishX, true, rng, crowded);
   if (lower[0].y - upper.at(-1).y < MIN_TURN_HEIGHT) return null;
   return { points: [...upper, ...lower], foldAt };
 }
@@ -359,6 +376,11 @@ function curvesFit(paths, nodes, themeId) {
     return !obstacles.some((boxes, other) => other !== before && other !== before + 1 &&
       boxes.some(box => intersects(hull, box)));
   });
+}
+
+function curvesSeparated(paths) {
+  const hulls = paths.map(path => convexHull([path.start, path.control1, path.control2, path.end]));
+  return hulls.every((hull, index) => hulls.slice(index + 2).every(other => !intersects(hull, other)));
 }
 
 function makeCurves(nodes, rng, themeId) {
@@ -473,7 +495,25 @@ function layoutQuality(nodes, paths, foldAt) {
     .39 * sharpestTurn - .24 * Math.max(0, bends - 2) - .18 * Math.max(0, steepestGrade - 1.45);
 }
 
-function layoutPage(source, rng, themeId, previousShapes, exactPaths) {
+function layoutRandom(source, rng, themeId, previousShapes, maxGap, targetTurns) {
+  let best;
+  for (let attempt = 0; attempt < 192; attempt++) {
+    const guide = randomRouteCurves(rng, targetTurns, source.length);
+    if (!curvesSeparated(guide.paths)) continue;
+    const positioned = placeRouteMarkers(source, guide.paths, themeId, maxGap);
+    if (!positioned || !positioned.nodes.every(node => markerOnTerrain(node, node.kind, themeId)) ||
+        !markersFit(positioned.nodes, themeId) || !curvesFit(positioned.paths, positioned.nodes, themeId)) continue;
+    const shape = fingerprint(positioned.paths);
+    const novelty = previousShapes.length ? Math.min(...previousShapes.map(previous => shapeDistance(shape, previous))) : null;
+    if (novelty !== null && novelty < MIN_VARIATION) continue;
+    const quality = layoutQuality(positioned.nodes, positioned.paths, null);
+    if (!best || quality > best.quality) best = {...positioned, shape, novelty, quality, attempts: attempt + 1, turnCount: guide.turns};
+    if (best && attempt - best.attempts > 24) break;
+  }
+  return best;
+}
+
+function layoutPage(source, rng, themeId, previousShapes, exactPaths, maxGap = Infinity) {
   if (source.length === 1) {
     const point = rounded({ x: WIDTH / 2 + (rng() - .5) * 74, y: 544 + (rng() - .5) * 38 });
     return { nodes: [{ ...source[0], ...point }], paths: [], attempts: 1, novelty: null, fallback: false, foldAt: null, minimumNovelty: MIN_VARIATION };
@@ -499,8 +539,13 @@ function layoutPage(source, rng, themeId, previousShapes, exactPaths) {
     const { points, foldAt } = layout;
     const guideNodes = source.map((node, index) => ({ ...node, ...points[index] }));
     if (!markersFit(guideNodes, themeId)) continue;
-    const guide = folded ? makeFoldedCurves(guideNodes, foldAt, rng, themeId) : makeCurves(guideNodes, rng, themeId);
+    let guide = folded ? makeFoldedCurves(guideNodes, foldAt, rng, themeId) : makeCurves(guideNodes, rng, themeId);
     if (!guide) continue;
+    if (folded && rng() < .5) guide = guide.map(path => {
+      const reflect = point => ({x: point.x, y: FIRST_ANCHOR_ROW + LAST_ANCHOR_ROW - point.y});
+      return {...pathRecord(path.from, path.to, reflect(path.start), reflect(path.control1), reflect(path.control2), reflect(path.end))};
+    });
+    if (!curvesSeparated(guide)) continue;
     const exact = guide.map(path => path.d).join('|');
     if (exactPaths.has(exact)) continue;
     const shape = fingerprint(guide);
@@ -508,14 +553,14 @@ function layoutPage(source, rng, themeId, previousShapes, exactPaths) {
       ? Math.min(...previousShapes.map(previous => shapeDistance(shape, previous)))
       : null;
     if (novelty !== null && novelty < minimumNovelty) continue;
-    const positioned = placeRouteMarkers(source, guide, themeId);
+    const positioned = placeRouteMarkers(source, guide, themeId, maxGap);
     if (!positioned) continue;
-    const { nodes, paths } = positioned;
+    const { nodes, paths, gap } = positioned;
     if (!nodes.every(node => markerOnTerrain(node, node.kind, themeId)) ||
         !markersFit(nodes, themeId) || !curvesFit(paths, nodes, themeId)) continue;
-    const quality = layoutQuality(nodes, guide, foldAt);
+    const quality = layoutQuality(nodes, maxGap < Infinity ? paths : guide, foldAt);
     const turnAfter = folded ? nodes.findIndex((node, index) => index > 0 && node.x < nodes[index - 1].x) : null;
-    const candidate = { nodes, paths, novelty, fallback, foldAt: turnAfter, shape, exact, quality, firstAttempt: best?.firstAttempt ?? attempt };
+    const candidate = { nodes, paths, gap, novelty, fallback, foldAt: turnAfter, shape, exact, quality, firstAttempt: best?.firstAttempt ?? attempt };
     if (novelty !== null && novelty < targetVariation) {
       if (!alternative || novelty > alternative.novelty) alternative = candidate;
       continue;
@@ -527,16 +572,64 @@ function layoutPage(source, rng, themeId, previousShapes, exactPaths) {
   if (!best) return null;
   previousShapes.push(best.shape);
   exactPaths.add(best.exact);
-  const { nodes, paths, novelty, fallback, foldAt } = best;
-  return { nodes, paths, attempts, novelty, fallback, foldAt, minimumNovelty };
+  const { nodes, paths, gap, novelty, fallback, foldAt } = best;
+  return { nodes, paths, gap, attempts, novelty, fallback, foldAt, minimumNovelty, shape: fingerprint(paths) };
 }
 
-function pageGeometry(group, seed, themeId) {
+function pageGeometry(group, seed, themeId, maxGap, previousShapes = [], targetTurns = 4) {
+  if (group.length >= 2) {
+    for (let batch = 0; batch < 2; batch++) {
+      const generated = layoutRandom(group, random(mixSeed(seed, 40 + batch)), themeId, previousShapes, maxGap, targetTurns);
+      if (generated) return generated;
+    }
+  }
   for (let batch = 0; batch < MAX_BATCHES; batch++) {
-    const layout = layoutPage(group, random(batch ? mixSeed(seed, batch) : seed), themeId, [], new Set());
+    const layout = layoutPage(group, random(batch ? mixSeed(seed, batch) : seed), themeId, previousShapes, new Set(), maxGap);
     if (layout) return layout;
   }
+  // A different turn budget can resolve a congested bend before relaxing novelty.
+  if (group.length >= MIN_PAGE_NODES) {
+    const generated = layoutRandom(group, random(mixSeed(seed, 50)), themeId, previousShapes, maxGap, targetTurns === 4 ? 6 : 4);
+    if (generated) return generated;
+  }
+  // Keep the learning markers evenly spaced when a dense page cannot also
+  // reserve a full station for the decorative flag. Add a short curved tail
+  // instead, with the same terrain, collision and trail-clearance checks.
+  if (group.length > MAX_PAGE_NODES && group.at(-1).kind === 'finish') {
+    const source = group.slice(0, -1);
+    for (let batch = 0; batch < MAX_BATCHES; batch++) {
+      const layout = layoutPage(source, random(mixSeed(seed, MAX_BATCHES + batch)), themeId, [], new Set());
+      if (!layout) continue;
+      const extended = finishTail(layout, group.at(-1), themeId);
+      if (extended) return {...extended, shape: fingerprint(extended.paths)};
+    }
+  }
+  if (previousShapes.length) return pageGeometry(group, seed, themeId, maxGap, [], targetTurns);
   throw new Error('Could not generate a collision-free route map');
+}
+
+function finishTail(layout, marker, themeId) {
+  const last = layout.nodes.at(-1);
+  const incoming = layout.paths.at(-1);
+  const tangent = unit(incoming.end.x - incoming.control2.x, incoming.end.y - incoming.control2.y);
+  const angle = Math.atan2(tangent.y, tangent.x);
+  for (const radius of [125, 145, 170, 195, 220, 250]) {
+    for (const turn of [0, -.3, .3, -.6, .6, -.9, .9, -1.2, 1.2, -1.5, 1.5]) {
+      const end = rounded({x: last.x + Math.cos(angle + turn) * radius, y: last.y + Math.sin(angle + turn) * radius});
+      const finish = {...marker, ...end};
+      const nodes = [...layout.nodes, finish];
+      if (!markerOnTerrain(finish, finish.kind, themeId) || !markersFit(nodes, themeId)) continue;
+      const tail = {
+        ...pathRecord(last.key, finish.key, {x: last.x, y: last.y},
+          {x: last.x + tangent.x * radius / 3, y: last.y + tangent.y * radius / 3},
+          {x: end.x - (end.x - last.x) / 3, y: end.y - (end.y - last.y) / 3}, end),
+        leg: layout.nodes.length - 1,
+      };
+      const paths = [...layout.paths, tail];
+      if (curvesFit(paths, nodes, themeId)) return {...layout, nodes, paths, gap: routeMarkerGap(nodes, paths, themeId)};
+    }
+  }
+  return null;
 }
 
 function seedFor(route, groups) {
@@ -555,8 +648,10 @@ export function createRouteMapPages(route) {
   if (!route.chapters.length) return [];
   const groups = partition(buildNodes(route.chapters));
   const routeSeed = seedFor(route, groups);
+  const turnCounts = planTurnCounts(groups.length, routeSeed);
+  const layouts = [];
 
-  return groups.map((group, pageIndex) => {
+  const pages = groups.map((group, pageIndex) => {
     const seed = mixSeed(routeSeed, pageIndex);
     const themeId = themes[pageIndex % themes.length];
     const lessonIds = group.filter(node => node.kind === 'lesson').map(node => node.id);
@@ -569,15 +664,40 @@ export function createRouteMapPages(route) {
       firstLesson: first.lesson,
       lastLesson: group.findLast(node => node.chapterId === first.chapterId).lesson,
     } : null;
+    const terminal = pageIndex === groups.length - 1;
+    const compact = terminal && group.length < MIN_PAGE_NODES;
+    const source = terminal ? [...group, {key: 'finish', kind: 'finish', ...MARKER.finish}] : group;
     let geometry;
-    const layout = () => geometry ??= pageGeometry(group, seed, themeId);
+    const layout = () => {
+      if (geometry) return geometry;
+      const maxGap = compact ? pages[pageIndex - 1]?.spacing ?? DEFAULT_MARKER_GAP : Infinity;
+      // Bounded, deterministic history keeps direct page jumps fast and makes
+      // each page identical regardless of which page the user opened first.
+      const blockStart = pageIndex - pageIndex % SHAPE_HISTORY_PAGES;
+      const previousShapes = layouts.slice(blockStart, pageIndex).map(previous => previous().shape);
+      const positioned = pageGeometry(source, seed, themeId, maxGap, previousShapes, turnCounts[pageIndex]);
+      geometry = {
+        ...positioned,
+        nodes: terminal ? positioned.nodes.slice(0, -1) : positioned.nodes,
+        paths: terminal ? positioned.paths.filter(path => path.leg < group.length - 1) : positioned.paths,
+        finish: terminal ? positioned.nodes.at(-1) : null,
+        finishPaths: terminal ? positioned.paths.filter(path => path.leg === group.length - 1) : [],
+      };
+      return geometry;
+    };
+    layouts.push(layout);
     return {
       pageIndex, pageNumber: pageIndex + 1, totalPages: groups.length, themeId, seed,
       lessonIds, totalChapters: group.length - lessonIds.length, totalLessons: lessonIds.length,
       continuation: continuedChapter !== null, continuedChapter,
+      compact,
       continuesToNextPage: last.chapterId === groups[pageIndex + 1]?.[0].chapterId,
       get nodes() { return layout().nodes; },
       get paths() { return layout().paths; },
+      get spacing() { return layout().gap; },
+      get finish() { return layout().finish; },
+      get finishPaths() { return layout().finishPaths; },
     };
   });
+  return pages;
 }

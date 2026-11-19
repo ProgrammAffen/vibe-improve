@@ -57,10 +57,28 @@ export function PawArt({terrain, placement}: {terrain: MapTerrain; placement: Pa
   return <span ref={host} className="adventure-marker-art" aria-hidden="true"/>;
 }
 
+export function FinishFlagArt() {
+  return <svg className="adventure-finish-art" viewBox="0 0 100 141" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+    <ellipse cx="50" cy="141" rx="37" ry="9" fill="var(--map-shadow)" opacity=".42"/>
+    <path d="M29 139 46 133 65 139 69 145 44 149 25 144Z" fill="var(--map-ground)"/>
+    <path d="M29 139 46 133 44 143 25 144Z" fill="var(--map-sheet)" opacity=".5"/>
+    <path d="M44 143 65 139 69 145 44 149Z" fill="var(--map-ink)" opacity=".2"/>
+    <path d="M45 14 52 12 52 140 45 143Z" fill="#9c6d40"/>
+    <path d="M49 13 52 12 52 140 49 141Z" fill="#654323"/>
+    <path d="M52 19 94 25 82 44 94 64 52 57Z" fill="#ee252a"/>
+    <path d="M52 19 94 25 65 40 52 35Z" fill="#ff575b"/>
+    <path d="M52 35 65 40 94 64 52 57Z" fill="#f7353b"/>
+    <path d="M65 40 94 25 82 44 94 64Z" fill="#c91422"/>
+    <path d="M54 28 54 48 69 41Z" fill="var(--map-sheet)"/>
+    <path d="M43 13 49 6 56 12 50 20Z" fill="#dfb46d"/>
+    <path d="M49 6 56 12 50 20 49 13Z" fill="#ab7b3c"/>
+  </svg>;
+}
+
 export function TerrainTrail({page, height = HEIGHT}: {page: MapPage; height?: number}) {
   const host = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    host.current?.replaceChildren(createTerrainTrail(page.themeId, page.paths, {seed: page.seed, width: WIDTH, height}));
+    host.current?.replaceChildren(createTerrainTrail(page.themeId, [...page.paths, ...page.finishPaths], {seed: page.seed, width: WIDTH, height}));
   }, [page, height]);
   return <div ref={host} className="adventure-trail" aria-hidden="true"/>;
 }

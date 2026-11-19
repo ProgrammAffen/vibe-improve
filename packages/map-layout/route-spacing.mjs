@@ -61,22 +61,33 @@ function locate({ sections }, at) {
   return { index, t, point: curvePoint(path, t) };
 }
 
-function spaceStations(source, measurement, themeId) {
+function markerRadii(source, themeId) {
   const [left, top, right, bottom] = markerArtwork(themeId, 'landmark').bounds;
   const landmarkAspect = (right - left) / (bottom - top);
-  const radii = source.map(node => {
+  return source.map(node => {
     const width = node.kind === 'chapter' ? Math.min(node.width, node.height * landmarkAspect) : node.width;
     return width / 2;
   });
+}
+
+export function routeMarkerGap(source, paths, themeId) {
+  if (source.length < 2 || !paths.length) return 0;
+  const radii = markerRadii(source, themeId);
+  const last = source.length - 1;
+  return (measureRoute(paths).total - (2 * sum(radii) - radii[0] - radii[last])) / last;
+}
+
+function spaceStations(source, measurement, themeId, maxGap = Infinity) {
+  const radii = markerRadii(source, themeId);
   const last = source.length - 1;
   const reserved = 2 * sum(radii) - radii[0] - radii[last];
-  const gap = (measurement.total - reserved) / last;
+  const gap = Math.min((measurement.total - reserved) / last, maxGap);
   if (gap <= 0) return null;
 
   let at = 0;
   return source.map((_, index) => {
     if (index > 0) at += radii[index - 1] + gap + radii[index];
-    return locate(measurement, index === last ? measurement.total : at);
+    return locate(measurement, at);
   });
 }
 
@@ -108,9 +119,10 @@ function splitIntoLegs(source, guide, stations) {
   return paths;
 }
 
-export function placeRouteMarkers(source, guide, themeId) {
-  const stations = spaceStations(source, measureRoute(guide), themeId);
+export function placeRouteMarkers(source, guide, themeId, maxGap = Infinity) {
+  const stations = spaceStations(source, measureRoute(guide), themeId, maxGap);
   if (!stations) return null;
   const nodes = source.map((node, index) => ({ ...node, ...stations[index].point }));
-  return { nodes, paths: splitIntoLegs(source, guide, stations) };
+  const paths = splitIntoLegs(source, guide, stations);
+  return { nodes, paths, gap: routeMarkerGap(nodes, paths, themeId) };
 }

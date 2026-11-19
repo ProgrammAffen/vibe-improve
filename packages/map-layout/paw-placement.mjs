@@ -24,8 +24,9 @@ function nearestDirection(page, node) {
 
 export function pawPlacement(page, node, projection = 0.65) {
   if (!Number.isFinite(projection) || projection <= 0) throw new TypeError('Projection must be a finite positive number');
-  const outgoing = page.paths.find(path => path.from === node.key);
-  const incoming = page.paths.find(path => path.to === node.key);
+  const paths = [...page.paths, ...(page.finishPaths ?? [])];
+  const outgoing = paths.find(path => path.from === node.key);
+  const incoming = paths.find(path => path.to === node.key);
   const after = outgoing && direction(outgoing.start, outgoing.control1);
   const before = incoming && direction(incoming.control2, incoming.end);
   const tangent = normalized((after?.x ?? 0) + (before?.x ?? 0), (after?.y ?? 0) + (before?.y ?? 0))

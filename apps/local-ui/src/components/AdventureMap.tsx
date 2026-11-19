@@ -10,7 +10,7 @@ import BackHomeButton from './BackHomeButton';
 import GameButton, {GameButtonArt} from './GameButton';
 import GameSelect from './GameSelect';
 import {projectMapPage, type MapViewport} from './adventure-map-viewport';
-import {LandmarkArt, mapAsset, PawArt, terrainName, TerrainTrail, type MapTerrain} from './adventure-map-art';
+import {FinishFlagArt, LandmarkArt, mapAsset, PawArt, terrainName, TerrainTrail, type MapTerrain} from './adventure-map-art';
 import './adventure-map.css';
 
 type Props = {
@@ -267,7 +267,7 @@ export function AdventureMap({route, language, onStartLesson, startPending=false
     return () => observer.disconnect();
   }, [pages.length]);
   const pageIndex = Math.min(pageChoice ?? startingIndex, Math.max(0, pages.length - 1));
-  const projected = useMemo(() => pages[pageIndex] ? projectMapPage(pages[pageIndex], viewport) : undefined, [pages, pageIndex, viewport]);
+  const projected = useMemo(() => pages[pageIndex] ? projectMapPage(pages[pageIndex], viewport, pages[pageIndex - 1]) : undefined, [pages, pageIndex, viewport]);
   const page = projected?.page;
   const markers = useMemo(() => page?.nodes.map(node => ({node, placement: pawPlacement(page, node)})) ?? [], [page]);
   const terrain = page?.themeId ?? 'grassland';
@@ -349,6 +349,13 @@ export function AdventureMap({route, language, onStartLesson, startPending=false
               </span>}
             </button>;
           })}
+          {page.finish && <span className="adventure-finish-flag" role="img" aria-label={translate(language, '路线终点', 'End of route')}
+            style={{left: `${(page.finish.x - page.finish.width / 2) / WIDTH * 100}%`,
+              top: `${(page.finish.y - page.finish.height) / projected!.height * 100}%`,
+              width: `${page.finish.width / WIDTH * 100}%`, height: `${page.finish.height / projected!.height * 100}%`,
+              zIndex: Math.round(page.finish.y)}}>
+            <FinishFlagArt/>
+          </span>}
         </div>
       </div>
       <nav ref={pagination} className="adventure-map-pages" aria-label={translate(language, '地图分页', 'Map pages')}>

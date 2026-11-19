@@ -8,6 +8,7 @@ interface MapNodeBase extends Point {
   label: string; width: number; height: number;
 }
 export type MapNode = MapNodeBase & ({ kind: 'chapter'; lesson?: never } | { kind: 'lesson'; lesson: number });
+export interface MapFinish extends Point {kind: 'finish'; key: string; width: number; height: number}
 export interface TrailSegment {
   from: string | null; to: string | null; start: Point; control1: Point; control2: Point; end: Point; d: string; leg: number;
 }
@@ -17,11 +18,14 @@ export interface MapPage {
   readonly nodes: readonly MapNode[]; readonly paths: readonly TrailSegment[]; readonly lessonIds: readonly string[];
   totalChapters: number; totalLessons: number; seed: number; continuation: boolean;
   continuedChapter: ContinuedChapter | null; continuesToNextPage: boolean;
+  compact: boolean; spacing: number; finish: MapFinish | null; readonly finishPaths: readonly TrailSegment[];
 }
 export const WIDTH: number;
 export const HEIGHT: number;
 export const MAX_PAGE_NODES: number;
 export function createRouteMapPages(route: Pick<RouteDocument, 'id' | 'chapters'>): MapPage[];
+export function routeMarkerGap(source: readonly (MapNode | MapFinish)[], paths: readonly TrailSegment[], themeId: MapTheme): number;
+export function placeRouteMarkers<T extends MapNode | MapFinish>(source: readonly T[], guide: readonly TrailSegment[], themeId: MapTheme, maxGap?: number): {nodes: T[]; paths: TrailSegment[]; gap: number} | null;
 export type Bounds = readonly [number, number, number, number];
 export interface PawPlacement extends Point {
   top: number; left: number; tangent: Point; angle: number; matrix: readonly [number, number, number, number]; center: Point;
