@@ -1,0 +1,65 @@
+.lesson-rich-editor {
+  position: relative;
+  min-width: 0;
+  color: #44321f;
+  font-size: 16px;
+  line-height: 1.85;
+}
+.lesson-rich-content {min-height: 5rem; padding: 12px 18px; font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif; font-weight: 400; overflow-wrap: anywhere; outline: none !important; cursor: text;}
+.lesson-rich-content:focus {background: rgb(188 151 89 / 5%);}
+.lesson-rich-content > :first-child {margin-top: 0;}
+.lesson-rich-content > :last-child {margin-bottom: 0;}
+.lesson-rich-content p {margin: .65em 0;}
+.lesson-rich-content h1, .lesson-rich-content h2, .lesson-rich-content h3 {font-family: inherit; line-height: 1.5; margin: 1.1em 0 .5em; color: #42301c;}
+.lesson-rich-content h1 {font-size: 1.65em;}
+.lesson-rich-content h2 {font-size: 1.4em;}
+.lesson-rich-content h3 {font-size: 1.18em;}
+.lesson-rich-content ul, .lesson-rich-content ol {padding-left: 1.8em;}
+.lesson-rich-content li > p {margin: .25em 0;}
+.lesson-rich-content blockquote {margin: .9em 0; padding: .2em 1em; border-left: 3px solid #939c67; background: rgb(142 156 98 / 8%); color: #685334;}
+.lesson-rich-content code {font: .9em/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; background: rgb(114 88 49 / 8%); padding: .12em .3em; border-radius: 3px;}
+.lesson-rich-content pre {white-space: pre-wrap; tab-size: 2; padding: 14px 18px; background: #ece3cf; color: #483b2b; border-radius: 6px; overflow: auto;}
+.lesson-rich-content pre code {padding: 0; background: transparent;}
+.lesson-rich-content a {color: #526b41; text-decoration: underline; text-underline-offset: 3px;}
+.lesson-rich-content hr {border: 0; border-top: 1px solid #d0ba94; margin: 1.5em 0;}
+.lesson-rich-content .ProseMirror-selectednode {background: rgb(148 161 101 / 16%); outline: none;}
+.lesson-rich-editor--readonly .lesson-rich-content {min-height: 0; cursor: auto;}
+.lesson-rich-editor--readonly .lesson-rich-content:focus {background: transparent;}
+.lesson-rich-toolbar {display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; min-width: 0; padding: 7px 12px; color: #584125; background: #f0e0bd; box-shadow: inset 0 -1px #c8b189;}
+.lesson-rich-toolbar .lesson-rich-heading {flex: 0 0 110px; width: 110px; font-size: 13px;}
+.lesson-rich-toolbar .lesson-rich-heading .game-select-trigger {min-height: 34px; height: 34px; padding: 0 13px;}
+.lesson-rich-tool-group {display: inline-flex; gap: 2px; align-items: center; padding-right: 8px; border-right: 1px solid rgb(134 102 59 / 22%);}
+.lesson-rich-tool {display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; padding: 7px; border: 0; border-radius: 4px; background: transparent; color: inherit; outline: none !important; cursor: pointer;}
+.lesson-rich-tool svg {width: 19px; height: 19px; stroke-width: 2;}
+.lesson-rich-tool[aria-pressed="true"] {color: #405535; background: #d5d6ae;}
+.lesson-rich-tool:not(:disabled):hover, .lesson-rich-tool:not(:disabled):focus-visible {background: #c9b78f; color: #fffaf0;}
+.lesson-rich-tool:disabled {opacity: .32; cursor: default;}
+.lesson-rich-math {display: inline-block; max-width: 100%; vertical-align: baseline; border-radius: 4px; padding: 0 3px; outline: none !important;}
+.lesson-rich-math[role="button"] {cursor: pointer;}
+.lesson-rich-math[role="button"]:hover, .lesson-rich-math[role="button"]:focus-visible {background: rgb(144 158 98 / 19%);}
+.lesson-rich-math[data-type="block-math"] {display: block; overflow-x: auto; padding: 8px 12px; text-align: center;}
+.lesson-rich-math .katex-display {margin: .35em 0;}
+.lesson-rich-math--invalid {color: #9a5034; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap;}
+.lesson-rich-quote {display: block; margin: 4px 18px 8px auto; padding: 4px 9px; border: 0; border-radius: 4px; outline: none !important; background: #e5e7ce; color: #506342; font: inherit; font-size: 13px; cursor: pointer;}
+.lesson-rich-quote:hover, .lesson-rich-quote:focus-visible {text-decoration: underline;}
+.lesson-rich-notice {display: flex; justify-content: space-between; gap: 10px; padding: 4px 18px 10px; color: #8a5938; font-size: 12px;}
+.lesson-rich-notice button {border: 0; background: transparent; color: inherit; cursor: pointer;}
+.lesson-rich-dialog {width: min(760px, 94vw); color: #44321f;}
+.lesson-rich-dialog .stone-dialog-inner {font-size: 16px;}
+.lesson-rich-dialog .game-select {width: 180px; margin-bottom: 12px;}
+.lesson-rich-dialog .game-select-trigger {height: 42px; min-height: 42px; font-size: 15px;}
+.lesson-rich-field {display: grid; gap: 8px; margin: 8px 0;}
+.lesson-rich-field input, .lesson-rich-field textarea, .lesson-rich-source {box-sizing: border-box; width: 100%; padding: 12px; border: 1px solid #c9b38b; border-radius: 5px; color: #44321f; background: #fff8e7; outline: none !important; font: 14px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;}
+.lesson-rich-field input:focus, .lesson-rich-field textarea:focus, .lesson-rich-source:focus {background: #f6edda;}
+.lesson-rich-field textarea {min-height: 120px; resize: vertical;}
+.lesson-rich-source {height: min(44vh, 420px); min-height: 140px; resize: vertical;}
+.lesson-rich-math-preview {display: grid; place-items: center; min-height: 90px; padding: 12px; overflow: auto; color: #584125; border-radius: 5px; background: rgb(255 250 231 / 55%); font-size: 16px;}
+.lesson-rich-form-error {min-height: 1.7em; margin: 8px 0; font-size: 13px; color: #9a5034;}
+.lesson-rich-dialog-actions {display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; padding-top: 8px;}
+.lesson-rich-dialog-actions .game-button {flex: 0 1 auto; min-height: 46px; width: auto; min-width: 130px; padding: 12px 24px; font-size: 16px;}
+.lesson-rich-dialog-actions .game-button-leading-icon svg {width: 18px; height: 18px;}
+@media (max-width: 800px) {
+  .lesson-rich-toolbar {gap: 4px; padding: 6px;}
+  .lesson-rich-tool-group {padding-right: 4px;}
+  .lesson-rich-content {padding: 10px 12px;}
+}

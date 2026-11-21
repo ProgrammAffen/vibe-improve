@@ -1,0 +1,407 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vibe-improve:lesson-workspace:1",
+  "title": "Private lesson notebook workspace v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "routeId",
+    "nodeId",
+    "revision",
+    "blocks"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "projectId": {
+      "type": "string",
+      "pattern": "^proj_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+    },
+    "routeId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "nodeId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 999999999
+    },
+    "blocks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/block"
+      },
+      "maxItems": 500
+    }
+  },
+  "$comment": "The shared domain validator additionally enforces a 2 MiB UTF-8 size, editor node/attribute rules, tree depth, global unique IDs, existing referenced block IDs, aggregate record limits and source time ordering.",
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "url": {
+      "type": "string",
+      "maxLength": 2048,
+      "pattern": "^https?://"
+    },
+    "editorNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "doc",
+            "paragraph",
+            "text",
+            "heading",
+            "bulletList",
+            "orderedList",
+            "listItem",
+            "blockquote",
+            "codeBlock",
+            "hardBreak",
+            "horizontalRule",
+            "inlineMath",
+            "blockMath",
+            "taskList",
+            "taskItem"
+          ]
+        },
+        "attrs": {
+          "type": "object"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/editorNode"
+          },
+          "maxItems": 20000
+        },
+        "marks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mark"
+          },
+          "maxItems": 8
+        }
+      }
+    },
+    "editorDocument": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/editorNode"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "doc"
+            }
+          }
+        }
+      ]
+    },
+    "mark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "bold",
+            "italic",
+            "strike",
+            "code",
+            "underline",
+            "link"
+          ]
+        },
+        "attrs": {
+          "type": "object"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "quote"
+      ],
+      "properties": {
+        "quote": {
+          "type": "string",
+          "maxLength": 10000
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999999
+        },
+        "startMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999999
+        },
+        "endMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999999
+        }
+      },
+      "dependentRequired": {
+        "endMs": [
+          "startMs"
+        ]
+      }
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "role",
+        "text"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "role": {
+          "enum": [
+            "user",
+            "assistant"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "complete",
+            "incomplete"
+          ]
+        }
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "title",
+        "messages",
+        "collapsed"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "kind": {
+          "enum": [
+            "note",
+            "question"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "content": {
+          "$ref": "#/$defs/editorDocument"
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "blockId",
+              "source"
+            ],
+            "properties": {
+              "blockId": {
+                "$ref": "#/$defs/identifier"
+              },
+              "source": {
+                "$ref": "#/$defs/source"
+              }
+            }
+          },
+          "maxItems": 30
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/message"
+          },
+          "maxItems": 300
+        },
+        "collapsed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "version": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "collapsed",
+        "records"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "kind": {
+          "enum": [
+            "text",
+            "math",
+            "resource",
+            "link"
+          ]
+        },
+        "content": {
+          "$ref": "#/$defs/editorDocument"
+        },
+        "latex": {
+          "type": "string",
+          "maxLength": 10000
+        },
+        "resource": {
+          "$ref": "#/$defs/resource"
+        },
+        "url": {
+          "$ref": "#/$defs/url"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "collapsed": {
+          "type": "boolean"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/record"
+          },
+          "maxItems": 2000
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "text"
+              }
+            }
+          },
+          "then": {
+            "required": [],
+            "properties": {
+              "latex": false,
+              "resource": false,
+              "url": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "math"
+              }
+            }
+          },
+          "then": {
+            "required": [],
+            "properties": {
+              "content": false,
+              "resource": false,
+              "url": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "resource"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "resource"
+            ],
+            "properties": {
+              "content": false,
+              "latex": false,
+              "url": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "link"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "url"
+            ],
+            "properties": {
+              "content": false,
+              "latex": false,
+              "resource": false
+            }
+          }
+        }
+      ]
+    }
+  }
+}

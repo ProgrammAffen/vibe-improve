@@ -162,3 +162,8 @@ AI路线校验失败映射为智能体结果被拒绝，不能套用用户手动
 智能体展示回归覆盖全部路线字段和同名先修切换、普通问答与相同候选的未修改状态、当前待确认与部分及已采集字段详情，以及失败／停止后的生成记录展开。记录默认收起时不展示长正文，展开后内容完整，未完成项不显示“接收中”。中英文窄桌面验证按钮可见、详情可滚动及恢复生成时折叠状态重置；资料解析与章节关联沿用项目资料验收。
 
 学习前设置回归覆盖新路线不预设测验或复习、其他设置仅保留必学／选学、目标框高度、中英文小窗口的详情滚动，以及旧路线和检查点的内容保留。细化协议接受省略或空 assessment，拒绝提前返回的测验对象与 review；审核只读学习路线，不因未出题而阻塞。旧不完整配置可明确移除并撤销，不能因隐藏入口而无法继续确认。
+
+
+小节工作台持久化按[工作台契约](../contracts/lesson-workspace.md)验收。执行 `node --test tests/lesson-workspace.test.mjs tests/lesson-settings.test.mjs apps/local-ui/src/lesson-editor/rich-editor.test.mjs`，验证结构与安全边界、原生两进程恢复、旧版本拒写、失效资料保留笔记、清空后的正文/公式/笔记/问答不可被旧窗口恢复，以及原件预览不暴露路径。浏览器另验证 IndexedDB 刷新恢复及多窗口版本冲突。
+
+Notebook 第一版补充执行 `tests/lesson-agent.test.mjs`、`tests/lesson-editor.test.mjs`、`tests/lesson-editor-package.test.mjs` 与 `tests/prelearning-settings.test.mjs`。公式回归使用真实 ProseMirror 输入规则和编辑后的 JSON 保存，不能只验证 Markdown 初始解析；AI 协议用合成 CLI 验证追加、追问、取消、失效来源降级、不可变图片快照及修改提案。浏览器合成工作台验证公式点击重编及保存、引用提问、原记录内追问、保存为笔记、采用真实前后修改、重新打开与窄屏滚动。真实账户的各 Agent 回复质量另行验收，不能由合成协议代替。打包检查本地 PDF 字体/字符映射/解码器、模块 worker MIME 和全部编辑器依赖许可；不依赖 CDN。

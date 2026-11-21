@@ -42,6 +42,7 @@ async function progress(projectId: string, route: RouteDocument, change?: Learni
       if (change.kind === 'reset') {
         if (state.pending) throw new Error('PLANNING_CONFLICT');
         const reset = emptyProgress(nextProgressRevision(history.progressRevision));
+        reset.notebookResetRevision = reset.progressRevision;
         saveProgress(reset);
         return reset;
       }

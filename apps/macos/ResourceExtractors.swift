@@ -210,7 +210,7 @@ enum ResourceExtractors {
         return excerpts(entries, partialReason: skippedLongText ? "sizeLimited" : nil)
     }
 
-    static func captions(_ data: Data) -> ResourceExtraction {
+    static func captions(_ data: Data, within ranges: [ResourceLocation]? = nil) -> ResourceExtraction {
         guard let file = decoded(data) else { return failure("encoding") }
         let content = file.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
         let time = #"(?m)^(\d{1,3}:)?(\d{2}):(\d{2})[,.](\d{3})[ \t]+-->[ \t]+(\d{1,3}:)?(\d{2}):(\d{2})[,.](\d{3})[^\n]*\n"#
@@ -233,12 +233,14 @@ enum ResourceExtractors {
             let text = PublicResourceWeb.entities(source.substring(from: NSMaxRange(match.range)).replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression))
             let cue = cleaned(text)
             if cue.isEmpty { incomplete = true; continue }
+            if let ranges, !ranges.contains(where: { start <= ($0.end ?? $0.start) && end >= $0.start }) { continue }
             if let last = cues.last, start >= last.0.start, start - (last.0.end ?? start) < 2500, end - last.0.start <= 30_000,
                last.1.count + cue.count < 1050 {
                 cues[cues.count - 1] = (ResourceLocation(kind: "time", start: last.0.start, end: end), last.1 + " " + cue)
             } else { cues.append((ResourceLocation(kind: "time", start: start, end: end), cue)) }
         }
-        return excerpts(cues, partialReason: incomplete ? "someCaptions" : nil, emptyReason: "invalidCaptions")
+        let selected = ranges.map { ranges in cues.filter { cue in ranges.contains { cue.0.start <= ($0.end ?? $0.start) && (cue.0.end ?? cue.0.start) >= $0.start } } } ?? cues
+        return excerpts(selected, partialReason: incomplete ? "someCaptions" : nil, emptyReason: "invalidCaptions")
     }
 }
 

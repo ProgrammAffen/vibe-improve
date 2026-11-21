@@ -47,7 +47,10 @@ final class AssetServer {
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "vibe-improve.local-assets")
     private let root: URL
-    init(root: URL) { self.root = root.standardizedFileURL }
+    private let lessonPreview: ((String, String?, Bool) throws -> LessonPreviewResponse)?
+    init(root: URL, lessonPreview: ((String, String?, Bool) throws -> LessonPreviewResponse)? = nil) {
+        self.root = root.standardizedFileURL; self.lessonPreview = lessonPreview
+    }
     func start(ready: @escaping (UInt16) -> Void) throws {
         let parameters = NWParameters.tcp
         parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
@@ -83,11 +86,22 @@ final class AssetServer {
         guard let host = headers["host"], host.hasPrefix("127.0.0.1:"), UInt16(host.dropFirst(10)) == listener?.port?.rawValue else { reply(connection, code: "403 Forbidden", data: Data()); return }
         let raw = String(pieces[1]).components(separatedBy: "?")[0]
         guard let decoded = raw.removingPercentEncoding, !decoded.contains("\0"), !decoded.contains("\\") else { reply(connection, code: "400 Bad Request", data: Data()); return }
+        if decoded.hasPrefix("/vibe-improve/lesson-preview/") {
+            let expectedOrigin = "http://127.0.0.1:" + String(listener?.port?.rawValue ?? 0)
+            guard headers["origin"] == nil || headers["origin"] == expectedOrigin,
+                  !["cross-site", "same-site"].contains(headers["sec-fetch-site"] ?? ""),
+                  let lessonPreview else { reply(connection, code: "403 Forbidden", data: Data()); return }
+            do {
+                let response = try lessonPreview(String(decoded.dropFirst("/vibe-improve/lesson-preview/".count)), headers["range"], pieces[0] == "HEAD")
+                reply(connection, code: response.code, data: response.data, headers: response.headers, stream: response.stream)
+            } catch { reply(connection, code: "404 Not Found", data: Data()) }
+            return
+        }
         let stripped = decoded.hasPrefix("/vibe-improve/") ? String(decoded.dropFirst("/vibe-improve/".count)) : String(decoded.drop(while: { $0 == "/" }))
         let relative = stripped.isEmpty ? "index.html" : stripped
         let file = root.appendingPathComponent(relative).standardizedFileURL.resolvingSymlinksInPath()
         guard file.path.hasPrefix(root.path + "/"), let bytes = try? Data(contentsOf: file, options: .mappedIfSafe) else { reply(connection, code: "404 Not Found", data: Data()); return }
-        let types = ["html":"text/html; charset=utf-8", "js":"text/javascript; charset=utf-8", "css":"text/css; charset=utf-8", "json":"application/json", "png":"image/png", "jpg":"image/jpeg", "svg":"image/svg+xml", "mp4":"video/mp4", "otf":"font/otf", "woff2":"font/woff2"]
+        let types = ["html":"text/html; charset=utf-8", "js":"text/javascript; charset=utf-8", "mjs":"text/javascript; charset=utf-8", "wasm":"application/wasm", "woff":"font/woff", "ttf":"font/ttf", "css":"text/css; charset=utf-8", "json":"application/json", "png":"image/png", "jpg":"image/jpeg", "svg":"image/svg+xml", "mp4":"video/mp4", "otf":"font/otf", "woff2":"font/woff2"]
         var extra = ["Content-Type": types[file.pathExtension] ?? "application/octet-stream", "Accept-Ranges":"bytes"]
         var body = bytes
         var code = "200 OK"
@@ -104,16 +118,28 @@ final class AssetServer {
         extra["Content-Length"] = String(body.count)
         reply(connection, code: code, data: pieces[0] == "HEAD" ? Data() : body, headers: extra)
     }
-    private func reply(_ connection: NWConnection, code: String, data: Data, headers: [String: String] = [:]) {
+    private func reply(_ connection: NWConnection, code: String, data: Data, headers: [String: String] = [:], stream: LessonPreviewStream? = nil) {
         var fields = headers
         if fields["Content-Length"] == nil { fields["Content-Length"] = String(data.count) }
         fields["Connection"] = "close"
         fields["X-Content-Type-Options"] = "nosniff"
         fields["Cache-Control"] = "no-store"
-        fields["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; media-src 'self' blob:; connect-src 'self' https://*.tcloudbasegateway.com https://*.tcb-api.tencentcloudapi.com https://*.tcloudbase.com https://*.tcb.qcloud.la https://*.tencentcloudapi.com; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
+        if fields["Content-Security-Policy"] == nil { fields["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; media-src 'self' blob:; connect-src 'self' https://*.tcloudbasegateway.com https://*.tcb-api.tencentcloudapi.com https://*.tcloudbase.com https://*.tcb.qcloud.la https://*.tencentcloudapi.com; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'" }
         let head = "HTTP/1.1 \(code)\r\n" + fields.map { "\($0.key): \($0.value)\r\n" }.joined() + "\r\n"
         var result = Data(head.utf8); result.append(data)
-        connection.send(content: result, completion: .contentProcessed { _ in connection.cancel() })
+        connection.send(content: result, completion: .contentProcessed { [weak self] error in
+            guard error == nil, let stream, let self else { stream?.close(); connection.cancel(); return }
+            self.sendPreview(connection, stream: stream)
+        })
+    }
+    private func sendPreview(_ connection: NWConnection, stream: LessonPreviewStream) {
+        do {
+            guard let chunk = try stream.next() else { stream.close(); connection.cancel(); return }
+            connection.send(content: chunk, completion: .contentProcessed { [weak self] error in
+                guard error == nil, let self else { stream.close(); connection.cancel(); return }
+                self.sendPreview(connection, stream: stream)
+            })
+        } catch { stream.close(); connection.cancel() }
     }
 }
 
@@ -171,6 +197,37 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             return try attachments.read(file, project: id)
         },log:{event,code,details in diagnosticLog.record(event,level:event.hasSuffix("failed") ? "warn":"info",resultCode:code,diagnostic:details)})
     }()
+    lazy var lessonStore: LessonStore? = {
+        guard let planning = planningStore, let projects = projectStore, let library = resourceLibrary else { return nil }
+        return try? LessonStore(runtime: runtimeFiles, context: { identity in
+            _ = try projects.projectWorkspace(for: identity.projectId)
+            guard let state = try planning.read(projectID: identity.projectId),
+                  let route = state["routeDraft"] as? [String: Any], route["id"] as? String == identity.routeId,
+                  let revision = route["revision"] as? Int, state["confirmedRevision"] as? Int == revision,
+                  let chapters = route["chapters"] as? [[String: Any]],
+                  let chapter = chapters.first(where: { ($0["nodes"] as? [[String: Any]] ?? []).contains(where: { $0["id"] as? String == identity.nodeId }) }),
+                  let node = (chapter["nodes"] as? [[String: Any]])?.first(where: { $0["id"] as? String == identity.nodeId })
+            else { throw LessonError.target }
+            let progress = try planning.learningProgress(projectID: identity.projectId, routeID: identity.routeId, revision: revision)
+            var result: [String: Any] = ["route": route, "chapter": chapter, "node": node,
+                                         "notebookResetRevision": progress["notebookResetRevision"] ?? 0]
+            if let choice = state["agentChoice"] { result["agentChoice"] = choice }
+            return result
+        }, resource: { identity, ref in
+            let item = try library.item(identity.projectId, ref: ref)
+            guard !item.removed, item.draftID == nil else { throw LessonError.resource }
+            return item
+        })
+    }()
+    lazy var lessonPreview: LessonPreviewStore? = lessonStore.map { LessonPreviewStore(store: $0) }
+    lazy var lessonAgent: LessonAgentManager? = {
+        guard let agents = agentManager, let store = lessonStore, let resources = resourceLibrary, let runner = planningAgent else { return nil }
+        return LessonAgentManager(agents: agents, runtime: runtimeFiles, readContext: { identity, revision in
+            try store.agentContext(identity, expectedRevision: revision)
+        }, validateOptions: { project, options in
+            try runner.validateOptions(projectID: project, options: options)
+        }, resources: resources)
+    }()
     lazy var resourceBridge: ResourceBridge? = {
         guard let library = resourceLibrary, let planning = planningStore else { return nil }
         let coordinator = planningCoordinator
@@ -219,7 +276,11 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         NSApplication.shared.activate(ignoringOtherApps: true)
         makeMenus()
         guard let root = Bundle.main.resourceURL?.appendingPathComponent("web") else { return }
-        server = AssetServer(root: root)
+        let preview = lessonPreview
+        server = AssetServer(root: root, lessonPreview: { token, range, head in
+            guard let preview else { throw LessonError.preview }
+            return try preview.response(token, range: range, head: head)
+        })
         do {
             try server.start { [weak self] port in
                 diagnosticLog.record("native.server.ready")
@@ -296,6 +357,7 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
               projectPayloadFits(action, body),
               let store = projectStore else { replyHandler(nil, "PROJECT_STORAGE_UNAVAILABLE"); return }
         let value = body["value"] as? [String: Any] ?? [:]
+        if action.hasPrefix("lesson."){handleLesson(action,value:value,replyHandler:replyHandler);return}
         if action.hasPrefix("planning."){handlePlanning(action,value:value,replyHandler:replyHandler);return}
         if action.hasPrefix("route."){handleRoutePreparation(action,value:value,replyHandler:replyHandler);return}
         if action.hasPrefix("resources.") {
@@ -364,7 +426,45 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             measured["value"]=value
         }
         guard let bytes=try? JSONSerialization.data(withJSONObject:measured) else{return false}
-        return bytes.count<=(action.hasPrefix("planning.") ? 2_097_152:65_536)
+        return bytes.count<=((action.hasPrefix("planning.") || action.hasPrefix("lesson.")) ? 2_162_688:65_536)
+    }
+    private func handleLesson(_ action: String, value: [String: Any], replyHandler: @escaping (Any?, String?) -> Void) {
+        guard let store = lessonStore else { replyHandler(nil, LessonError.storage.rawValue); return }
+        projectQueue.async { [self] in
+            do {
+                let result: Any
+                if action.hasPrefix("lesson.agent.") {
+                    guard let agent = lessonAgent else { throw LessonError.storage }
+                    result = try agent.handle(action: action, payload: value)
+                } else {
+                    let identity = try LessonIdentity(value)
+                    let identityKeys: Set<String> = ["projectId", "routeId", "nodeId"]
+                    switch action {
+                    case "lesson.read":
+                        guard Set(value.keys) == identityKeys else { throw LessonError.invalid }
+                        result = try store.read(identity)
+                    case "lesson.save":
+                        guard Set(value.keys) == identityKeys.union(["expectedRevision", "workspace"]),
+                              let number = value["expectedRevision"] as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+                              let revision = value["expectedRevision"] as? Int, let document = value["workspace"] as? [String: Any]
+                        else { throw LessonError.invalid }
+                        result = try store.save(identity, expectedRevision: revision, workspace: document)
+                    case "lesson.preview":
+                        guard Set(value.keys) == identityKeys.union(["ref"]), let fields = value["ref"] as? [String: String],
+                              Set(fields.keys) == ["id", "version"], let id = fields["id"], let version = fields["version"],
+                              UUID(uuidString: id) != nil, UUID(uuidString: version) != nil, let preview = lessonPreview
+                        else { throw LessonError.invalid }
+                        result = try preview.issue(identity, ref: ResourceSelection(id: id, version: version))
+                    default: throw LessonError.invalid
+                    }
+                }
+                DispatchQueue.main.async { replyHandler(result, nil) }
+            } catch {
+                let code = (error as? LessonError)?.rawValue ?? (error as? LessonAgentError)?.rawValue ?? (error as? PlanningAgentError)?.rawValue ?? (error as? AgentError)?.rawValue ?? LessonError.storage.rawValue
+                diagnosticLog.record("native.lesson.failed", level: "warn", resultCode: code)
+                DispatchQueue.main.async { replyHandler(nil, code) }
+            }
+        }
     }
     private func handlePlanning(_ action:String,value:[String:Any],replyHandler:@escaping(Any?,String?)->Void){
         guard let coordinator=planningCoordinator else{replyHandler(nil,PlanningError.storage.rawValue);return}
@@ -453,7 +553,7 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     private func isAllowed(_ url: URL) -> Bool {
         LocalClientOrigin(port: port).permits(url)
     }
-    func applicationWillTerminate(_ notification: Notification) { planningAgent?.shutdown();agentManager?.shutdown() }
+    func applicationWillTerminate(_ notification: Notification) { lessonAgent?.shutdown();planningAgent?.shutdown();agentManager?.shutdown() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }
 let app = NSApplication.shared

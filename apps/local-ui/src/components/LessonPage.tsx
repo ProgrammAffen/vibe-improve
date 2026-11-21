@@ -1,14 +1,15 @@
-import {ArrowLeft, Check, Clock3} from 'lucide-react';
-import {useEffect, useRef} from 'react';
+import {lazy, Suspense, useEffect, useRef} from 'react';
+import {ArrowLeft, Clock3} from 'lucide-react';
 import type {RouteChapter, RouteNode} from '../../../../packages/domain/route-validation.mjs';
-import {assessmentAnswer} from '../../../../packages/domain/assessment.mjs';
 import {translate, type Language} from '../i18n';
 import BackHomeButton from './BackHomeButton';
 import GameButton from './GameButton';
-import {LessonBackpack} from './ResourceAttachments';
+import LegacyLessonContent from './LegacyLessonContent';
 import './lesson-page.css';
 
-type Props = {
+const NotebookLesson = lazy(() => import('./NotebookLesson'));
+
+export type LessonPageProps = {
   chapter: RouteChapter;
   node: RouteNode;
   language: Language;
@@ -17,57 +18,36 @@ type Props = {
   completed: boolean;
   busy: boolean;
   error: string;
-  onComplete: () => void;
+  onComplete: () => void | Promise<void>;
   onMap: () => void;
   onHome: () => void;
 };
 
-export default function LessonPage({chapter, node, language, projectId, routeId, completed, busy, error, onComplete, onMap, onHome}: Props) {
-  const t = (zh: string, en: string) => translate(language, zh, en);
+function LegacyLesson({chapter, node, language, error, onMap, onHome}: LessonPageProps) {
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), [node.id]);
-
+  const t = (zh: string, en: string) => translate(language, zh, en);
   return <section className="lesson-page">
     <nav className="lesson-navigation" aria-label={t('课程导航', 'Lesson navigation')}>
       <BackHomeButton language={language} onClick={onHome}/>
       <GameButton variant="secondary" leadingIcon={<ArrowLeft/>} onClick={onMap}>{t('返回地图', 'Back to map')}</GameButton>
     </nav>
     <article className="lesson-sheet">
-      <header>
-        <p className="lesson-chapter">{chapter.title}</p>
-        <h1 ref={title} tabIndex={-1}>{node.title}</h1>
+      <header><p className="lesson-chapter">{chapter.title}</p><h1 ref={title} tabIndex={-1}>{node.title}</h1>
         <span className="lesson-duration"><Clock3 aria-hidden="true"/>{t(`${node.estimatedMinutes} 分钟`, `${node.estimatedMinutes} min`)}</span>
-        <span className="lesson-requirement">{node.requirement==='optional'?t('选学','Elective'):t('必学','Required')}</span>
+        <span className="lesson-requirement">{node.requirement === 'optional' ? t('选学', 'Elective') : t('必学', 'Required')}</span>
       </header>
-      <section>
-        <h2>{t('学习目标', 'Learning goals')}</h2>
-        <ul>{node.objectives.map(objective => <li key={objective.id}>{objective.description}</li>)}</ul>
-      </section>
-      {projectId && routeId && <LessonBackpack projectId={projectId} scope={{routeId, nodeId: node.id}} chapterId={chapter.id} language={language}/>}
-      {!!node.activities?.length && <section>
-        <h2>{t('学习活动', 'Learning activities')}</h2>
-        <ol>{node.activities.map((activity, index) => <li key={index}>{activity}</li>)}</ol>
-      </section>}
-      {node.assessment && <section className="lesson-assessment">
-        <h2>{t('验收测验', 'Assessment quiz')}</h2>
-        <p className="lesson-assessment-text">{node.assessment.task}</p>
-        <details key={node.id} className="lesson-assessment-answer">
-          <summary>{t('查看测验答案／评判标准', 'Show quiz answers / grading criteria')}</summary>
-          <p className="lesson-assessment-text">{assessmentAnswer(node.assessment,language)}</p>
-        </details>
-      </section>}
-      {node.review && <section className="lesson-review">
-        <h2>{t('复习内容', 'Review content')}</h2>
-        <p>{node.review.content}</p>
-        <h3>{t('回答正确的指标', 'Criteria for a correct answer')}</h3>
-        <ul>{node.review.passCriteria.map((criterion, index) => <li key={index}>{criterion}</li>)}</ul>
-      </section>}
-      <footer>
-        {error && <p role="alert" className="lesson-error">{error}</p>}
-        {completed
-          ? <span className="lesson-complete" role="status"><Check aria-hidden="true"/>{t('已自评完成', 'Self-assessed complete')}</span>
-          : <GameButton disabled={busy} onClick={onComplete}>{busy ? t('保存中…', 'Saving…') : t('自评完成', 'Mark complete')}</GameButton>}
-      </footer>
+      <section><h2>{t('学习目标', 'Learning goals')}</h2><ul>{node.objectives.map(objective => <li key={objective.id}>{objective.description}</li>)}</ul></section>
+      {!!node.activities?.length && <section><h2>{t('学习活动', 'Learning activities')}</h2><ol>{node.activities.map((activity, index) => <li key={index}>{activity}</li>)}</ol></section>}
+      <LegacyLessonContent node={node} language={language}/>
+      {error && <p role="alert" className="lesson-error">{error}</p>}
     </article>
   </section>;
+}
+
+export default function LessonPage(props: LessonPageProps) {
+  if (!props.projectId || !props.routeId) return <LegacyLesson {...props}/>;
+  return <Suspense fallback={<section className="lesson-page"><p role="status">{translate(props.language, '正在打开小节…', 'Opening lesson…')}</p></section>}>
+    <NotebookLesson {...props} projectId={props.projectId} routeId={props.routeId}/>
+  </Suspense>;
 }

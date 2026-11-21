@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vibe-improve:lesson-storage:1",
+  "title": "Private native lesson notebook storage envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "storageVersion",
+    "notebookResetRevision",
+    "workspace"
+  ],
+  "properties": {
+    "storageVersion": {
+      "const": 1
+    },
+    "notebookResetRevision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 999999999
+    },
+    "workspace": {
+      "$ref": "lesson-workspace.schema.json"
+    }
+  }
+}

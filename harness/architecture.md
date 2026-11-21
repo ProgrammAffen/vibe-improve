@@ -92,6 +92,8 @@ macOS桌面应用管理的运行数据固定在`~/Library/Application Support/Vi
 
 小节补充资料沿用原生资料库的 `lessons:[{routeId,nodeId}]` 独立存储，不修改路线正文或学习记录。新添文件和链接以无摘录的 `attachment` 状态保存，读取清单或重启不调度解析。`resources.attachLesson` 只接收当前项目内已保存的版本引用及真实小节作用域，复用已有资料并原子检查去重与名额；编辑态允许关联已落盘但尚未确认的路线小节，学习态继续要求确认修订。旧解析资料与规划阶段的关联继续读取，主动重新加入规划草稿才启动未解析附件的解析。
 
+小节工作台按 [工作台与磁盘信封契约](../contracts/lesson-workspace.md) 保存，业务形状和原生信封分别见 [workspace schema](../contracts/lesson-workspace.schema.json) 与 [storage schema](../contracts/lesson-storage.schema.json)。原生使用 `projects/lessons/<projectId>/<route-node SHA256>.json` 原子文件，浏览器使用独立 IndexedDB；共用领域验证器和工作台修订保护。路线清空学习记录时原子提交 notebookResetRevision，工作台读写前清空旧正文、公式、笔记与问答，保留资料及链接；旧窗口和晚到 AI 响应不可重新写回。
+
 ## 同步边界（后续）
 
 - 本地先提交，使用 outbox 上传已授权数据；云端分配游标，按 `eventId` 去重。不同设备不共享 SQLite 文件。

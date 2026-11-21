@@ -1,6 +1,7 @@
 import {mkdir, copyFile, readFile, rm} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {preparePdfResources} from './package-editor-resources.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const {assets} = JSON.parse(await readFile(join(root, 'assets/manifest.json'), 'utf8'));
@@ -36,4 +37,5 @@ for (const file of files) {
   await copyFile(join(root, 'assets', file), output);
 }
 await readFile(join(root, 'cloud/public-license-key.json'));
+await preparePdfResources(root, join(root, 'tmp/build/public'));
 console.log(`Prepared ${files.length} approved assets.`);

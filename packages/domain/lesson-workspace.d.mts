@@ -1,0 +1,16 @@
+export type LessonIdentity = {projectId: string; routeId: string; nodeId: string};
+export type LessonEditorContent = {type?: string; attrs?: Record<string, any>; content?: LessonEditorContent[]; marks?: {type: string; attrs?: Record<string, any>; [key: string]: any}[]; text?: string; [key: string]: any};
+export type LessonSource = {quote: string; page?: number; startMs?: number; endMs?: number};
+export type LessonMessage = {id: string; role: 'user'|'assistant'; text: string; status?: 'pending'|'complete'|'incomplete'};
+export type LessonRecord = {id: string; kind: 'note'|'question'; title: string; content?: LessonEditorContent; source?: LessonSource; references?: {blockId: string; source: LessonSource}[]; messages: LessonMessage[]; collapsed: boolean};
+export type LessonBlock = {id: string; kind: 'text'|'math'|'resource'|'link'; content?: LessonEditorContent; latex?: string; resource?: {id: string; version: string}; url?: string; title?: string; collapsed: boolean; records: LessonRecord[]};
+export type LessonWorkspace = LessonIdentity & {schemaVersion: 1; revision: number; blocks: LessonBlock[]};
+export const LESSON_MAX_BYTES: number;
+export const LESSON_MAX_BLOCKS: number;
+export function validateLessonIdentity(value: unknown): LessonIdentity;
+export function lessonURL(value: unknown): string;
+export function validateLessonWorkspace(value: unknown, identity?: LessonIdentity): LessonWorkspace;
+export function emptyLessonWorkspace(identity: LessonIdentity): LessonWorkspace;
+export function nextLessonWorkspace(current: unknown, identity: LessonIdentity, expectedRevision: number, proposed: unknown): LessonWorkspace;
+export function recoverLessonWorkspace(value: unknown, identity?: LessonIdentity): LessonWorkspace;
+export function resetLessonWorkspace(value: unknown, identity?: LessonIdentity): LessonWorkspace;

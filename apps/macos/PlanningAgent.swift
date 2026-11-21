@@ -618,7 +618,7 @@ final class PlanningAgentManager {
     }
 }
 
-private final class PlanningAgentTransport {
+final class PlanningAgentTransport {
     private static let handshakeTimeout:TimeInterval=25
     private let launch:AgentSessionLaunch,options:[String:Any],process=Process(),input=Pipe(),output=Pipe(),errorPipe=Pipe()
     private let condition=NSCondition(),writeLock=NSLock()
@@ -627,6 +627,7 @@ private final class PlanningAgentTransport {
     private let progress:(String,Int)->Void
     private let preview:(String)->Void
     private var replyStream=PlanningReplyStream()
+    private var lessonStream:LessonTextStream?
     private var idleDeadline:TimeInterval?
     private let idleTimeout:TimeInterval
     private let webSearch: Bool
@@ -641,7 +642,14 @@ private final class PlanningAgentTransport {
         self.progress=progress
         self.preview=preview
     }
-    private func replyDelta(_ text:String,reset:Bool=false){if reset{replyStream=PlanningReplyStream()};preview(replyStream.append(text))}
+    private func replyDelta(_ text:String,reset:Bool=false,key:String="response"){
+        if lessonStream != nil {
+            preview(lessonStream!.update(key:key,text:text,append:!reset))
+            if lessonStream!.overflowed{condition.lock();readError = .tooLarge;condition.broadcast();condition.unlock();stop()}
+            return
+        }
+        if reset{replyStream=PlanningReplyStream()};preview(replyStream.append(text))
+    }
     private func activity(_ stage:String,characters:Int=0){idleDeadline=ProcessInfo.processInfo.systemUptime+idleTimeout;progress(stage,characters)}
     private func checkCancellation()throws{
         condition.lock();defer{condition.unlock()}
@@ -764,6 +772,20 @@ private final class PlanningAgentTransport {
         guard text.utf8.count <= 96_000 else { throw PlanningAgentError.tooLarge }
         return text
     }
+    // Learning conversations deliberately do not use the route JSON envelope.
+    func performLesson(systemPrompt:String,requestPrompt:String,attachments:[PlanningChatAttachment]=[])throws->String{
+        lessonStream=LessonTextStream()
+        do {
+            let text=try exchange(systemPrompt:systemPrompt,requestPrompt:requestPrompt,attachments:attachments)
+            try checkCancellation()
+            guard text.utf8.count<=1024*1024,!lessonStream!.overflowed else{throw PlanningAgentError.tooLarge}
+            let result=lessonStream!.finalize(text)
+            guard !lessonStream!.overflowed else{throw PlanningAgentError.tooLarge}
+            return result
+        }catch let timeout as PlanningAgentWaitTimeout{
+            progress(timeout.rawValue,0);throw PlanningAgentError.timeout
+        }
+    }
     private func exchange(systemPrompt:String,requestPrompt:String,attachments:[PlanningChatAttachment]=[])throws->String{
         var content:[[String:Any]]=[["type":"text","text":requestPrompt]]
         if !attachments.isEmpty {
@@ -847,7 +869,7 @@ private final class PlanningAgentTransport {
             }
             guard let method=message["method"] as? String,let parameters=message["params"] as? [String:Any] else{continue}
             if stage>=2,parameters["threadId"] as? String==threadID,turnID==nil || parameters["turnId"] as? String==turnID,let delta=parameters["delta"] as? String,!delta.isEmpty {
-                if method=="item/agentMessage/delta",let itemID=parameters["itemId"] as? String{activity("generating",characters:delta.utf16.count);replyDelta(delta,reset:previewItemID != itemID);previewItemID=itemID}
+                if method=="item/agentMessage/delta",let itemID=parameters["itemId"] as? String{activity("generating",characters:delta.utf16.count);replyDelta(delta,reset:previewItemID != itemID,key:itemID);previewItemID=itemID}
                 if ["item/reasoning/summaryTextDelta","item/reasoning/textDelta"].contains(method){activity("thinking",characters:delta.utf16.count)}
             }
             if method=="item/started" || method=="item/completed",let item=parameters["item"] as? [String:Any] {
@@ -857,7 +879,7 @@ private final class PlanningAgentTransport {
             }
             if method=="item/completed",stage>=2,parameters["threadId"] as? String==threadID,turnID==nil || parameters["turnId"] as? String==nil || parameters["turnId"] as? String==turnID,let item=parameters["item"] as? [String:Any],item["type"] as? String=="agentMessage",let text=item["text"] as? String,!text.isEmpty{
                 if finalText != text{activity("receiving")}
-                finalText=text;replyDelta(text,reset:true)
+                finalText=text;replyDelta(text,reset:true,key:(item["id"] as? String) ?? previewItemID ?? "response")
             }
             if method=="error"{throw Self.classifyJSON(parameters,fallback:.failed)}
             if method=="turn/completed" {
@@ -920,13 +942,13 @@ private final class PlanningAgentTransport {
                     if block["type"] as? String=="text"{
                         let text=block["text"] as? String ?? ""
                         if !text.isEmpty{activity("generating",characters:text.utf16.count)}
-                        replyDelta(text,reset:true)
+                        replyDelta(text,reset:true,key:"block-\(event["index"] as? Int ?? 0)")
                     }else if block["type"] as? String=="thinking",let thinking=block["thinking"] as? String,!thinking.isEmpty{
                         activity("thinking",characters:thinking.utf16.count)
                     }
                 }
                 if event["type"] as? String=="content_block_delta",let delta=event["delta"] as? [String:Any] {
-                    if delta["type"] as? String=="text_delta",let text=delta["text"] as? String,!text.isEmpty{activity("generating",characters:text.utf16.count);replyDelta(text)}
+                    if delta["type"] as? String=="text_delta",let text=delta["text"] as? String,!text.isEmpty{activity("generating",characters:text.utf16.count);replyDelta(text,key:"block-\(event["index"] as? Int ?? 0)")}
                     if delta["type"] as? String=="thinking_delta",let text=delta["thinking"] as? String,!text.isEmpty{activity("thinking",characters:text.utf16.count)}
                 }
             case "assistant":
@@ -934,7 +956,7 @@ private final class PlanningAgentTransport {
                 let text=content.compactMap{$0["type"] as? String=="text" ? $0["text"] as? String:nil}.joined()
                 if !text.isEmpty,text != assistant{activity("receiving")}
                 assistant=text
-                replyDelta(assistant,reset:true)
+                if lessonStream != nil{preview(lessonStream!.finalize(assistant))}else{replyDelta(assistant,reset:true)}
             case "user" where webSearch && initialized:
                 if let body = message["message"] as? [String: Any], let content = body["content"] as? [[String: Any]] {
                     for block in content where block["type"] as? String == "tool_result" { noteStreamSearchResult(block) }
@@ -980,6 +1002,31 @@ private final class PlanningAgentTransport {
         if ["network","econn","enotfound","dns","connection reset","fetch failed","connection refused","failed to connect"].contains(where:text.contains){return .network}
         if ["permission denied","operation not permitted","sandbox denied"].contains(where:text.contains){return .permission}
         return fallback
+    }
+}
+
+// Retain separate assistant messages and text blocks instead of replacing a
+// completed paragraph when a provider starts its next message.
+struct LessonTextStream {
+    private var order:[String]=[],parts:[String:String]=[:]
+    private(set) var overflowed=false
+    mutating func update(key:String,text:String,append:Bool)->String{
+        let old=parts[key] ?? ""
+        let next=append ? old+text : (old.hasPrefix(text) ? old:text)
+        guard !overflowed,order.count<4096,content.utf8.count-old.utf8.count+next.utf8.count+2<=1024*1024 else{overflowed=true;return content}
+        if parts[key]==nil{order.append(key)}
+        parts[key]=next
+        return content
+    }
+    var content:String{order.compactMap{parts[$0]}.filter{!$0.isEmpty}.joined(separator:"\n\n")}
+    mutating func finalize(_ text:String)->String{
+        let current=content
+        if text.isEmpty || text==current || text==order.last.flatMap({parts[$0]}) || current.hasPrefix(text){return current}
+        if current.isEmpty || text.hasPrefix(current) || text==order.compactMap({parts[$0]}).joined(){
+            guard text.utf8.count<=1024*1024 else{overflowed=true;return current};order=["final"];parts=["final":text];return text
+        }
+        if !current.contains(text){return update(key:"final",text:text,append:false)}
+        return content
     }
 }
 

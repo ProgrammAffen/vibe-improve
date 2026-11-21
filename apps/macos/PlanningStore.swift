@@ -24,6 +24,7 @@ final class PlanningStore {
         var skippedReasons: [String: String]?
         var startedNodeIds: Set<String>?
         var progressRevision: Int?
+        var notebookResetRevision: Int?
 
         var studiedNodeIds: Set<String> { completedNodeIds.union(startedNodeIds ?? []) }
         var revision: Int { progressRevision ?? 0 }
@@ -87,7 +88,8 @@ final class PlanningStore {
             return LearningProgress(routeId: routeID, completedNodeIds: [])
         }
         let progress = try JSONDecoder().decode(LearningProgress.self, from: data)
-        guard progress.routeId == routeID, progress.revision >= 0, progress.revision < 1_000_000_000 else { throw PlanningError.storage }
+        guard progress.routeId == routeID, progress.revision >= 0, progress.revision < 1_000_000_000,
+              (progress.notebookResetRevision ?? 0) >= 0, (progress.notebookResetRevision ?? 0) <= progress.revision else { throw PlanningError.storage }
         return progress
     }
     private func protectStudiedLessons(_ projectID: String, previous: [String: Any]?, next: [String: Any]?) throws {
@@ -128,6 +130,7 @@ final class PlanningStore {
                     started.removeAll()
                     completed.removeAll()
                     skipped.removeAll()
+                    progress.notebookResetRevision = progress.revision + 1
                     changed = true
                 } else {
                     guard state["confirmedRevision"] as? Int == revision else { throw PlanningError.conflict }
@@ -168,6 +171,7 @@ final class PlanningStore {
             }
             return [
                 "progressRevision": progress.revision,
+                "notebookResetRevision": progress.notebookResetRevision ?? 0,
                 "recordedNodeCount": started.union(skipped.keys).count,
                 "startedNodeIds": started.intersection(ids).sorted(),
                 "completedNodeIds": completed.intersection(ids).sorted(),

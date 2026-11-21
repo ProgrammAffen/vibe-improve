@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent} from 'react';
+import {lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent} from 'react';
 import service from './api';
 import Field from './components/Field';
 import GameButton from './components/GameButton';
@@ -14,7 +14,7 @@ import {confirmedRoute, learningService, prerequisiteMet, type LearningProgress}
 import {recordedNodes} from './routes/learning-record';
 import PlanningPage from './components/PlanningPage';
 import AdventureMap from './components/AdventureMap';
-import LessonPage from './components/LessonPage';
+const LessonPage = lazy(() => import('./components/LessonPage'));
 import {planningError, planningService, type PlanningEntry} from './planning/service';
 import type {RouteDocument} from '../../../packages/domain/route-validation.mjs';
 import {Info, Mail, TriangleAlert} from 'lucide-react';
@@ -377,6 +377,7 @@ export default function App() {
         <li>{t(`已开始（含已完成）${progress.startedNodeIds.size} 节`, `${progress.startedNodeIds.size} started (including completed)`)}</li>
         <li>{t(`已自评完成 ${progress.completedNodeIds.size} 节`, `${progress.completedNodeIds.size} self-assessed as complete`)}</li>
         <li>{t(`已跳过及原因 ${progress.skippedReasons.size} 节`, `${progress.skippedReasons.size} skipped, including reasons`)}</li>
+        <li>{t('学习正文、公式、笔记与问答也会清空；资料、链接及原文件保留。', 'Lesson text, formulas, notes and conversations will also be cleared. Resources, links and original files are retained.')}</li>
         {archived > 0 && <li>{t(`已从路线移除的历史小节 ${archived} 节`, `${archived} previously removed lessons`)}</li>}
       </ul>
       {lessons.length > 0 && <details className="learning-reset-lessons">
@@ -423,9 +424,9 @@ export default function App() {
     if (page === 'lesson' && lessonId && learningProgress) {
       const chapter = route.chapters.find(item => item.nodes.some(node => node.id === lessonId));
       const node = chapter?.nodes.find(item => item.id === lessonId);
-      if (chapter && node) return <LessonPage key={route.id + ':' + node.id} chapter={chapter} node={node} language={language} projectId={project.id} routeId={route.id} completed={learningProgress.completedNodeIds.has(node.id)}
+      if (chapter && node) return <Suspense fallback={<section className="lesson-page"><p role="status">{t('正在打开小节…', 'Opening lesson…')}</p></section>}><LessonPage key={route.id + ':' + node.id} chapter={chapter} node={node} language={language} projectId={project.id} routeId={route.id} completed={learningProgress.completedNodeIds.has(node.id)}
         busy={learningBusy} error={learningError ? t('保存失败，请重试。', 'Could not save progress. Try again.') : ''}
-        onComplete={() => void completeLesson()} onMap={() => navigate('map')} onHome={() => navigate('home')}/>;
+        onComplete={completeLesson} onMap={() => navigate('map')} onHome={() => navigate('home')}/></Suspense>;
     }
     if (!learningProgress) return <section className="lesson-page">
       <nav className="lesson-navigation"><BackHomeButton language={language} onClick={() => navigate('home')}/></nav>

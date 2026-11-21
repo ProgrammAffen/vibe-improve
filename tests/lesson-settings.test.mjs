@@ -104,6 +104,15 @@ precondition(nodes[1]["requirement"] as? String=="optional");precondition((nodes
 var changed=restored,changedChapters=chapters,changedNodes=nodes
 changedNodes[0]["requirement"]="optional";changedChapters[0]["nodes"]=changedNodes;changed["chapters"]=changedChapters
 do{_ = try reopened.saveEditor(projectID:id,route:changed,expectedRevision:loaded["revision"] as! Int);preconditionFailure("Modified studied settings")}catch PlanningError.studiedLessonLocked{}
+let cleared=try reopened.learningProgress(projectID:id,routeID:"synthetic",revision:revision,change:.reset,expectedProgressRevision:started["progressRevision"] as! Int)
+precondition(cleared["notebookResetRevision"] as? Int == cleared["progressRevision"] as? Int)
+precondition(cleared["recordedNodeCount"] as? Int == 0)
+let afterReset=try store().learningProgress(projectID:id,routeID:"synthetic",revision:revision)
+precondition(afterReset["notebookResetRevision"] as? Int == cleared["notebookResetRevision"] as? Int)
+let restarted=try reopened.learningProgress(projectID:id,routeID:"synthetic",revision:revision,change:.start("a"),expectedProgressRevision:cleared["progressRevision"] as! Int)
+precondition(restarted["progressRevision"] as! Int > restarted["notebookResetRevision"] as! Int)
+precondition(restarted["notebookResetRevision"] as? Int == cleared["notebookResetRevision"] as? Int)
+do{_ = try reopened.learningProgress(projectID:id,routeID:"synthetic",revision:revision,change:.reset,expectedProgressRevision:started["progressRevision"] as! Int);preconditionFailure("Stale clearing epoch accepted")}catch PlanningError.conflict{}
 print("Native lesson settings verified")
 `);
   const compile = spawnSync('/usr/bin/swiftc',['-module-cache-path','tmp/cache/swift','-framework','JavaScriptCore','apps/macos/RuntimeDirectory.swift','apps/macos/PlanningStore.swift',source,'-o',binary],{encoding:'utf8',timeout:150_000});

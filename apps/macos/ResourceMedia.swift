@@ -4,7 +4,7 @@ import AVKit
 import PDFKit
 
 enum ResourceMedia {
-    static func embeddedCaptions(_ url: URL) -> ResourceExtraction? {
+    static func embeddedCaptions(_ url: URL, within ranges: [ResourceLocation]? = nil) -> ResourceExtraction? {
         guard ["mp4", "m4v", "mov"].contains(url.pathExtension.lowercased()) else { return nil }
         let asset = AVURLAsset(url: url)
         let tracks = loadMedia { try await asset.loadTracks(withMediaType: .subtitle) + asset.loadTracks(withMediaType: .text) } ?? []
@@ -33,7 +33,9 @@ enum ResourceMedia {
                 let length = Int(bytes[0]) * 256 + Int(bytes[1])
                 guard length > 0, length <= size - 2, let text = ResourceExtractors.decoded(Data(bytes[2..<(length + 2)])) else { continue }
                 let location = ResourceLocation(kind: "time", start: Int(startTime * 1000), end: Int((startTime + duration) * 1000))
-                cues.append((location, text))
+                if ranges == nil || ranges!.contains(where: { location.start <= ($0.end ?? $0.start) && (location.end ?? location.start) >= $0.start }) {
+                    cues.append((location, text))
+                }
             }
             let partial = reader.status != .completed
             reader.cancelReading()
