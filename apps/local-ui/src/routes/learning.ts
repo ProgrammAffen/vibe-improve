@@ -53,7 +53,7 @@ async function progress(projectId: string, route: RouteDocument, change?: Learni
       switch (change.kind) {
         case 'skip': {
           const reason = change.reason.trim();
-          if (!reason || reason.length > MAX_SKIP_REASON_LENGTH) throw new Error('PLANNING_INVALID');
+          if (reason.length > MAX_SKIP_REASON_LENGTH) throw new Error('PLANNING_INVALID');
           if (completed) throw new Error('PLANNING_CONFLICT');
           if (history.skippedReasons.has(node.id)) return currentProgress(history, ids);
           history.skippedReasons.set(node.id, reason);
@@ -64,9 +64,10 @@ async function progress(projectId: string, route: RouteDocument, change?: Learni
           history.startedNodeIds.add(node.id);
           break;
         case 'complete':
-          if (completed) return currentProgress(history, ids);
+          if (completed && !history.skippedReasons.has(node.id)) return currentProgress(history, ids);
           if (!history.startedNodeIds.has(node.id)) throw new Error('PLANNING_CONFLICT');
           history.completedNodeIds.add(node.id);
+          history.skippedReasons.delete(node.id);
           break;
       }
       history.progressRevision = nextProgressRevision(history.progressRevision);

@@ -11,7 +11,6 @@ import AgentSelectionPage from './components/AgentSelectionPage';
 import RouteSourcePage from './components/RouteSourcePage';
 import {routeService} from './routes/service';
 import {confirmedRoute, learningService, prerequisiteMet, type LearningProgress} from './routes/learning';
-import {recordedNodes} from './routes/learning-record';
 import PlanningPage from './components/PlanningPage';
 import AdventureMap from './components/AdventureMap';
 const LessonPage = lazy(() => import('./components/LessonPage'));
@@ -27,7 +26,6 @@ import './dialogs.css';
 type Snapshot = Awaited<ReturnType<typeof service.getSnapshot>>;
 type Page = 'home' | 'settings' | 'account' | 'projects' | 'new-project' | 'agents' | 'route-source' | 'planning' | 'map' | 'lesson';
 type Adventure = {projectId: string; route: RouteDocument};
-type LearningReset = {adventure: Adventure; progress: LearningProgress; fromMap: boolean};
 type AuthMode = 'login' | 'register' | 'verify' | 'forgot' | 'reset' | 'change';
 type NativeBridge = {preferences?: Record<string, unknown>; setPreferences?: (value: Record<string, unknown>) => void; quit?: () => void};
 const ASSET = import.meta.env.BASE_URL + 'assets/';
@@ -71,9 +69,6 @@ export default function App() {
   const [learningError, setLearningError] = useState(false);
   const [learningBusy, setLearningBusy] = useState(false);
   const [learningReadAttempt, setLearningReadAttempt] = useState(0);
-  const [learningRefresh, setLearningRefresh] = useState(0);
-  const [learningReset, setLearningReset] = useState<LearningReset | null>(null);
-  const [resetError, setResetError] = useState('');
   const projectRequest = useRef(0);
   const changingProgress = useRef(false);
   const adventureRef = useRef(adventure);
@@ -153,12 +148,6 @@ export default function App() {
   }, [snapshot?.reauthRequired]);
 
   useEffect(() => {setRedeemOpen(false); setActivationCode('');}, [user?.id]);
-
-  useEffect(() => {
-    if (learningReset && !changingProgress.current
-        && (selectedProject?.id !== learningReset.adventure.projectId
-          || page !== (learningReset.fromMap ? 'map' : 'planning'))) setLearningReset(null);
-  }, [learningReset, page, selectedProject?.id]);
 
   useEffect(() => {
     if (!adventure) return;
@@ -321,77 +310,6 @@ export default function App() {
     navigate('planning');
   }
 
-  function requestLearningReset(session: Adventure, progress: LearningProgress, fromMap: boolean) {
-    if (changingProgress.current || progress.recordedNodeCount === 0) return;
-    setResetError('');
-    setLearningReset({adventure: session, progress, fromMap});
-  }
-
-  async function confirmLearningReset() {
-    if (!learningReset || changingProgress.current) return;
-    const {adventure: session, progress, fromMap} = learningReset;
-    if (selectedProject?.id !== session.projectId || page !== (fromMap ? 'map' : 'planning')) return;
-    changingProgress.current = true;
-    setLearningBusy(true);
-    setResetError('');
-    try {
-      const result = await learningService.reset(session.projectId, session.route, progress.progressRevision);
-      if (adventureRef.current === session) setLearningProgress(result);
-      setLearningReset(null);
-      setLearningRefresh(value => value + 1);
-      if (fromMap && adventureRef.current === session && initialPage() === 'map') editRoute();
-    } catch (cause) {
-      const conflict = ['PLANNING_CONFLICT', 'PLANNING_BUSY'].includes(planningError(cause));
-      setResetError(conflict
-        ? t('路线或学习记录已更新。请关闭此窗口并重新读取。', 'The route or progress changed. Close this dialog and reload.')
-        : t('无法清空学习记录，请重试。', 'Could not clear learning records. Try again.'));
-      if (conflict) {
-        setLearningReadAttempt(value => value + 1);
-        setLearningRefresh(value => value + 1);
-      }
-    } finally {
-      changingProgress.current = false;
-      setLearningBusy(false);
-    }
-  }
-
-  function renderLearningReset() {
-    if (!learningReset) return null;
-    const {adventure: session, progress} = learningReset;
-    const affected = recordedNodes(progress);
-    const lessons = session.route.chapters.flatMap(chapter => chapter.nodes
-      .filter(node => affected.has(node.id)).map(node => ({id: node.id, title: node.title, chapter: chapter.title})));
-    const archived = progress.recordedNodeCount - lessons.length;
-    const routeTitle = session.route.title || selectedProject?.name || t('当前路线', 'Current route');
-    const close = () => {if (!changingProgress.current) setLearningReset(null);};
-    return <Modal title={t('清空整条路线的学习记录', 'Clear all learning records')} closeLabel={t('关闭', 'Close')} onClose={close}
-      busy={learningBusy} className="confirmation-dialog learning-reset-dialog">
-      <div className="confirmation-message">
-        <TriangleAlert className="notice-icon warning-icon" aria-hidden="true" focusable="false"/>
-        <p className="confirmation-copy">{t(
-          `「${routeTitle}」中 ${progress.recordedNodeCount} 个小节的学习记录将永久清除，进度归零，原路线可重新编辑。`,
-          `Learning records for ${progress.recordedNodeCount} lessons in “${routeTitle}” will be cleared permanently. Progress will reset, and you can edit the route.`,
-        )}</p>
-      </div>
-      <ul className="learning-reset-counts">
-        <li>{t(`已开始（含已完成）${progress.startedNodeIds.size} 节`, `${progress.startedNodeIds.size} started (including completed)`)}</li>
-        <li>{t(`已自评完成 ${progress.completedNodeIds.size} 节`, `${progress.completedNodeIds.size} self-assessed as complete`)}</li>
-        <li>{t(`已跳过及原因 ${progress.skippedReasons.size} 节`, `${progress.skippedReasons.size} skipped, including reasons`)}</li>
-        <li>{t('学习正文、公式、笔记与问答也会清空；资料、链接及原文件保留。', 'Lesson text, formulas, notes and conversations will also be cleared. Resources, links and original files are retained.')}</li>
-        {archived > 0 && <li>{t(`已从路线移除的历史小节 ${archived} 节`, `${archived} previously removed lessons`)}</li>}
-      </ul>
-      {lessons.length > 0 && <details className="learning-reset-lessons">
-        <summary>{t('查看受影响的小节', 'View affected lessons')}</summary>
-        <ul>{lessons.map(lesson => <li key={lesson.id}>{lesson.chapter} · {lesson.title}</li>)}</ul>
-      </details>}
-      {resetError && <p className="form-message is-error" role="alert">{resetError}</p>}
-      <div className="confirmation-actions">
-        <GameButton variant="secondary" onClick={close} disabled={learningBusy}>{t('取消', 'Cancel')}</GameButton>
-        <GameButton variant="danger" onClick={() => void confirmLearningReset()} disabled={learningBusy}>{t('确认清空', 'Clear records')}</GameButton>
-      </div>
-    </Modal>;
-  }
-
   function renderProjectFlow() {
     const list = <ProjectListPage language={language} onBack={() => navigate('home')} onNew={() => {
       setSelectedProject(null);
@@ -417,8 +335,7 @@ export default function App() {
       navigate('planning');
     }}/>;
     if (page === 'planning') return <PlanningPage key={project.id + planningEntry} language={language} project={project} entryMode={planningEntry}
-      onPrevious={() => navigate('route-source')} onHome={() => navigate('home')} onConfirmed={route => openMap(project.id, route)}
-      learningRefresh={learningRefresh} onResetLearning={(route, progress) => requestLearningReset({projectId: project.id, route}, progress, false)}/>;
+      onPrevious={() => navigate('route-source')} onHome={() => navigate('home')} onConfirmed={route => openMap(project.id, route)}/>;
     if (!adventure || adventure.projectId !== project.id) return list;
     const {route} = adventure;
     if (page === 'lesson' && lessonId && learningProgress) {
@@ -439,8 +356,7 @@ export default function App() {
     return <AdventureMap key={project.id + ':' + route.id} route={route} language={language} initialNodeId={lessonId}
       completedNodeIds={learningProgress.completedNodeIds} skippedReasons={learningProgress.skippedReasons}
       onStartLesson={startLesson} startPending={learningBusy} startError={learningError ? t('无法记录开始学习，请重试。', 'Could not start the lesson. Try again.') : ''}
-      onSkipLesson={skipLesson} onBack={() => navigate('home')} onEdit={editRoute}
-      onResetLearning={learningProgress.recordedNodeCount > 0 ? () => requestLearningReset(adventure, learningProgress, true) : undefined}/>;
+      onSkipLesson={skipLesson} onBack={() => navigate('home')} onEdit={editRoute}/>;
   }
 
   async function run(action: () => Promise<unknown>, completed?: () => void) {
@@ -607,7 +523,6 @@ export default function App() {
     {snapshot?.bindingPrompt && user && !auth && !removeDevice && !redeemOpen && <Modal title={t('绑定当前设备', 'Link this device')} closeLabel={t('关闭', 'Close')} onClose={() => service.dismissDeviceBinding()} busy={busy} className="device-binding-dialog"><div className="confirmation-message"><Info className="notice-icon info-icon" aria-hidden="true" focusable="false" /><p className="confirmation-copy">{t('是否将当前设备绑定到此账户？', 'Link this device to your account?')}</p></div><p className="binding-capacity">{t('已绑定设备', 'Linked devices')} {snapshot.bindingPrompt.used} / {snapshot.bindingPrompt.maximum}</p>{warning && <p className="form-message is-error" role="alert">{warning}</p>}<div className="confirmation-actions"><GameButton variant="secondary" onClick={() => service.dismissDeviceBinding()} disabled={busy}>{t('暂不绑定', 'Not now')}</GameButton><GameButton onClick={() => run(() => service.bindDevice())} disabled={busy}>{t('确认绑定', 'Link device')}</GameButton></div></Modal>}
     {removeDevice && <Modal title={t('移除设备', 'Remove device')} closeLabel={t('关闭', 'Close')} onClose={() => setRemoveDevice(null)} busy={busy}><div className="confirmation-message"><TriangleAlert className="notice-icon warning-icon" aria-hidden="true" focusable="false" /><p className="confirmation-copy">{t('移除后，该设备将失去授权。学习数据仍保留。', 'This device will lose access to the license. Learning data stays intact.')}</p></div>{warning && <p className="form-message is-error" role="alert">{warning}</p>}<div className="confirmation-actions"><GameButton variant="secondary" onClick={() => setRemoveDevice(null)} disabled={busy}>{t('取消', 'Cancel')}</GameButton><GameButton variant="danger" onClick={() => run(() => service.revokeDevice(removeDevice!), () => setRemoveDevice(null))} disabled={busy}>{t('确认移除', 'Remove device')}</GameButton></div></Modal>}
     {featureNotice && <Modal title={featureNotice === 'new' ? t('开始新项目', 'New Quest') : featureNotice === 'load' ? t('加载项目', 'Load Quest') : t('退出', 'Exit')} closeLabel={t('关闭', 'Close')} onClose={() => setFeatureNotice(null)}><div className="confirmation-message">{featureNotice !== 'exit' && <Info className="notice-icon info-icon" aria-hidden="true" focusable="false" />}<p className="confirmation-copy">{featureNotice === 'exit' ? t('退出 Vibe Improve？', 'Exit Vibe Improve?') : t('此功能尚未接入。', 'This feature is not connected yet.')}</p></div><div className="confirmation-actions">{featureNotice === 'exit' ? <><GameButton variant="secondary" onClick={() => setFeatureNotice(null)}>{t('取消', 'Cancel')}</GameButton><GameButton variant="danger" onClick={() => {const native = nativeBridge(); if (native?.quit) native.quit(); else window.close(); setFeatureNotice(null);}}>{t('退出', 'Exit')}</GameButton></> : <GameButton variant="secondary" onClick={() => setFeatureNotice(null)}>{t('返回', 'Back')}</GameButton>}</div></Modal>}
-    {renderLearningReset()}
   </main>;
 }
 

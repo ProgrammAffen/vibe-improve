@@ -1,4 +1,4 @@
-import {useLayoutEffect, useRef, type CSSProperties} from 'react';
+import {useId, useLayoutEffect, useRef, type CSSProperties} from 'react';
 import {chapterSignBounds, createDirectionalPaw, createTerrainTrail, HEIGHT, markerArtwork, WIDTH, type MapNode, type MapPage, type PawPlacement} from '../../../../packages/map-layout/index.mjs';
 
 export type MapTerrain = MapPage['themeId'];
@@ -48,13 +48,31 @@ export function LandmarkArt({terrain, node, language}: {terrain: MapTerrain; nod
   </>;
 }
 
-export function PawArt({terrain, placement}: {terrain: MapTerrain; placement: PawPlacement}) {
+export function PawArt({terrain, placement, gold = false}: {terrain: MapTerrain; placement: PawPlacement; gold?: boolean}) {
   const host = useRef<HTMLSpanElement>(null);
+  const filterId = 'adventure-gold-paw-' + useId().replace(/[^A-Za-z0-9_-]/g, '');
   useLayoutEffect(() => {
     const paw = markerArtwork(terrain, 'paw');
-    host.current?.replaceChildren(createDirectionalPaw(mapAsset(`${paw.theme}-paw`), paw.bounds, placement));
-  }, [terrain, placement]);
-  return <span ref={host} className="adventure-marker-art" aria-hidden="true"/>;
+    const art = createDirectionalPaw(mapAsset(`${paw.theme}-paw`), paw.bounds, placement);
+    if (gold) {
+      const namespace = 'http://www.w3.org/2000/svg';
+      const filter = document.createElementNS(namespace, 'filter');
+      filter.id = filterId;
+      filter.setAttribute('color-interpolation-filters', 'sRGB');
+      const matrix = document.createElementNS(namespace, 'feColorMatrix');
+      // Recolor luminance, retaining the original polygon facets, rim and alpha.
+      matrix.setAttribute('type', 'matrix');
+      matrix.setAttribute('values', '0.153072 0.514944 0.051984 0 0.26 0.140316 0.472032 0.047652 0 0.15 0.06378 0.21456 0.02166 0 0.015 0 0 0 1 0');
+      filter.append(matrix);
+      art.querySelector('defs')?.append(filter);
+      const surface = document.createElementNS(namespace, 'g');
+      surface.setAttribute('filter', `url(#${filterId})`);
+      for (const child of Array.from(art.children)) if (child.tagName !== 'defs') surface.append(child);
+      art.append(surface);
+    }
+    host.current?.replaceChildren(art);
+  }, [terrain, placement, gold, filterId]);
+  return <span ref={host} className="adventure-marker-art adventure-paw-art" data-tone={gold ? 'gold' : 'terrain'} aria-hidden="true"/>;
 }
 
 export function FinishFlagArt() {

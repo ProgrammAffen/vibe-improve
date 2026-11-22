@@ -102,15 +102,6 @@
   min-inline-size: 0;
 }
 
-.adventure-map-reset.text-button {
-  --plain-rest-ink: #faf0ce;
-  --plain-hover-bg: #57432a;
-  padding: 4px 8px;
-  min-block-size: 32px;
-  font-size: 13px;
-  text-shadow: 0 1px 3px #211b14;
-}
-
 .adventure-map :is(.adventure-map-header, .adventure-map-pages) .game-button,
 .adventure-card .game-button {
   min-inline-size: 0;
@@ -305,7 +296,7 @@
   top: 5%;
   display: grid;
   place-items: center;
-  inline-size: clamp(14px, 1.9cqw, 32px);
+  inline-size: clamp(20px, 2.8cqw, 44px);
   aspect-ratio: 1;
   border: max(1px, .15cqw) solid #fff2c7;
   border-radius: 50%;
@@ -315,7 +306,8 @@
   pointer-events: none;
 }
 
-.adventure-marker-badge > svg { inline-size: 67%; block-size: 67%; stroke-width: 2.6px; }
+.adventure-marker-badge > svg { inline-size: 72%; block-size: 72%; stroke-width: 2.9px; }
+.adventure-marker[data-status='complete'] .adventure-marker-badge { background: #967022; }
 .adventure-marker[data-status='locked'] .adventure-marker-badge { background: #695d56; }
 .adventure-marker[data-status='current'] .adventure-marker-badge { background: #be812f; }
 .adventure-marker[data-status='skipped'] .adventure-marker-badge { background: #4f6379; }
@@ -438,19 +430,6 @@
 .adventure-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .adventure-card .adventure-card-start { min-inline-size: min(135px, 100%); }
 .adventure-card-skip-form { display: grid; gap: 7px; }
-.adventure-card-skip-form label { font-weight: 700; }
-.adventure-card-skip-form textarea {
-  inline-size: 100%;
-  min-block-size: 54px;
-  padding: 7px 9px;
-  border: 1px solid var(--map-rim);
-  border-radius: 6px;
-  background: #ffffff60;
-  color: inherit;
-  font: inherit;
-  resize: vertical;
-}
-.adventure-card-skip-form textarea:focus { background: color-mix(in srgb, var(--map-sheet) 88%, var(--map-accent)); }
 .adventure-card-skip-reason p { white-space: pre-wrap; }
 .adventure-card-skip-error { color: #842b25; }
 

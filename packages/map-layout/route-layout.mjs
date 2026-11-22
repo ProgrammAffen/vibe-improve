@@ -2,13 +2,12 @@ import { cubicSlopes, monotoneSlopes } from './curve-slopes.mjs';
 import { chapterSignBounds } from './chapter-sign.mjs';
 import { newThemes, originalThemes } from './map-themes.mjs';
 import { curvePoint, pathRecord, placeRouteMarkers, routeMarkerGap } from './route-spacing.mjs';
-import { randomRouteCurves } from './random-curves.mjs';
+import { randomRouteCurves, forwardRouteCurves } from './random-curves.mjs';
 
 export const WIDTH = 1672;
 export const HEIGHT = 941;
-export const MAX_PAGE_NODES = 10;
-const MIN_PAGE_NODES = 9;
-const DEFAULT_MARKER_GAP = 140;
+export const MAX_PAGE_NODES = 9;
+const MIN_PAGE_NODES = 8;
 const LAST_ANCHOR_ROW = 790;
 const FIRST_ANCHOR_ROW = 240;
 const SIDE_INSET = 205;
@@ -49,7 +48,7 @@ const themes = [...originalThemes, ...newThemes];
 function planTurnCounts(count, seed) {
   const rng = random(seed), planned = [];
   while (planned.length < count) {
-    const choices = [3, 4, 5, 6, 7].filter(turns =>
+    const choices = [4, 5, 6, 7].filter(turns =>
       turns !== planned.at(-1) && turns !== planned[planned.length - themes.length]);
     planned.push(choices[Math.floor(rng() * choices.length)]);
   }
@@ -74,17 +73,22 @@ function buildNodes(chapters) {
 function comparePartitions(a, b) {
   return Number(a.shortfall > 0) - Number(b.shortfall > 0)
     || a.pageCount - b.pageCount
+    || a.shortfall - b.shortfall
     || a.splits - b.splits
-    || a.shortfall - b.shortfall;
+    || a.imbalance - b.imbalance;
 }
 
 function partition(nodes) {
   if (nodes.length <= MAX_PAGE_NODES) return [nodes];
 
+  // Balance modest routes instead of leaving one or two isolated lessons on a
+  // terminal page. Landmarks still stay with their first lesson.
+  const minimum = Math.min(MIN_PAGE_NODES, Math.floor(nodes.length / Math.ceil(nodes.length / MAX_PAGE_NODES)));
+
   const best = Array(nodes.length + 1);
-  best[nodes.length] = { pageCount: 0, splits: 0, shortfall: 0 };
+  best[nodes.length] = { pageCount: 0, splits: 0, shortfall: 0, imbalance:0 };
   for (let start = nodes.length - 1; start >= 0; start--) {
-    const first = Math.min(start + MIN_PAGE_NODES, nodes.length);
+    const first = Math.min(start + 2, nodes.length);
     const last = Math.min(start + MAX_PAGE_NODES, nodes.length);
     for (let end = last; end >= first; end--) {
       const suffix = best[end];
@@ -95,7 +99,8 @@ function partition(nodes) {
         end,
         pageCount: suffix.pageCount + 1,
         splits: suffix.splits + Number(continuation),
-        shortfall: Math.max(suffix.shortfall, MIN_PAGE_NODES - (end - start)),
+        shortfall: Math.max(suffix.shortfall, minimum - (end - start)),
+        imbalance: suffix.imbalance + (end - start) ** 2,
       };
       if (!best[start] || comparePartitions(candidate, best[start]) < 0) best[start] = candidate;
     }
@@ -212,6 +217,12 @@ function markerGaps(nodes, padding = 23) {
 }
 
 const sum = values => values.reduce((total, value) => total + value, 0);
+
+function opposedEndpoints(nodes) {
+  const first = nodes[0], last = nodes.at(-1);
+  return first.x <= 370 && first.x < last.x &&
+    (first.y <= 410 && last.y >= 660 || first.y >= 660 && last.y <= 410);
+}
 
 function profileHeight(knots, progress) {
   const at = Math.max(0, Math.min(knots.length - 1, progress * (knots.length - 1)));
@@ -495,13 +506,13 @@ function layoutQuality(nodes, paths, foldAt) {
     .39 * sharpestTurn - .24 * Math.max(0, bends - 2) - .18 * Math.max(0, steepestGrade - 1.45);
 }
 
-function layoutRandom(source, rng, themeId, previousShapes, maxGap, targetTurns) {
+function layoutRandom(source, rng, themeId, previousShapes, maxGap, targetTurns, forwardOnly = false) {
   let best;
   for (let attempt = 0; attempt < 192; attempt++) {
-    const guide = randomRouteCurves(rng, targetTurns, source.length);
+    const guide = forwardOnly || source.length <= 5 ? forwardRouteCurves(rng, source.length) : randomRouteCurves(rng, targetTurns, source.length);
     if (!curvesSeparated(guide.paths)) continue;
-    const positioned = placeRouteMarkers(source, guide.paths, themeId, maxGap);
-    if (!positioned || !positioned.nodes.every(node => markerOnTerrain(node, node.kind, themeId)) ||
+    const positioned = placeRouteMarkers(source, guide.paths, themeId);
+    if (!positioned || positioned.gap < 125 || !opposedEndpoints(positioned.nodes) || !positioned.nodes.every(node => markerOnTerrain(node, node.kind, themeId)) ||
         !markersFit(positioned.nodes, themeId) || !curvesFit(positioned.paths, positioned.nodes, themeId)) continue;
     const shape = fingerprint(positioned.paths);
     const novelty = previousShapes.length ? Math.min(...previousShapes.map(previous => shapeDistance(shape, previous))) : null;
@@ -556,7 +567,7 @@ function layoutPage(source, rng, themeId, previousShapes, exactPaths, maxGap = I
     const positioned = placeRouteMarkers(source, guide, themeId, maxGap);
     if (!positioned) continue;
     const { nodes, paths, gap } = positioned;
-    if (!nodes.every(node => markerOnTerrain(node, node.kind, themeId)) ||
+    if (gap < 125 || !opposedEndpoints(nodes) || !nodes.every(node => markerOnTerrain(node, node.kind, themeId)) ||
         !markersFit(nodes, themeId) || !curvesFit(paths, nodes, themeId)) continue;
     const quality = layoutQuality(nodes, maxGap < Infinity ? paths : guide, foldAt);
     const turnAfter = folded ? nodes.findIndex((node, index) => index > 0 && node.x < nodes[index - 1].x) : null;
@@ -576,35 +587,23 @@ function layoutPage(source, rng, themeId, previousShapes, exactPaths, maxGap = I
   return { nodes, paths, gap, attempts, novelty, fallback, foldAt, minimumNovelty, shape: fingerprint(paths) };
 }
 
-function pageGeometry(group, seed, themeId, maxGap, previousShapes = [], targetTurns = 4) {
+function pageGeometry(group, seed, themeId, maxGap, previousShapes = [], targetTurns = 4, forwardOnly = false) {
   if (group.length >= 2) {
-    for (let batch = 0; batch < 2; batch++) {
-      const generated = layoutRandom(group, random(mixSeed(seed, 40 + batch)), themeId, previousShapes, maxGap, targetTurns);
+    for (let batch = 0; batch < 3; batch++) {
+      const generated = layoutRandom(group, random(mixSeed(seed, 40 + batch)), themeId, previousShapes, maxGap, batch === 2 ? 7 : targetTurns, forwardOnly);
       if (generated) return generated;
     }
   }
-  for (let batch = 0; batch < MAX_BATCHES; batch++) {
+  for (let batch = 0; !forwardOnly && batch < MAX_BATCHES; batch++) {
     const layout = layoutPage(group, random(batch ? mixSeed(seed, batch) : seed), themeId, previousShapes, new Set(), maxGap);
     if (layout) return layout;
   }
   // A different turn budget can resolve a congested bend before relaxing novelty.
-  if (group.length >= MIN_PAGE_NODES) {
+  if (!forwardOnly && group.length >= MIN_PAGE_NODES) {
     const generated = layoutRandom(group, random(mixSeed(seed, 50)), themeId, previousShapes, maxGap, targetTurns === 4 ? 6 : 4);
     if (generated) return generated;
   }
-  // Keep the learning markers evenly spaced when a dense page cannot also
-  // reserve a full station for the decorative flag. Add a short curved tail
-  // instead, with the same terrain, collision and trail-clearance checks.
-  if (group.length > MAX_PAGE_NODES && group.at(-1).kind === 'finish') {
-    const source = group.slice(0, -1);
-    for (let batch = 0; batch < MAX_BATCHES; batch++) {
-      const layout = layoutPage(source, random(mixSeed(seed, MAX_BATCHES + batch)), themeId, [], new Set());
-      if (!layout) continue;
-      const extended = finishTail(layout, group.at(-1), themeId);
-      if (extended) return {...extended, shape: fingerprint(extended.paths)};
-    }
-  }
-  if (previousShapes.length) return pageGeometry(group, seed, themeId, maxGap, [], targetTurns);
+  if (previousShapes.length) return pageGeometry(group, seed, themeId, maxGap, [], targetTurns, forwardOnly);
   throw new Error('Could not generate a collision-free route map');
 }
 
@@ -618,7 +617,7 @@ function finishTail(layout, marker, themeId) {
       const end = rounded({x: last.x + Math.cos(angle + turn) * radius, y: last.y + Math.sin(angle + turn) * radius});
       const finish = {...marker, ...end};
       const nodes = [...layout.nodes, finish];
-      if (!markerOnTerrain(finish, finish.kind, themeId) || !markersFit(nodes, themeId)) continue;
+      if (finish.x < last.x + 35 || !markerOnTerrain(finish, finish.kind, themeId) || !markersFit(nodes, themeId)) continue;
       const tail = {
         ...pathRecord(last.key, finish.key, {x: last.x, y: last.y},
           {x: last.x + tangent.x * radius / 3, y: last.y + tangent.y * radius / 3},
@@ -626,7 +625,7 @@ function finishTail(layout, marker, themeId) {
         leg: layout.nodes.length - 1,
       };
       const paths = [...layout.paths, tail];
-      if (curvesFit(paths, nodes, themeId)) return {...layout, nodes, paths, gap: routeMarkerGap(nodes, paths, themeId)};
+      if (curvesSeparated(paths) && curvesFit(paths, nodes, themeId)) return {...layout, nodes, paths};
     }
   }
   return null;
@@ -666,16 +665,22 @@ export function createRouteMapPages(route) {
     } : null;
     const terminal = pageIndex === groups.length - 1;
     const compact = terminal && group.length < MIN_PAGE_NODES;
-    const source = terminal ? [...group, {key: 'finish', kind: 'finish', ...MARKER.finish}] : group;
+    const source = group;
     let geometry;
     const layout = () => {
       if (geometry) return geometry;
-      const maxGap = compact ? pages[pageIndex - 1]?.spacing ?? DEFAULT_MARKER_GAP : Infinity;
+      const maxGap = Infinity;
       // Bounded, deterministic history keeps direct page jumps fast and makes
       // each page identical regardless of which page the user opened first.
       const blockStart = pageIndex - pageIndex % SHAPE_HISTORY_PAGES;
       const previousShapes = layouts.slice(blockStart, pageIndex).map(previous => previous().shape);
-      const positioned = pageGeometry(source, seed, themeId, maxGap, previousShapes, turnCounts[pageIndex]);
+      let positioned;
+      for (let attempt = 0; attempt < 24; attempt++) {
+        const candidate = pageGeometry(source, attempt ? mixSeed(seed, 80 + attempt) : seed, themeId, maxGap, previousShapes, turnCounts[pageIndex], compact);
+        positioned = terminal ? finishTail(candidate, {key:'finish',kind:'finish',...MARKER.finish}, themeId) : candidate;
+        if (positioned) break;
+      }
+      if (!positioned) throw new Error('Could not place the route finish');
       geometry = {
         ...positioned,
         nodes: terminal ? positioned.nodes.slice(0, -1) : positioned.nodes,

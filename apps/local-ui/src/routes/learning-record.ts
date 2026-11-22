@@ -39,8 +39,10 @@ export function parseProgress(value: unknown, max = MAX_ROUTE_NODES): LearningPr
     throw new Error('PLANNING_STORAGE_UNAVAILABLE');
   }
   const skipped = Object.entries(skippedReasons);
+  // The key records the skipped state. Empty values are new no-reason skips;
+  // retain nonempty legacy values without inventing an explanation.
   if (skipped.length > max || !skipped.every(([, reason]) => typeof reason === 'string'
-      && reason.trim().length > 0 && reason.length <= MAX_SKIP_REASON_LENGTH)) throw new Error('PLANNING_STORAGE_UNAVAILABLE');
+      && reason.length <= MAX_SKIP_REASON_LENGTH)) throw new Error('PLANNING_STORAGE_UNAVAILABLE');
   const result = {
     progressRevision, notebookResetRevision, recordedNodeCount: 0, startedNodeIds: new Set([...startedNodeIds, ...completedNodeIds]),
     completedNodeIds: new Set(completedNodeIds), skippedReasons: new Map<string, string>(skipped),

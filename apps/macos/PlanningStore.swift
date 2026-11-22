@@ -148,10 +148,11 @@ final class PlanningStore {
                         changed = started.insert(nodeID).inserted
                     case .complete:
                         guard started.contains(nodeID) else { throw PlanningError.conflict }
-                        changed = completed.insert(nodeID).inserted
+                        let wasSkipped = skipped.removeValue(forKey: nodeID) != nil
+                        changed = completed.insert(nodeID).inserted || wasSkipped
                     case .skip(_, let rawReason):
                         let reason = rawReason.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !reason.isEmpty, reason.utf16.count <= 240 else { throw PlanningError.invalid }
+                        guard reason.utf16.count <= 240 else { throw PlanningError.invalid }
                         guard !completed.contains(nodeID) else { throw PlanningError.conflict }
                         changed = skipped[nodeID] == nil
                         if changed { skipped[nodeID] = reason }

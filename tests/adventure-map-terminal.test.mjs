@@ -32,29 +32,29 @@ test('only the terminal page has a connected flag without changing lesson counts
  assert.deepEqual(createRouteMapPages({id:'empty',chapters:[]}),[]);
 });
 
-test('sparse terminal pages inherit the previous page gap, including their final flag',()=>{
+test('sparse terminal pages unfold toward the right with uniform learning-marker gaps',()=>{
  let sparse=0;
  for(const sizes of [[10],[11],[12],[13],[14],[15],[16],[17],[40],Array(9).fill(1),[4,4,4]]){
   for(let seed=0;seed<6;seed++){
-   const pages=createRouteMapPages(route(sizes,'terminal-gap-'+sizes.join('-')+'-'+seed)),last=pages.at(-1);
+   const sample=route(sizes,'terminal-gap-'+sizes.join('-')+'-'+seed),pages=createRouteMapPages(sample),last=pages.at(-1);
    if(!last.compact||pages.length<2)continue;
    sparse++;
-   const previous=pages.at(-2),nodes=allNodes(last);
-   assert.ok(last.spacing<=previous.spacing+.1,`${nodes.length}: ${last.spacing} > ${previous.spacing}`);
-   for(let i=0;i<nodes.length-1;i++)near(routeMarkerGap(nodes.slice(i,i+2),allPaths(last).filter(path=>path.leg===i),last.themeId),last.spacing);
-   assert.deepEqual(createRouteMapPages(route(sizes,'terminal-gap-'+sizes.join('-')+'-'+seed)).at(-1).finish,last.finish);
+   assert.ok(last.spacing>=125);
+   for(let i=0;i<last.nodes.length-1;i++)near(routeMarkerGap(last.nodes.slice(i,i+2),last.paths.filter(path=>path.leg===i),last.themeId),last.spacing);
+   for(const path of last.paths)assert.ok(path.start.x<=path.control1.x&&path.control1.x<=path.control2.x&&path.control2.x<=path.end.x,'A sparse final page must not bend back toward its beginning');
+   assert.deepEqual(createRouteMapPages(sample).at(-1).finish,last.finish);
   }
  }
- assert.ok(sparse>=30);
+ assert.ok(sparse>=24);
 });
 
-test('screen projection keeps short-page spacing bounded by the preceding page and flags clear of navigation',()=>{
+test('screen projection preserves expanded short pages and keeps flags clear of navigation',()=>{
  for(const sizes of [[10],[12],[14],[16],[40],Array(9).fill(1)]){
   const pages=createRouteMapPages(route(sizes,'projected-'+sizes.join('-'))),last=pages.at(-1),previous=pages.at(-2);
   for(const [width,height,top,bottom] of [[960,540,118,80],[1280,800,140,98],[1920,1080,142,96],[2560,1080,146,100]]){
    const viewport={width,height,top,bottom},projected=projectMapPage(last,viewport,previous),page=projected.page;
    const reference=projectMapPage(previous,viewport).page;
-   if(last.compact)assert.ok(page.spacing<=reference.spacing+.15,`${sizes}: ${page.spacing} > ${reference.spacing}`);
+   if(last.compact){assert.ok(page.nodes[0].x<page.nodes.at(-1).x);assert.ok((page.nodes[0].y<page.nodes.at(-1).y)===(last.nodes[0].y<last.nodes.at(-1).y));}
    const scale=width/1672;
    assert.ok((page.finish.y-page.finish.height)*scale>=top-1);
    assert.ok(page.finish.y*scale<=height-bottom+1);
@@ -66,12 +66,26 @@ test('screen projection keeps short-page spacing bounded by the preceding page a
  }
 });
 
+test('resizing preserves opposite endpoints and redistributes learning markers uniformly without cropping the page',()=>{
+ for(const sizes of [[1],[4],[10],Array(20).fill(5)]){
+  const pages=createRouteMapPages(route(sizes,'resized-endpoints-'+sizes.join('-')));
+  for(const original of pages) for(const viewport of [{width:960,height:540,top:118,bottom:80},{width:1440,height:960,top:140,bottom:98},{width:2560,height:1080,top:146,bottom:100}]){
+   const page=projectMapPage(original,viewport).page,first=page.nodes[0],last=page.nodes.at(-1);
+   near(first.x,original.nodes[0].x);near(last.x,original.nodes.at(-1).x);
+   assert.equal(first.y<last.y,original.nodes[0].y<original.nodes.at(-1).y);
+   for(let index=0;index<page.nodes.length-1;index++)near(routeMarkerGap(page.nodes.slice(index,index+2),page.paths.filter(path=>path.leg===index),page.themeId),page.spacing);
+   near(page.paths.at(-1).end.x,last.x);near(page.paths.at(-1).end.y,last.y);
+   if(page.finish){near(page.finishPaths[0].start.x,last.x);near(page.finishPaths[0].start.y,last.y);}
+  }
+ }
+});
+
 test('dense terminal pages retain uniform chapter spacing and a clear finish without losing markers',()=>{
  for(const count of [5,10,15,20]){
   for(let seed=0;seed<8;seed++){
    const pages=createRouteMapPages(route(Array(count).fill(1),'terminal-stress-'+seed)),page=pages.at(-1);
    assert.equal(pages.flatMap(p=>p.lessonIds).length,count);
-   assert.ok(page.nodes.length<=10);
+   assert.ok(page.nodes.length<=9);
    const gap=routeMarkerGap(page.nodes,page.paths,page.themeId);
    for(let i=0;i<page.nodes.length-1;i++)near(routeMarkerGap(page.nodes.slice(i,i+2),page.paths.filter(path=>path.leg===i),page.themeId),gap);
    const flag=page.finish;

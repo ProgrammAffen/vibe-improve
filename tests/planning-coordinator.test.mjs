@@ -133,7 +133,6 @@ do{_ = try skip("define-a-question","Already familiar");check(false,"unconfirmed
 manual=try call("planning.confirm",manualID,["expectedRevision":rev(manual)])
 do{_ = try complete("interpret-results");check(false,"unfinished prerequisite bypassed")}catch PlanningError.conflict{}
 do{_ = try skip("interpret-results","Already familiar");check(false,"locked lesson skipped")}catch PlanningError.conflict{}
-do{_ = try skip("define-a-question","   ");check(false,"empty skip reason accepted")}catch PlanningError.invalid{}
 do{_ = try skip("define-a-question",String(repeating:"a",count:241));check(false,"long skip reason accepted")}catch PlanningError.invalid{}
 let legacyRouteID=learningRoute["id"] as! String
 let legacyKey=SHA256.hash(data:Data(legacyRouteID.utf8)).map{String(format:"%02x",$0)}.joined()
@@ -187,6 +186,33 @@ let savedProgress=try call("planning.learning.read",manualID,learningIdentity)
 check(savedProgress["completedNodeIds"] as? [String]==["define-a-question","interpret-results"],"learning progress was lost on reopen")
 check((savedProgress["skippedReasons"] as? [String:String])?.isEmpty==true,"completed lesson still shows as skipped")
 check(savedProgress["recordedNodeCount"] as? Int==3,"inactive progress record was omitted from reset review")
+// New clients omit reasons entirely; the presence of a skip key is the state.
+let noReasonID="proj_12345678-1234-4234-8234-123456789abf"
+var noReasonPlan=try store.enter(projectID:noReasonID,provider:nil,locale:"en")
+var noReasonRoute=route
+noReasonRoute["id"]=(noReasonPlan["routeDraft"] as! [String:Any])["id"]
+noReasonPlan=try store.saveEditor(projectID:noReasonID,route:noReasonRoute,expectedRevision:rev(noReasonPlan))
+noReasonPlan=try store.confirmRoute(projectID:noReasonID,expectedRevision:rev(noReasonPlan))
+let noReasonSavedRoute=noReasonPlan["routeDraft"] as! [String:Any]
+let noReasonIdentity:[String:Any]=["routeId":noReasonSavedRoute["id"]!,"routeRevision":rev(noReasonSavedRoute)]
+var noReasonRequest=noReasonIdentity
+noReasonRequest["nodeId"]="define-a-question";noReasonRequest["progressRevision"]=0
+let noReasonSkipped=try call("planning.learning.skip",noReasonID,noReasonRequest)
+check(noReasonSkipped["skippedReasons"] as? [String:String]==["define-a-question":""],"no-reason skip invented a reason or was rejected")
+let noReasonReopened=try learningReopened.learningProgress(projectID:noReasonID,routeID:noReasonSavedRoute["id"] as! String,revision:rev(noReasonSavedRoute))
+check(noReasonReopened["skippedReasons"] as? [String:String]==["define-a-question":""],"empty skip state was lost after reopen")
+noReasonRequest["reason"]="";noReasonRequest["progressRevision"]=progressRevision(noReasonSkipped)
+let noReasonRepeated=try call("planning.learning.skip",noReasonID,noReasonRequest)
+check(progressRevision(noReasonRepeated)==progressRevision(noReasonSkipped),"empty skip was not idempotent")
+noReasonRequest.removeValue(forKey:"reason");noReasonRequest["nodeId"]="interpret-results"
+let noReasonDependent=try call("planning.learning.start",noReasonID,noReasonRequest)
+check(noReasonDependent["startedNodeIds"] as? [String]==["interpret-results"],"empty skipped prerequisite failed to unlock its dependent")
+noReasonRequest["nodeId"]="define-a-question";noReasonRequest["progressRevision"]=progressRevision(noReasonDependent)
+let noReasonStarted=try call("planning.learning.start",noReasonID,noReasonRequest)
+noReasonRequest["progressRevision"]=progressRevision(noReasonStarted)
+_ = try call("planning.learning.complete",noReasonID,noReasonRequest)
+let noReasonCompleted=try learningReopened.learningProgress(projectID:noReasonID,routeID:noReasonSavedRoute["id"] as! String,revision:rev(noReasonSavedRoute))
+check(noReasonCompleted["completedNodeIds"] as? [String]==["define-a-question"] && (noReasonCompleted["skippedReasons"] as? [String:String])?.isEmpty==true,"completed no-reason skip was not cleared")
 do{_ = try learningReopened.learningProgress(projectID:manualID,routeID:legacyRouteID,revision:rev(learningRoute));check(false,"stale route revision accepted")}catch PlanningError.conflict{}
 var reordered=manual["routeDraft"] as! [String:Any]
 reordered["chapters"]=Array((reordered["chapters"] as! [[String:Any]]).reversed())

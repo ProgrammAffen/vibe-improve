@@ -106,8 +106,9 @@ final class PlanningCoordinator {
                 } else if action == "planning.learning.complete" {
                     change = .complete(nodeID)
                 } else {
-                    expected.insert("reason")
-                    guard let reason = value["reason"] as? String else { throw PlanningError.invalid }
+                    if value["reason"] != nil { expected.insert("reason") }
+                    guard value["reason"] == nil || value["reason"] is String else { throw PlanningError.invalid }
+                    let reason = value["reason"] as? String ?? ""
                     change = .skip(nodeID, reason: reason)
                 }
             }

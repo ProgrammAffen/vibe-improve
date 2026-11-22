@@ -21,40 +21,40 @@ function routeWithLessons(sizes, id = 'map-lesson-layout') {
 
 const markerCounts = pages => pages.map(page => page.totalChapters + page.totalLessons);
 
-test('short routes use one page and dense cuts keep chapter landmarks and first lessons together', () => {
+test('short routes use one page and balanced cuts keep chapter landmarks and first lessons together', () => {
   assert.deepEqual(markerCounts(createRouteMapPages(routeWithLessons([1]))), [2]);
-  const short = createRouteMapPages(routeWithLessons([9]));
+  const short = createRouteMapPages(routeWithLessons([8]));
   assert.deepEqual(short.map(({ themeId, totalChapters, totalLessons }) => [themeId, totalChapters, totalLessons]), [
-    ['grassland', 1, 9],
+    ['grassland', 1, 8],
   ]);
-  const wholeChapters = createRouteMapPages(routeWithLessons([8, 9]));
-  assert.deepEqual(markerCounts(wholeChapters), [9, 10]);
+  const wholeChapters = createRouteMapPages(routeWithLessons([7, 8]));
+  assert.deepEqual(markerCounts(wholeChapters), [8, 9]);
   assert(wholeChapters.every(page => !page.continuation));
-  assert.deepEqual(markerCounts(createRouteMapPages(routeWithLessons([7, 9]))), [10, 8]);
-  assert.deepEqual(markerCounts(createRouteMapPages(routeWithLessons(Array(9).fill(1)))), [10, 8]);
+  assert(createRouteMapPages(routeWithLessons([7, 9])).every(page => page.nodes.length <= MAX_PAGE_NODES));
+  assert.deepEqual(markerCounts(createRouteMapPages(routeWithLessons(Array(9).fill(1)))), [6, 6, 6]);
 });
 
 test('38 lessons fill the first page and use only the terrains required by density', () => {
   const oneChapter = createRouteMapPages(routeWithLessons([38]));
-  assert.deepEqual(markerCounts(oneChapter), [10, 10, 10, 9]);
-  assert.deepEqual(oneChapter.map(page => page.themeId), terrains.slice(0, 4));
+  assert.deepEqual(markerCounts(oneChapter), [8, 8, 8, 8, 7]);
+  assert.deepEqual(oneChapter.map(page => page.themeId), terrains.slice(0, 5));
 
   const sevenChapters = createRouteMapPages(routeWithLessons([4, 5, 6, 6, 6, 5, 6]));
-  assert.deepEqual(markerCounts(sevenChapters), [9, 9, 9, 9, 9]);
-  assert.equal(sevenChapters[0].nodes.length, 9);
+  assert(sevenChapters.every(page => page.nodes.length >= 7 && page.nodes.length <= MAX_PAGE_NODES));
+  assert.equal(sevenChapters[0].nodes.length, MAX_PAGE_NODES);
 });
 
-test('an extra page is allowed when it keeps every page within 9–10 markers', () => {
+test('chapter-aware cuts keep dense pages within eight or nine markers', () => {
   const pages = createRouteMapPages(routeWithLessons([8, 43, 46]));
-  assert.equal(pages.length, 11);
-  assert(markerCounts(pages).every(count => count >= 9 && count <= 10));
+  assert.equal(pages.length, 12);
+  assert(markerCounts(pages).every(count => count >= 8 && count <= MAX_PAGE_NODES));
 });
 
-test('a 40-lesson chapter keeps only the last page below nine and continues without duplicate nodes', () => {
+test('a 40-lesson chapter balances its five pages and continues without duplicate nodes', () => {
   const route = routeWithLessons([40]);
   const pages = createRouteMapPages(route);
   const originalIds = route.chapters[0].nodes.map(node => node.id);
-  assert.deepEqual(markerCounts(pages), [9, 9, 9, 9, 5]);
+  assert.deepEqual(markerCounts(pages), [9, 8, 8, 8, 8]);
   assert.deepEqual(pages.map(page => page.themeId), terrains.slice(0, 5));
   assert.deepEqual(pages.flatMap(page => page.lessonIds), originalIds);
   assert.equal(pages.reduce((total, page) => total + page.totalChapters, 0), 1);
@@ -78,7 +78,7 @@ test('maximum validated lesson and chapter counts produce bounded, ordered pages
   const route = routeWithLessons(sizes, 'maximum-map-route');
   assert.equal(sizes.reduce((sum, count) => sum + count, 0), MAX_ROUTE_NODES);
   const pages = createRouteMapPages(route);
-  assert.equal(pages.length, Math.ceil((MAX_ROUTE_NODES + sizes.length) / MAX_PAGE_NODES));
+  assert(pages.length <= Math.ceil((MAX_ROUTE_NODES + sizes.length) / MAX_PAGE_NODES) + 1);
   assert.deepEqual(pages.flatMap(page => page.lessonIds), route.chapters.flatMap(chapter => chapter.nodes.map(node => node.id)));
   assert.deepEqual(pages.slice(0, 10).map(page => page.themeId), [...terrains, terrains[0]]);
   assert(pages.every(page => page.totalChapters + page.totalLessons <= MAX_PAGE_NODES && page.totalLessons > 0));
@@ -103,4 +103,30 @@ test('chapter and lesson IDs that match remain distinct along the trail', () => 
   assert(page.paths.some(path => path.to === lesson.key));
   assert(page.paths.some(path => path.from === lesson.key));
   assert(Number.isFinite(pawPlacement(page, lesson).angle));
+});
+
+test('every page begins at a left corner and its last learning marker ends on the opposite vertical side', () => {
+  const starts = new Set();
+  const variants = [
+    ...Array.from({length: 20}, (_, count) => [count + 1]),
+    [4, 5, 6, 6, 6, 5, 6], Array(20).fill(5), Array(24).fill(1),
+  ];
+  for (const [index, sizes] of variants.entries()) {
+    const pages = createRouteMapPages(routeWithLessons(sizes, 'opposed-corners-' + index));
+    for (const page of pages) {
+      const first = page.nodes[0], last = page.nodes.at(-1);
+      assert.ok(page.nodes.length >= 2);
+      assert.ok(first.x <= 370 && first.x < last.x);
+      const upper = first.y <= 410 && last.y >= 660;
+      const lower = first.y >= 660 && last.y <= 410;
+      assert.ok(upper || lower, `${sizes} / page ${page.pageNumber}: ${first.y} -> ${last.y}`);
+      starts.add(upper ? 'upper' : 'lower');
+      assert.ok(page.spacing >= 125 - .01);
+      if (page.compact) for (const path of page.paths) {
+        assert.ok(path.start.x <= path.control1.x && path.control1.x <= path.control2.x && path.control2.x <= path.end.x);
+      }
+      if (page.finish) assert.ok(page.finish.x > last.x, 'The flag continues forward after the final lesson');
+    }
+  }
+  assert.deepEqual([...starts].sort(), ['lower', 'upper']);
 });

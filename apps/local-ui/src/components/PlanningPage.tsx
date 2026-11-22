@@ -181,13 +181,11 @@ type PlanningPageProps={
  onPrevious:()=>void;
  onHome:()=>void;
  onConfirmed?:(route:RouteDocument)=>void;
- learningRefresh?:number;
- onResetLearning?:(route:RouteDocument,progress:LearningProgress)=>void;
 };
 
 type NewGenerationMode=Exclude<GenerationMode,'resume'>;
 
-export default function PlanningPage({language,project,entryMode='resume',onPrevious,onHome,onConfirmed,learningRefresh=0,onResetLearning}:PlanningPageProps){
+export default function PlanningPage({language,project,entryMode='resume',onPrevious,onHome,onConfirmed}:PlanningPageProps){
  const [state,setState]=useState<PlanningState|null>(null),[draft,setDraft]=useState<RouteDocument|null>(null),[dirty,setDirty]=useState(false),[busy,setBusy]=useState(true),[working,setWorking]=useState(false),[error,setError]=useState(''),[conversationError,setConversationError]=useState(''),[notice,setNotice]=useState(''),[workingLabel,setWorkingLabel]=useState<string|undefined>(),[partialReply,setPartialReply]=useState<string|undefined>(),[importReview,setImportReview]=useState<string|null>(null),[activity,setActivity]=useState<PlanningActivity|undefined>();
  const [removeImport,setRemoveImport]=useState<number|null>(null),[generationConfirmation,setGenerationConfirmation]=useState<NewGenerationMode|null>(null),[restartReview,setRestartReview]=useState(false),[reanswerReview,setReanswerReview]=useState<QuestionId|null>(null),[generationOpen,setGenerationOpen]=useState(false),[generationRunning,setGenerationRunning]=useState(false),[generationEntries,setGenerationEntries]=useState<GenerationEntry[]>([]),[generationError,setGenerationError]=useState('');
  const [routeGenerationStage,setRouteGenerationStage]=useState<GenerationStage>({phase:'prepare'});
@@ -203,7 +201,7 @@ export default function PlanningPage({language,project,entryMode='resume',onPrev
  const [progressRead,setProgressRead]=useState<{key:string;progress?:LearningProgress}>();
  const [progressRetry,setProgressRetry]=useState(0);
  const savedRoute=state?.routeDraft;
- const progressKey=onResetLearning&&savedRoute?JSON.stringify([project.id,savedRoute.id,savedRoute.revision,learningRefresh,progressRetry]):undefined;
+ const progressKey=savedRoute?JSON.stringify([project.id,savedRoute.id,savedRoute.revision,progressRetry]):undefined;
  const learningProgress=progressRead?.key===progressKey?progressRead?.progress:undefined;
  const learningRead=progressKey&&!learningProgress?(progressRead?.key===progressKey?'failed':'loading'):undefined;
  useEffect(()=>{
@@ -387,7 +385,6 @@ export default function PlanningPage({language,project,entryMode='resume',onPrev
  const savedGeneration=progress&&draftChange==='removed'?{...progress,resumable:false}:progress;
  return <>{state.step==='editor'&&draft?<RouteEditorSurface language={language} state={state} route={draft} busy={busy} working={working} workingLabel={workingLabel} partialReply={partialReply} partialProviderId={partialProviderId} activity={activity} dirty={dirty} error={error} conversationError={conversationError} notice={notice} onOptions={updateOptions} onProvider={updateProvider} onRoute={setRoute} onSave={()=>void action(async()=>{await save();setNotice(translate(language,'草稿已保存','Draft saved'))})} onConfirm={()=>void action(confirm)} onSend={(text,mentions,target,files)=>ai('edit',text,mentions,target,false,'new',[],files)} onCancel={cancel} onApply={()=>void action(async()=>{if(stateRef.current)accept(await planningService.applyProposal(stateRef.current))})} onDiscard={()=>void action(async()=>{if(stateRef.current)accept(await planningService.discardProposal(stateRef.current))})} onUndo={()=>void action(async()=>{const current=dirtyRef.current?await save():stateRef.current;if(current)accept(await planningService.undo(current))})} onRedo={()=>void action(async()=>{if(stateRef.current)accept(await planningService.redo(stateRef.current))})} onRemoveImport={()=>void action(async()=>{const route=await routeService.read(project.id);setRemoveImport(route.revision)})} onPrevious={previous} onHome={()=>leave(onHome)}
   studiedNodeIds={learningProgress?.startedNodeIds} learningRead={learningRead} onRetryLearning={()=>setProgressRetry(value=>value+1)}
-  onResetLearning={onResetLearning&&savedRoute&&learningProgress&&learningProgress.recordedNodeCount>0?()=>onResetLearning(savedRoute,learningProgress):undefined}
   renderMaterials={resources.enabled?(target,locked)=>{
     const items=attachmentsFrom(linkedTo(target),[...resources.items,...(materialData?.items??[])]);
     const onRemove=locked?undefined:(link:MaterialLink)=>void updateMaterial(target,link,false,link.segmentId);

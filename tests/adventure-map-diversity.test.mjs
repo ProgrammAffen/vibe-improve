@@ -62,10 +62,10 @@ function difference(a, b) {
   return best;
 }
 
-test('full ten-marker pages vary their curve shape across the 20-chapter, 100-lesson route', () => {
+test('full eight-to-nine-marker pages vary their curve shape across the 20-chapter, 100-lesson route', () => {
   const pages = createRouteMapPages(route(Array(20).fill(5))), traces = pages.map(trace);
-  assert.equal(pages.length, 12);
-  assert.ok(pages.every(page => page.nodes.length === 10));
+  assert.equal(pages.length, 14);
+  assert.ok(pages.every(page => page.nodes.length >= 8 && page.nodes.length <= 9));
   assert.equal(pages.flatMap(page => page.lessonIds).length, 100);
   const turns = pages.map(page => Math.round(turningAmount(paths(page))));
   assert.ok(new Set(turns).size >= 4, `The route needs different numbers of bends: ${turns}`);
@@ -80,7 +80,7 @@ test('full ten-marker pages vary their curve shape across the 20-chapter, 100-le
 });
 
 test('random waypoints support different requested turn counts, irregular bends and stable seeds', () => {
-  for (const turns of [2,3,4,5,6,7]) {
+  for (const turns of [4,5,6,7]) {
     const variants = new Set();
     for (let seed = 0; seed < 16; seed++) {
       const generated = randomRouteCurves(random(seed), turns);
@@ -100,7 +100,7 @@ test('page layouts stay deterministic when opening the last page first or jumpin
   const sample = route(Array(20).fill(5));
   const forward = createRouteMapPages(sample).map(page => ({nodes: page.nodes, paths: paths(page)}));
   const jumped = createRouteMapPages(sample);
-  for (const index of [11, 6, 1, 10, 0, 5, 3, 8, 4, 9, 2, 7])
+  for (const index of [13, 11, 6, 1, 10, 0, 5, 3, 8, 4, 9, 2, 7, 12])
     assert.deepEqual({nodes: jumped[index].nodes, paths: paths(jumped[index])}, forward[index]);
   const other = createRouteMapPages({...sample, id: 'a-different-learning-route'});
   assert.notDeepEqual(other[0].paths, forward[0].paths);

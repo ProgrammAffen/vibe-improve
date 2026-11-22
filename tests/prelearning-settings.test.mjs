@@ -24,7 +24,18 @@ const {RouteEditorSurface,LessonPage,LegacyLessonContent,renderToStaticMarkup,cr
 const project='proj_12345678-1234-4234-8234-123456789abc';
 const route=()=>({format:'vibe-improve.route',schemaVersion:2,id:'synthetic',revision:1,title:'Synthetic plan',locale:'en',sourceLanguage:'en',chapters:[{id:'chapter',title:'Tools',stageGoal:'Use a tool.',nodes:[{id:'lesson',title:'Tool input',objectives:[{id:'goal',description:'Choose valid input and explain its role.'}],prerequisites:[],estimatedMinutes:30}]}]});
 const no=()=>{};
-const editor=(state,language)=>renderToStaticMarkup(createElement(RouteEditorSurface,{state,route:state.routeDraft,language,onRoute:no,onSave:no,onConfirm:no,onSend:()=>false,onCancel:no,onApply:no,onDiscard:no,onUndo:no,onPrevious:no,onHome:no}));
+const editor=(state,language,extra={})=>renderToStaticMarkup(createElement(RouteEditorSurface,{state,route:state.routeDraft,language,onRoute:no,onSave:no,onConfirm:no,onSend:()=>false,onCancel:no,onApply:no,onDiscard:no,onUndo:no,onPrevious:no,onHome:no,...extra}));
+
+test('started lesson protection remains read only without a clear-records-and-edit action',()=>{
+ const state=createPlanning(project,'codex','en',route());
+ for(const language of ['zh-CN','en']){
+  const html=editor(state,language,{studiedNodeIds:new Set(['lesson']),onResetLearning:no});
+  assert.doesNotMatch(html,/清空学习记录并编辑|Clear progress &amp; edit|清空学习记录后可|Clear learning progress from/);
+  assert.match(html,language==='en'?/aria-description="Study started · Read only"/:/aria-description="已开始学习 · 只读"/);
+  assert.match(html,/readonly=""/i);
+  assert.match(html,language==='en'?/Study started · Read only/:/已开始学习 · 只读/);
+ }
+});
 
 test('planning settings expose requirement without premature quiz or review controls',()=>{
   const state=createPlanning(project,'codex','en',route());

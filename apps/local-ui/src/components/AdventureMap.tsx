@@ -1,11 +1,10 @@
-import {useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent} from 'react';
+import {useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowLeft, ArrowRight, Check, Clock3, LockKeyhole, MapPin, Pencil, SkipForward, X} from 'lucide-react';
 import type {RouteChapter, RouteDocument, RouteNode} from '../../../../packages/domain/route-validation.mjs';
 import {isRequiredLesson, learningPrerequisiteIds, learningProgressSummary} from '../../../../packages/domain/route-learning.mjs';
 import {createRouteMapPages, HEIGHT, pawPlacement, WIDTH, type MapNode} from '../../../../packages/map-layout/index.mjs';
 import {translate, type Language} from '../i18n';
-import {MAX_SKIP_REASON_LENGTH} from '../routes/learning';
 import BackHomeButton from './BackHomeButton';
 import GameButton, {GameButtonArt} from './GameButton';
 import GameSelect from './GameSelect';
@@ -20,7 +19,6 @@ type Props = {
   startPending?: boolean;
   startError?: string;
   onEdit: () => void;
-  onResetLearning?: () => void;
   onBack: () => void;
   initialNodeId?: string;
   currentNodeId?: string;
@@ -35,6 +33,22 @@ type Selection = {anchor: HTMLButtonElement; node: MapNode};
 type Placement = {x: number; y: number; point: number; side: 'left' | 'right' | 'above' | 'below'};
 const EMPTY = new Set<string>();
 const NO_SKIPS = new Map<string, string>();
+
+export function SkipLessonConfirmation({language, saving, failed, canSkip, onConfirm, onCancel}: {
+  language: Language; saving: boolean; failed: boolean; canSkip: boolean;
+  onConfirm: (event: FormEvent<HTMLFormElement>) => void; onCancel: () => void;
+}) {
+  const prompt = useRef<HTMLParagraphElement>(null);
+  useEffect(() => prompt.current?.focus({preventScroll: true}), []);
+  return <form className="adventure-card-skip-form" onSubmit={onConfirm}>
+    <p ref={prompt} tabIndex={-1}>{translate(language, '确定跳过本节吗？', 'Skip this lesson?')}</p>
+    {failed && <p className="adventure-card-skip-error" role="alert">{translate(language, '保存失败，请重试。', 'Could not save. Try again.')}</p>}
+    <div className="adventure-card-actions">
+      <GameButton variant="secondary" disabled={saving} onClick={onCancel}>{translate(language, '取消', 'Cancel')}</GameButton>
+      <GameButton type="submit" disabled={saving || !canSkip}>{saving ? translate(language, '保存中…', 'Saving…') : translate(language, '确认跳过', 'Confirm skip')}</GameButton>
+    </div>
+  </form>;
+}
 
 function locateCard(anchor: DOMRect, card: DOMRect): Placement {
   const margin = 10;
@@ -76,13 +90,10 @@ function LandmarkCard({selection, chapter, lesson, unmet, status, completed, ski
 }) {
   const card = useRef<HTMLElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
-  const reasonInput = useRef<HTMLTextAreaElement>(null);
   const skipSaving = useRef(false);
   const close = useRef(onClose);
-  const formId = useId();
   const [placement, setPlacement] = useState<Placement>();
   const [skipMode, setSkipMode] = useState<'view' | 'confirm' | 'saving'>('view');
-  const [reason, setReason] = useState('');
   const [skipFailed, setSkipFailed] = useState(false);
   const canSkip = !!onSkip && (status === 'current' || status === 'ready');
   const canStart = status === 'complete' || unmet.length === 0;
@@ -110,24 +121,21 @@ function LandmarkCard({selection, chapter, lesson, unmet, status, completed, ski
 
   const positioned = Boolean(placement);
   useEffect(() => { if (positioned) heading.current?.focus({preventScroll: true}); }, [positioned]);
-  useEffect(() => { if (skipMode === 'confirm') reasonInput.current?.focus(); }, [skipMode]);
 
   function dismissSkip() {
     setSkipMode('view');
-    setReason('');
     setSkipFailed(false);
     heading.current?.focus({preventScroll: true});
   }
 
   async function confirmSkip(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const trimmed = reason.trim();
-    if (!lesson || !onSkip || !canSkip || !trimmed || skipSaving.current) return;
+    if (!lesson || !onSkip || !canSkip || skipSaving.current) return;
     skipSaving.current = true;
     setSkipMode('saving');
     setSkipFailed(false);
     let saved = false;
-    try { saved = await onSkip(lesson.id, trimmed); }
+    try { saved = await onSkip(lesson.id, ''); }
     catch { saved = false; }
     finally { skipSaving.current = false; }
     if (saved) dismissSkip();
@@ -177,13 +185,7 @@ function LandmarkCard({selection, chapter, lesson, unmet, status, completed, ski
           <button className="adventure-card-close" aria-label={translate(language, '关闭', 'Close')} disabled={skipMode === 'saving' || startPending} onClick={() => onClose(true)}><X size={21}/></button>
         </header>
         <div className="adventure-card-details" tabIndex={0}>
-          {skipMode !== 'view' ? <form className="adventure-card-skip-form" id={formId} onSubmit={confirmSkip}>
-            <p id={formId + '-hint'}>{translate(language, '跳过会满足后续小节对本节的前置要求。补学并完成后计入进度。', 'Skipping satisfies this prerequisite. This lesson counts toward progress once completed.')}</p>
-            <label htmlFor={formId + '-reason'}>{translate(language, '跳过原因', 'Reason for skipping')}</label>
-            <textarea ref={reasonInput} id={formId + '-reason'} aria-describedby={formId + '-hint'} value={reason}
-              onChange={event => setReason(event.target.value)} rows={2} maxLength={MAX_SKIP_REASON_LENGTH} required disabled={skipMode === 'saving'}/>
-            {skipFailed && <p className="adventure-card-skip-error" role="alert">{translate(language, '保存失败，请重试。', 'Could not save. Try again.')}</p>}
-          </form> : lesson ? <>
+          {skipMode !== 'view' ? <SkipLessonConfirmation language={language} saving={skipMode === 'saving'} failed={skipFailed} canSkip={canSkip} onConfirm={confirmSkip} onCancel={dismissSkip}/> : lesson ? <>
             <p className="adventure-card-meta"><Clock3 size={16} aria-hidden="true"/>{translate(language, `${lesson.estimatedMinutes} 分钟`, `${lesson.estimatedMinutes} min`)}
               <span className="adventure-card-state">{isRequiredLesson(lesson)?translate(language, '必学', 'Required'):translate(language, '选学', 'Elective')}</span>
               {status === 'complete' && <span className="adventure-card-state"><Check size={16} aria-hidden="true"/>{translate(language, '已完成', 'Completed')}</span>}
@@ -208,18 +210,11 @@ function LandmarkCard({selection, chapter, lesson, unmet, status, completed, ski
             <p className="adventure-card-meta"><Check size={16} aria-hidden="true"/>{chapterProgress.optionalOnly ? translate(language, `选学 ${chapterProgress.completed} / ${chapterProgress.total} 节已完成`, `${chapterProgress.completed} / ${chapterProgress.total} elective lessons completed`) : translate(language, `必学 ${chapterProgress.completed} / ${chapterProgress.total} 节已完成`, `${chapterProgress.completed} / ${chapterProgress.total} required lessons completed`)}</p>
           </>}
         </div>
-        {lesson && <div className="adventure-card-actions">
-          {skipMode === 'view' ? <>
+        {lesson && skipMode === 'view' && <div className="adventure-card-actions">
             {canSkip && <GameButton variant="secondary" disabled={startPending} onClick={() => setSkipMode('confirm')}>{translate(language, '跳过本节', 'Skip lesson')}</GameButton>}
             <GameButton className="adventure-card-start" disabled={!canStart || startPending} onClick={() => onStart(lesson.id)}>
               {startPending ? translate(language, '正在开始…', 'Starting…') : status === 'skipped' ? translate(language, '补学本节', 'Study lesson') : translate(language, '开始学习', 'Start learning')}
             </GameButton>
-          </> : <>
-            <GameButton variant="secondary" disabled={skipMode === 'saving'} onClick={dismissSkip}>{translate(language, '取消', 'Cancel')}</GameButton>
-            <GameButton type="submit" form={formId} disabled={skipMode === 'saving' || !reason.trim() || !canSkip}>
-              {skipMode === 'saving' ? translate(language, '保存中…', 'Saving…') : translate(language, '确认跳过', 'Confirm skip')}
-            </GameButton>
-          </>}
         </div>}
       </div>
     </section>,
@@ -227,7 +222,7 @@ function LandmarkCard({selection, chapter, lesson, unmet, status, completed, ski
   );
 }
 
-export function AdventureMap({route, language, onStartLesson, startPending=false, startError, onEdit, onResetLearning, onBack, initialNodeId, currentNodeId, completedNodeIds = EMPTY, skippedReasons = NO_SKIPS, onSkipLesson}: Props) {
+export function AdventureMap({route, language, onStartLesson, startPending=false, startError, onEdit, onBack, initialNodeId, currentNodeId, completedNodeIds = EMPTY, skippedReasons = NO_SKIPS, onSkipLesson}: Props) {
   const {lessons, chapters} = useMemo(() => ({
     lessons: new Map(route.chapters.flatMap(chapter => chapter.nodes.map(node => [node.id, {chapter, node}] as const))),
     chapters: new Map(route.chapters.map(chapter => [chapter.id, chapter] as const)),
@@ -309,7 +304,6 @@ export function AdventureMap({route, language, onStartLesson, startPending=false
       </div>
       <div className="adventure-map-actions">
         <GameButton variant="secondary" leadingIcon={<Pencil/>} onClick={onEdit} disabled={startPending}>{translate(language, '编辑路线', 'Edit route')}</GameButton>
-        {onResetLearning&&<button type="button" className="text-button adventure-map-reset" onClick={onResetLearning} disabled={startPending}>{translate(language, '清空学习记录并编辑', 'Clear progress & edit')}</button>}
       </div>
     </header>
     {page ? <>
@@ -343,7 +337,7 @@ export function AdventureMap({route, language, onStartLesson, startPending=false
               }}>
               <span className="adventure-terrain-contact" aria-hidden="true"/>
               {chapter ? <LandmarkArt terrain={terrain} node={node} language={language}/>
-                : <PawArt terrain={terrain} placement={placement}/>}
+                : <PawArt terrain={terrain} placement={placement} gold={state === 'complete' || state === 'skipped'}/>}
               {state && state !== 'ready' && <span className="adventure-marker-badge" aria-hidden="true">
                 {state === 'complete' ? <Check/> : state === 'skipped' ? <SkipForward/> : state === 'locked' ? <LockKeyhole/> : <MapPin/>}
               </span>}
