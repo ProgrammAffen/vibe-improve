@@ -23,31 +23,36 @@ const markerCounts = pages => pages.map(page => page.totalChapters + page.totalL
 
 test('short routes use one page and balanced cuts keep chapter landmarks and first lessons together', () => {
   assert.deepEqual(markerCounts(createRouteMapPages(routeWithLessons([1]))), [2]);
-  const short = createRouteMapPages(routeWithLessons([8]));
+  const short = createRouteMapPages(routeWithLessons([9]));
   assert.deepEqual(short.map(({ themeId, totalChapters, totalLessons }) => [themeId, totalChapters, totalLessons]), [
-    ['grassland', 1, 8],
+    ['grassland', 1, 9],
   ]);
   const wholeChapters = createRouteMapPages(routeWithLessons([7, 8]));
   assert.deepEqual(markerCounts(wholeChapters), [8, 9]);
   assert(wholeChapters.every(page => !page.continuation));
   assert(createRouteMapPages(routeWithLessons([7, 9])).every(page => page.nodes.length <= MAX_PAGE_NODES));
-  assert.deepEqual(markerCounts(createRouteMapPages(routeWithLessons(Array(9).fill(1)))), [6, 6, 6]);
+  assert.deepEqual(markerCounts(createRouteMapPages(routeWithLessons(Array(9).fill(1)))), [10, 8]);
 });
 
-test('38 lessons fill the first page and use only the terrains required by density', () => {
+test('38 lessons span four balanced pages and use only the terrains required by density', () => {
   const oneChapter = createRouteMapPages(routeWithLessons([38]));
-  assert.deepEqual(markerCounts(oneChapter), [8, 8, 8, 8, 7]);
-  assert.deepEqual(oneChapter.map(page => page.themeId), terrains.slice(0, 5));
+  assert.deepEqual(markerCounts(oneChapter), [10, 10, 10, 9]);
+  assert.deepEqual(oneChapter.map(page => page.themeId), terrains.slice(0, 4));
 
   const sevenChapters = createRouteMapPages(routeWithLessons([4, 5, 6, 6, 6, 5, 6]));
-  assert(sevenChapters.every(page => page.nodes.length >= 7 && page.nodes.length <= MAX_PAGE_NODES));
-  assert.equal(sevenChapters[0].nodes.length, MAX_PAGE_NODES);
+  assert.deepEqual(markerCounts(sevenChapters), [9, 9, 9, 9, 9]);
 });
 
-test('chapter-aware cuts keep dense pages within eight or nine markers', () => {
+test('chapter-aware cuts keep dense pages within eight to ten markers', () => {
   const pages = createRouteMapPages(routeWithLessons([8, 43, 46]));
-  assert.equal(pages.length, 12);
+  assert.equal(pages.length, 11);
   assert(markerCounts(pages).every(count => count >= 8 && count <= MAX_PAGE_NODES));
+});
+
+test('three pages fit fifteen chapter landmarks with their first lessons', () => {
+  const pages = createRouteMapPages(routeWithLessons(Array(15).fill(1)));
+  assert.deepEqual(pages.map(page => page.totalChapters), [5, 5, 5]);
+  assert(pages.every(page => page.nodes.length === MAX_PAGE_NODES && !page.continuation && !page.continuesToNextPage));
 });
 
 test('a 40-lesson chapter balances its five pages and continues without duplicate nodes', () => {

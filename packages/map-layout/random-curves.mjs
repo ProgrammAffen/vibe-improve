@@ -35,8 +35,11 @@ const toward = (a, b, t) => ({x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t
 
 export function randomRouteCurves(rng, targetTurns, markerCount = 10) {
   const minimumCells = Math.max(6, Math.min(9, Math.ceil(markerCount * .75)));
+  // Full pages visit all four outer regions before rounding their turns.
+  const outerCells = [0, COLUMNS - 1, COLUMNS * (ROWS - 1), COLUMNS * ROWS - 1];
   const options = [...availableWalks()].map(([turns, paths]) =>
-    ({turns, paths: paths.filter(path => path.length >= minimumCells)}))
+    ({turns, paths: paths.filter(path => path.length >= minimumCells &&
+      (markerCount < 8 || outerCells.every(cell => path.includes(cell))))}))
     .filter(group => group.paths.length)
     .sort((a, b) => Math.abs(a.turns - targetTurns) - Math.abs(b.turns - targetTurns));
   const {turns, paths: choices} = options[0];

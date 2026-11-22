@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {createRouteMapPages, routeMarkerGap} from '../packages/map-layout/index.mjs';
+import {createRouteMapPages, MAX_PAGE_NODES, routeMarkerGap} from '../packages/map-layout/index.mjs';
 import {curvePoint} from '../packages/map-layout/route-spacing.mjs';
 import {random} from '../packages/map-layout/route-layout.mjs';
 import {randomRouteCurves} from '../packages/map-layout/random-curves.mjs';
@@ -62,13 +62,13 @@ function difference(a, b) {
   return best;
 }
 
-test('full eight-to-nine-marker pages vary their curve shape across the 20-chapter, 100-lesson route', () => {
+test('full ten-marker pages vary their curve shape across the 20-chapter, 100-lesson route', () => {
   const pages = createRouteMapPages(route(Array(20).fill(5))), traces = pages.map(trace);
-  assert.equal(pages.length, 14);
-  assert.ok(pages.every(page => page.nodes.length >= 8 && page.nodes.length <= 9));
+  assert.equal(pages.length, 12);
+  assert.ok(pages.every(page => page.nodes.length === MAX_PAGE_NODES));
   assert.equal(pages.flatMap(page => page.lessonIds).length, 100);
   const turns = pages.map(page => Math.round(turningAmount(paths(page))));
-  assert.ok(new Set(turns).size >= 4, `The route needs different numbers of bends: ${turns}`);
+  assert.ok(new Set(turns).size >= 3, `The route needs different numbers of bends: ${turns}`);
   assert.ok(pages.filter(page => page.paths.some(path => path.end.x < path.start.x - 1)).length >= 2,
     'Random walks should include local returns as well as forward progress');
   for (const page of pages) {
@@ -83,11 +83,11 @@ test('random waypoints support different requested turn counts, irregular bends 
   for (const turns of [4,5,6,7]) {
     const variants = new Set();
     for (let seed = 0; seed < 16; seed++) {
-      const generated = randomRouteCurves(random(seed), turns);
+      const generated = randomRouteCurves(random(seed), turns, 6);
       assert.equal(generated.turns, turns);
       assert.equal(generated.waypoints.length, turns + 2);
       assert.ok(Math.abs(turningAmount(generated.paths) - turns) < 1.1);
-      assert.deepEqual(randomRouteCurves(random(seed), turns), generated);
+      assert.deepEqual(randomRouteCurves(random(seed), turns, 6), generated);
       variants.add(JSON.stringify(generated.waypoints));
       const lengths = generated.waypoints.slice(1).map((point, i) => distance(point, generated.waypoints[i]));
       assert.ok(Math.max(...lengths) - Math.min(...lengths) > 30, 'Bend positions should not form equally spaced periodic waves');
@@ -96,11 +96,27 @@ test('random waypoints support different requested turn counts, irregular bends 
   }
 });
 
+test('full pages place learning markers throughout the upper and lower areas on both sides', () => {
+  const variants = [
+    Array(15).fill(1), Array(24).fill(2), Array(20).fill(5),
+    Array.from({length: 24}, (_, index) => [1, 2, 3, 5, 1, 4, 9, 8][index % 8]),
+  ];
+  for (const [index, sizes] of variants.entries()) {
+    for (const page of createRouteMapPages(route(sizes, 'coverage-regression-' + index))) {
+      if (page.totalChapters + page.totalLessons < 8) continue;
+      for (const x of [350, 1280]) for (const y of [365, 720]) {
+        const nearest = Math.min(...page.nodes.map(node => Math.hypot(node.x - x, node.y - y)));
+        assert.ok(nearest < 230, `Page ${page.pageNumber} leaves the area near ${x},${y} empty`);
+      }
+    }
+  }
+});
+
 test('page layouts stay deterministic when opening the last page first or jumping backward', () => {
   const sample = route(Array(20).fill(5));
   const forward = createRouteMapPages(sample).map(page => ({nodes: page.nodes, paths: paths(page)}));
   const jumped = createRouteMapPages(sample);
-  for (const index of [13, 11, 6, 1, 10, 0, 5, 3, 8, 4, 9, 2, 7, 12])
+  for (const index of [11, 9, 6, 1, 10, 0, 5, 3, 8, 4, 2, 7])
     assert.deepEqual({nodes: jumped[index].nodes, paths: paths(jumped[index])}, forward[index]);
   const other = createRouteMapPages({...sample, id: 'a-different-learning-route'});
   assert.notDeepEqual(other[0].paths, forward[0].paths);

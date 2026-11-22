@@ -4,7 +4,7 @@ import {mkdir,mkdtemp} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {build} from 'esbuild';
-import {createRouteMapPages,pawPlacement,routeMarkerGap} from '../packages/map-layout/index.mjs';
+import {createRouteMapPages,MAX_PAGE_NODES,pawPlacement,routeMarkerGap} from '../packages/map-layout/index.mjs';
 
 const route=(sizes,id='terminal-map')=>({id,format:'vibe-improve.route',schemaVersion:2,revision:1,title:'Synthetic learning route',locale:'en',sourceLanguage:'en',chapters:sizes.map((count,ch)=>({id:'ch'+ch,title:'Chapter '+ch,stageGoal:'Learn the topic.',nodes:Array.from({length:count},(_,n)=>({id:`n${ch}_${n}`,title:'Lesson '+n,objectives:[{id:'goal',description:'Apply the topic.'}],prerequisites:[],estimatedMinutes:30}))}))});
 const allPaths=page=>[...page.paths,...page.finishPaths];
@@ -85,7 +85,7 @@ test('dense terminal pages retain uniform chapter spacing and a clear finish wit
   for(let seed=0;seed<8;seed++){
    const pages=createRouteMapPages(route(Array(count).fill(1),'terminal-stress-'+seed)),page=pages.at(-1);
    assert.equal(pages.flatMap(p=>p.lessonIds).length,count);
-   assert.ok(page.nodes.length<=9);
+   assert.ok(page.nodes.length<=MAX_PAGE_NODES);
    const gap=routeMarkerGap(page.nodes,page.paths,page.themeId);
    for(let i=0;i<page.nodes.length-1;i++)near(routeMarkerGap(page.nodes.slice(i,i+2),page.paths.filter(path=>path.leg===i),page.themeId),gap);
    const flag=page.finish;
@@ -101,6 +101,18 @@ test('dense terminal pages retain uniform chapter spacing and a clear finish wit
  const maximum=createRouteMapPages(route(Array.from({length:24},(_,i)=>i<8?22:21),'maximum-finish-map'));
  assert.equal(maximum.flatMap(page=>page.lessonIds).length,512);
  assert.equal(maximum.at(-1).finish.kind,'finish');
+});
+
+test('a full one-page route has room for the flag after a folded trail',()=>{
+ for(const [sizes,id] of [[[1,1,1,1,1],'stress-density-0-1'],[[2,1,2,1],'stress-density-2-2']]){
+  const pages=createRouteMapPages(route(sizes,id));
+  assert.equal(pages.length,1);
+  const [page]=pages,last=page.nodes.at(-1);
+  assert.equal(page.nodes.length,MAX_PAGE_NODES);
+  assert.ok(page.finish.x>last.x);
+  assert.equal(page.finishPaths[0].from,last.key);
+  assert.equal(page.finishPaths.at(-1).to,page.finish.key);
+ }
 });
 
 test('a page with one remaining lesson directs its footprint toward the finish path',()=>{

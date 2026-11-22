@@ -6,8 +6,9 @@ import { randomRouteCurves, forwardRouteCurves } from './random-curves.mjs';
 
 export const WIDTH = 1672;
 export const HEIGHT = 941;
-export const MAX_PAGE_NODES = 9;
+export const MAX_PAGE_NODES = 10;
 const MIN_PAGE_NODES = 8;
+const FOLD_MARKER_COUNT = 9;
 const LAST_ANCHOR_ROW = 790;
 const FIRST_ANCHOR_ROW = 240;
 const SIDE_INSET = 205;
@@ -48,7 +49,8 @@ const themes = [...originalThemes, ...newThemes];
 function planTurnCounts(count, seed) {
   const rng = random(seed), planned = [];
   while (planned.length < count) {
-    const choices = [4, 5, 6, 7].filter(turns =>
+    // These walks can reach all four corners without crossing themselves.
+    const choices = [4, 6, 7].filter(turns =>
       turns !== planned.at(-1) && turns !== planned[planned.length - themes.length]);
     planned.push(choices[Math.floor(rng() * choices.length)]);
   }
@@ -231,7 +233,7 @@ function profileHeight(knots, progress) {
 }
 
 function needsFold(nodes) {
-  return nodes.length === MAX_PAGE_NODES || sum(markerGaps(nodes, 30)) > WIDTH - 540;
+  return nodes.length >= FOLD_MARKER_COUNT || sum(markerGaps(nodes, 30)) > WIDTH - 540;
 }
 
 function samplePoints(source, rng, themeId) {
@@ -341,9 +343,9 @@ function sampleFold(source, rng, fallback) {
   }
   if (!splits.length) return null;
 
-  // A dense terminal page also contains the finish flag. Let its turn fall
-  // between any adjacent markers so a landmark is not forced into the bend.
-  const crowded = source.length > MAX_PAGE_NODES;
+  // Leave extra clearance between the rows on the densest pages and let the
+  // turn fall between any two markers.
+  const crowded = source.length > FOLD_MARKER_COUNT;
   const boundaries = crowded ? [] : splits.filter(split => source[split].kind === 'chapter');
   const choices = boundaries.length ? boundaries : splits;
   const foldAt = choices[Math.floor(rng() * choices.length)];
@@ -501,7 +503,12 @@ function layoutQuality(nodes, paths, foldAt) {
   const bends = directions.filter((direction, index) => index > 0 && direction !== directions[index - 1]).length;
   const rowPaths = foldAt === null ? paths : paths.filter((_, index) => index !== foldAt - 1);
   const steepestGrade = Math.max(...rowPaths.map(({ start, end }) => Math.abs(end.y - start.y) / Math.abs(end.x - start.x)));
-  return .42 * spanX + 1.17 * spanY - .58 * centerOffset -
+  // Cover the center as well as both sides of the upper and lower bands.
+  // Width and height alone also favor routes with a large empty corner.
+  const targets = [350, WIDTH / 2, 1280].flatMap(x => [365, 540, 720].map(y => ({x, y})));
+  const emptySpace = targets.map(target => Math.min(...nodes.map(node => distance(node, target))));
+  const coverage = Math.max(...emptySpace) / 300 + sum(emptySpace) / (targets.length * 300);
+  return -1.8 * coverage + .42 * spanX + 1.17 * spanY - .58 * centerOffset -
     .48 * relativeVariation(nearest) - .42 * relativeVariation(steps) -
     .39 * sharpestTurn - .24 * Math.max(0, bends - 2) - .18 * Math.max(0, steepestGrade - 1.45);
 }
@@ -612,8 +619,11 @@ function finishTail(layout, marker, themeId) {
   const incoming = layout.paths.at(-1);
   const tangent = unit(incoming.end.x - incoming.control2.x, incoming.end.y - incoming.control2.y);
   const angle = Math.atan2(tangent.y, tangent.x);
+  const turns = [0, -.3, .3, -.6, .6, -.9, .9, -1.2, 1.2, -1.5, 1.5];
+  // A full page can end along the return leg of a folded trail.
+  if (layout.nodes.length >= MIN_PAGE_NODES) turns.push(-1.8, 1.8, -2.1, 2.1, -2.4, 2.4, -2.7, 2.7, -3, 3);
   for (const radius of [125, 145, 170, 195, 220, 250]) {
-    for (const turn of [0, -.3, .3, -.6, .6, -.9, .9, -1.2, 1.2, -1.5, 1.5]) {
+    for (const turn of turns) {
       const end = rounded({x: last.x + Math.cos(angle + turn) * radius, y: last.y + Math.sin(angle + turn) * radius});
       const finish = {...marker, ...end};
       const nodes = [...layout.nodes, finish];
