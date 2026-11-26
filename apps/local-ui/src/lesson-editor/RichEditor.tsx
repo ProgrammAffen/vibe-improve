@@ -8,7 +8,7 @@ import GameSelect from '../components/GameSelect';
 import Modal from '../components/Modal';
 import {translate, type Language} from '../i18n';
 import {createRichExtensions, MATH_EDITOR_EVENT, type MathRequest} from './extensions';
-import {prepareHTMLImport} from './import-content';
+import {prepareHTMLImport, safeLink} from './import-content';
 import {editorDocument} from './editor-json';
 import 'katex/dist/katex.min.css';
 import './rich-editor.css';
@@ -63,6 +63,21 @@ export const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(function
     immediatelyRender: true,
     editorProps: {
       attributes: {class: 'lesson-rich-content', role: 'textbox', 'aria-multiline': 'true'},
+      handleDOMEvents: {
+        click(view, event) {
+          const projects = window.vibeNative?.projects;
+          if (!projects || !view.editable || !event.isTrusted || event.button !== 0 || !event.metaKey) return false;
+          const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+          if (!link || !view.dom.contains(link)) return false;
+          const url = safeLink(link.getAttribute('href') ?? '');
+          if (!url) return false;
+          event.preventDefault();
+          void projects.request('browser.open', {url}).catch(() => {
+            setNotice(translate(callbacks.current.language, '无法在内置浏览器打开此链接。', 'Could not open this link in the in-app browser.'));
+          });
+          return true;
+        },
+      },
       handleKeyDown(_view, event) {
         // Never let an editor Enter bubble into a surrounding chat submit handler.
         // Do not preventDefault: an IME candidate still needs its native confirmation.

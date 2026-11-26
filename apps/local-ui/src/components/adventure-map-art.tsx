@@ -35,7 +35,7 @@ export function LandmarkArt({terrain, node, language}: {terrain: MapTerrain; nod
     left: `${(bounds.left - node.x + node.width / 2) / node.width * 100}%`,
     top: `${(bounds.top - node.y + node.height) / node.height * 100}%`,
     width: `${(bounds.right - bounds.left) / node.width * 100}%`,
-    height: `${54 / node.height * 100}%`,
+    height: `${54 * (node.artworkScale ?? 1) / node.height * 100}%`,
   } satisfies CSSProperties;
 
   return <>
@@ -48,21 +48,29 @@ export function LandmarkArt({terrain, node, language}: {terrain: MapTerrain; nod
   </>;
 }
 
-export function PawArt({terrain, placement, gold = false}: {terrain: MapTerrain; placement: PawPlacement; gold?: boolean}) {
+// Channel gains keep the source's polygon lighting while deepening each scene's
+// own palette. Every channel gets darker; alpha, shape and direction are intact.
+const deepPawTones = {
+  grassland: [.64,.70,.56], snow: [.66,.72,.80], ocean: [.57,.69,.69], desert: [.77,.65,.50],
+  'river-valley': [.60,.69,.49], 'volcanic-belt': [.74,.50,.38], forest: [.54,.63,.45],
+  yardang: [.72,.56,.40], cavern: [.69,.53,.76],
+} satisfies Record<MapTerrain,[number,number,number]>;
+
+export function PawArt({terrain, placement, darkened = false}: {terrain: MapTerrain; placement: PawPlacement; darkened?: boolean}) {
   const host = useRef<HTMLSpanElement>(null);
-  const filterId = 'adventure-gold-paw-' + useId().replace(/[^A-Za-z0-9_-]/g, '');
+  const filterId = 'adventure-deep-paw-' + useId().replace(/[^A-Za-z0-9_-]/g, '');
   useLayoutEffect(() => {
     const paw = markerArtwork(terrain, 'paw');
     const art = createDirectionalPaw(mapAsset(`${paw.theme}-paw`), paw.bounds, placement);
-    if (gold) {
+    if (darkened) {
       const namespace = 'http://www.w3.org/2000/svg';
       const filter = document.createElementNS(namespace, 'filter');
       filter.id = filterId;
       filter.setAttribute('color-interpolation-filters', 'sRGB');
       const matrix = document.createElementNS(namespace, 'feColorMatrix');
-      // Recolor luminance, retaining the original polygon facets, rim and alpha.
       matrix.setAttribute('type', 'matrix');
-      matrix.setAttribute('values', '0.153072 0.514944 0.051984 0 0.26 0.140316 0.472032 0.047652 0 0.15 0.06378 0.21456 0.02166 0 0.015 0 0 0 1 0');
+      const [red,green,blue]=deepPawTones[terrain];
+      matrix.setAttribute('values', `${red} 0 0 0 0 0 ${green} 0 0 0 0 0 ${blue} 0 0 0 0 0 1 0`);
       filter.append(matrix);
       art.querySelector('defs')?.append(filter);
       const surface = document.createElementNS(namespace, 'g');
@@ -71,8 +79,8 @@ export function PawArt({terrain, placement, gold = false}: {terrain: MapTerrain;
       art.append(surface);
     }
     host.current?.replaceChildren(art);
-  }, [terrain, placement, gold, filterId]);
-  return <span ref={host} className="adventure-marker-art adventure-paw-art" data-tone={gold ? 'gold' : 'terrain'} aria-hidden="true"/>;
+  }, [terrain, placement, darkened, filterId]);
+  return <span ref={host} className="adventure-marker-art adventure-paw-art" data-tone={darkened ? 'deep' : 'terrain'} aria-hidden="true"/>;
 }
 
 export function FinishFlagArt() {

@@ -157,7 +157,11 @@ final class LessonStore {
             let saved = block["resource"] as? [String: String]
             return saved?["id"] == ref.id && saved?["version"] == ref.version
         }
-        guard inWorkspace || item.lessons.contains(ResourceScope(routeId: identity.routeId, nodeId: identity.nodeId)) else { throw LessonError.resource }
+        let directlyAttached = item.lessons.contains(ResourceScope(routeId: identity.routeId, nodeId: identity.nodeId))
+        if !inWorkspace && !directlyAttached {
+            let linkedResources = try trustedContext(identity)["linkedResources"] as? [ResourceSelection] ?? []
+            guard linkedResources.contains(ref) else { throw LessonError.resource }
+        }
         return item
     }
 }

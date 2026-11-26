@@ -2,7 +2,8 @@ import type {JSONContent} from '@tiptap/core';
 import type {AgentOptions} from '../../../../packages/domain/planning.mjs';
 
 export type LessonIdentity = {projectId: string; routeId: string; nodeId: string};
-export type LessonSource = {quote: string; page?: number; startMs?: number; endMs?: number};
+export type {LessonSource} from '../../../../packages/domain/lesson-workspace.mjs';
+import type {LessonSource} from '../../../../packages/domain/lesson-workspace.mjs';
 export type LessonMessage = {id: string; role: 'user' | 'assistant'; text: string; status?: 'pending' | 'complete' | 'incomplete'};
 export type LessonRecord = {
   id: string;

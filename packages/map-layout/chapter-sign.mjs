@@ -4,12 +4,13 @@ const reef = { file: 'shared/ocean-sign-footing.png', width: 1859, height: 846, 
 export const chapterSignAssets = [plank.file, reef.file];
 
 export function chapterSignBounds(point, themeId) {
-  const left = point.x + sign.offsetX - sign.width / 2;
+  const scale = point.artworkScale ?? 1;
+  const left = point.x + (sign.offsetX - sign.width / 2) * scale;
   const ocean = themeId === 'ocean';
-  const ground = point.y + (ocean ? 14 : 29);
+  const ground = point.y + (ocean ? 14 : 29) * scale;
   return {
-    left, right: left + sign.width, top: ground - sign.height,
-    bottom: ground + (ocean ? 22 : 6),
+    left, right: left + sign.width * scale, top: ground - sign.height * scale,
+    bottom: ground + (ocean ? 22 : 6) * scale,
   };
 }
 
@@ -35,8 +36,8 @@ export function createChapterSign(node, themeId, assetUrl) {
   Object.assign(marker.style, {
     left: `${(bounds.left - node.x + node.width / 2) / node.width * 100}%`,
     top: `${(bounds.top - node.y + node.height) / node.height * 100}%`,
-    width: `${sign.width / node.width * 100}%`,
-    height: `${sign.height / node.height * 100}%`,
+    width: `${(bounds.right - bounds.left) / node.width * 100}%`,
+    height: `${sign.height * (node.artworkScale ?? 1) / node.height * 100}%`,
   });
   if (themeId === 'ocean') marker.append(graphic(reef, 'chapter-sign-footing', assetUrl));
   marker.append(graphic(plank, 'chapter-sign-plank', assetUrl));

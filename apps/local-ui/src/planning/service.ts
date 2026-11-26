@@ -4,7 +4,7 @@ import type {Language} from '../i18n';
 import type {ProviderId} from '../agents/domain';
 import {routeService} from '../routes/service';
 import {browserProjectTransaction,browserRead,withProjectLock} from './browser-store';
-import type {LearningProgress} from '../routes/learning-record';
+import {studiedNodes,type LearningProgress} from '../routes/learning-record';
 
 export type PlanningIntent='interview'|'generate'|'edit'|'consistency';
 export type PlanningActivity={durationMs:number;lastActivityMs:number;thinkingCharacters:number;outputCharacters:number;events:{sequence:number;stage:string;atMs:number;thinkingCharacters:number;outputCharacters:number}[]};
@@ -138,7 +138,7 @@ async function request<T>(action:string,values:Record<string,unknown>):Promise<T
 function browserMutateUnlocked(id:string, change:(state:PlanningState|null,progress:LearningProgress)=>PlanningState){
  return browserProjectTransaction(id,({state,progress,savePlan})=>{
   const next=validatePlanning(change(state,progress));
-  assertStudiedRouteUnchanged(state?.routeDraft,next.routeDraft,progress.startedNodeIds);
+  assertStudiedRouteUnchanged(state?.routeDraft,next.routeDraft,studiedNodes(progress));
   if(next!==state)savePlan(next);
   return next;
  }).catch(cause=>{throw new Error(planningError(cause));});
@@ -188,7 +188,7 @@ export const planningService={
     if((state?.revision??null)!==expectedPlanningRevision||state?.pending)throw new Error('PLANNING_CONFLICT');
     if(state){
      const next=removeImportedRoute(state,state.revision);
-     assertStudiedRouteUnchanged(state.routeDraft,next.routeDraft,progress.startedNodeIds);
+     assertStudiedRouteUnchanged(state.routeDraft,next.routeDraft,studiedNodes(progress));
     }
     return state;
    });

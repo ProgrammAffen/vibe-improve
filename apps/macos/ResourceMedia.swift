@@ -75,10 +75,7 @@ final class ResourcePreviewWindows: NSObject, NSWindowDelegate {
     private var players: [NSWindow: AVPlayer] = [:]
 
     func open(_ item: LearningResource, location: ResourceLocation?) -> Bool {
-        guard !item.removed else { return false }
-        if item.isLink, let address = PublicResourceWeb.address(item.origin) {
-            return NSWorkspace.shared.open(address)
-        }
+        guard !item.removed, !item.isLink else { return false }
         guard let url = try? ResourceExtractors.fileURL(item) else { return false }
         if item.format == "pdf", let bytes = try? ResourceExtractors.read(url, stamp: item.stamp, maximum: 32 * 1024 * 1024),
            let document = PDFDocument(data: bytes), !document.isLocked {

@@ -2,6 +2,7 @@ import {parseRoute,validateRoute,MAX_ROUTE_BYTES,type RouteDocument} from '../..
 import {assertStudiedRouteUnchanged} from '../../../../packages/domain/planning.mjs';
 import type {Language} from '../i18n';
 import {browserProjectTransaction, withProjectLock} from '../planning/browser-store';
+import {studiedNodes} from './learning-record';
 
 export type RouteDraft={route:RouteDocument;fileName:string};
 export type RouteStage=RouteDraft&{importId:string};
@@ -73,7 +74,7 @@ export const routeService={
     const item=staged.get(value.importId);if(!item||item.projectId!==id||Date.now()-item.created>600_000)throw new Error('ROUTE_IMPORT_EXPIRED');
     const result=await withProjectLock(id,async()=>{
       await browserProjectTransaction(id,({state:plan,progress})=>{
-        assertStudiedRouteUnchanged(plan?.routeDraft,undefined,progress.startedNodeIds);
+        assertStudiedRouteUnchanged(plan?.routeDraft,undefined,studiedNodes(progress));
       });
       return browserMutate(id,s=>{if(s.revision!==state.revision)throw new Error('ROUTE_CONFLICT');if(!s.agentConfirmed)throw new Error('ROUTE_INVALID');return{...s,source:'import',routeDraft:{route:item.value.route,fileName:item.value.fileName},revision:s.revision+1}});
     });

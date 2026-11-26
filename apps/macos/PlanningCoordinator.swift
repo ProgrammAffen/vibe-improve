@@ -89,7 +89,7 @@ final class PlanningCoordinator {
             return try store.setAgentOptions(projectID:id,options:options,expectedRevision:expected)
         case "planning.read":
             try keys(value,["projectId"]);return try store.read(projectID:id) ?? NSNull()
-        case "planning.learning.read", "planning.learning.start", "planning.learning.complete", "planning.learning.skip", "planning.learning.reset":
+        case "planning.learning.read", "planning.learning.start", "planning.learning.complete", "planning.learning.master", "planning.learning.skip", "planning.learning.reset":
             var expected: Set<String> = ["projectId", "routeId", "routeRevision"]
             let change: PlanningStore.LearningChange?
             switch action {
@@ -105,6 +105,8 @@ final class PlanningCoordinator {
                     change = .start(nodeID)
                 } else if action == "planning.learning.complete" {
                     change = .complete(nodeID)
+                } else if action == "planning.learning.master" {
+                    change = .master(nodeID)
                 } else {
                     if value["reason"] != nil { expected.insert("reason") }
                     guard value["reason"] == nil || value["reason"] is String else { throw PlanningError.invalid }

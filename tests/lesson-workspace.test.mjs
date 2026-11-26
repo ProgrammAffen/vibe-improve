@@ -51,6 +51,31 @@ test('notebook rejects executable editor nodes, injected attributes, unsafe URLs
   assert.throws(() => validateLessonWorkspace(tooLarge), /LESSON_TOO_LARGE/);
 });
 
+test('web note anchors survive workspace saves and reject unsafe or mixed source selectors', () => {
+  const workspace = document();
+  const source = {quote: 'Example Domains', web: {url: 'https://www.iana.org/help/example-domains', prefix: '', suffix: ' A number of domains'}};
+  const note = {id: 'web-note', kind: 'note', title: 'Domain examples', collapsed: true, source, messages: []};
+  workspace.blocks[1].records.push(note);
+  const saved = nextLessonWorkspace(emptyLessonWorkspace(identity), identity, 0, workspace);
+  assert.deepEqual(validateLessonWorkspace(saved, identity).blocks[1].records.at(-1), note);
+  assert.deepEqual(resetLessonWorkspace(saved, identity).blocks[0].records, []);
+
+  for (const invalid of [
+    {...source, page: 1},
+    {...source, startMs: 0},
+    {...source, quote: ' '},
+    {...source, quote: 'a'.repeat(1001)},
+    {...source, web: {...source.web, prefix: 'a'.repeat(121)}},
+    {...source, web: {...source.web, selector: 'main'}},
+    {...source, web: {...source.web, url: 'javascript:void(0)'}},
+    {...source, web: {...source.web, url: 'https://user:password@example.org/'}},
+  ]) {
+    const candidate = structuredClone(workspace);
+    candidate.blocks[1].records.at(-1).source = invalid;
+    assert.throws(() => validateLessonWorkspace(candidate, identity), /LESSON_INVALID/);
+  }
+});
+
 test('native notebook restart, conflict, resource isolation and byte-range preview are durable and path safe', {skip: process.platform !== 'darwin', timeout: 120_000}, async () => {
   await mkdir('tmp/checks/lesson-workspace', {recursive: true});
   const run = await mkdtemp(resolve('tmp/checks/lesson-workspace/native-'));
@@ -65,20 +90,29 @@ let runtime = try RuntimeDirectory(url: base.appendingPathComponent("Runtime"))
 let project = "proj_12345678-1234-4234-8234-123456789abc"
 let identity = try LessonIdentity(["projectId": project, "routeId": "route_one", "nodeId": "node_one"])
 let ref = ResourceSelection(id: "12345678-1234-4234-8234-123456789abc", version: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+let webRef = ResourceSelection(id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbd", version: "cccccccc-cccc-4ccc-8ccc-cccccccccccd")
+let web = LearningResource(id: webRef.id, version: webRef.version, format: "web", name: "Guide", origin: "https://example.org/guide", planning: true, lessons: [], status: .ready)
+var linkedResources = [webRef]
 let file = base.appendingPathComponent("sample.txt")
 if initial { try Data("A safe source document".utf8).write(to: file) }
 var resource = LearningResource(id: ref.id, version: ref.version, format: "document", name: "sample.txt", origin: file.path, stamp: ResourceExtractors.stamp(file), planning: false, lessons: [ResourceScope(routeId: "route_one", nodeId: "node_one")], status: .attachment)
 var resetRevision = 0
 let store = try LessonStore(runtime: runtime, validatorURL: base.appendingPathComponent("lesson.js"), context: { identity in
     guard identity.projectId == project, identity.routeId == "route_one", identity.nodeId == "node_one" else { throw LessonError.target }
-    return ["route": ["title": "Synthetic route"], "chapter": ["title": "Chapter"], "node": ["title": "Lesson"], "notebookResetRevision": resetRevision]
+    return ["route": ["title": "Synthetic route"], "chapter": ["title": "Chapter"], "node": ["title": "Lesson"], "notebookResetRevision": resetRevision, "linkedResources": linkedResources]
 }, resource: { identity, selected in
-    guard identity.projectId == project && selected == ref else { throw LessonError.resource }
-    return resource
+    guard identity.projectId == project else { throw LessonError.resource }
+    if selected == ref { return resource }
+    if selected == webRef { return web }
+    throw LessonError.resource
 })
 func check(_ condition: Bool) { precondition(condition) }
 if initial {
     check(try store.read(identity)["revision"] as? Int == 0)
+    let guide = try LessonPreviewStore(store: store).issue(identity, ref: webRef)
+    check(guide["url"] as? String == "https://example.org/guide" && guide["mimeType"] as? String == "text/uri-list")
+    linkedResources = []
+    do { _ = try store.previewResource(identity, webRef); preconditionFailure("Unlinked planning resource previewed") } catch LessonError.resource {}
     let proposed = try JSONSerialization.jsonObject(with: Data(contentsOf: base.appendingPathComponent("workspace.json"))) as! [String: Any]
     check(try store.save(identity, expectedRevision: 0, workspace: proposed)["revision"] as? Int == 1)
     do { _ = try store.save(identity, expectedRevision: 0, workspace: proposed); preconditionFailure("Stale write accepted") } catch LessonError.conflict {}

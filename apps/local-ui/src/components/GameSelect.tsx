@@ -5,10 +5,8 @@ import {GameButtonArt} from './GameButton';
 import './game-select.css';
 
 export type GameSelectOption = {value: string; label: string; disabled?: boolean; icon?: string};
-type Props = {
-  value: string;
+type CommonProps = {
   options: GameSelectOption[];
-  onChange: (value: string) => void;
   id?: string;
   className?: string;
   triggerClassName?: string;
@@ -21,11 +19,16 @@ type Props = {
   valueLabel?: string;
   preferredPlacement?: 'above' | 'below';
 };
+type Props = CommonProps & (
+  {multiple: true; value: string[]; onChange: (value: string[]) => void}
+  | {multiple?: false; value: string; onChange: (value: string) => void}
+);
 
 const palette = ['paper', 'ink', 'edge', 'hover', 'selected', 'accent'] as const;
 
-export default function GameSelect({value, options, onChange, id, className = '', triggerClassName = '', menuClassName = '',
-  'aria-label': label, 'aria-labelledby': labelledBy, disabled = false, title, placeholder = '', valueLabel, preferredPlacement = 'below'}: Props) {
+export default function GameSelect(props: Props) {
+  const {value, options, multiple = false, id, className = '', triggerClassName = '', menuClassName = '',
+    'aria-label': label, 'aria-labelledby': labelledBy, disabled = false, title, placeholder = '', valueLabel, preferredPlacement = 'below'} = props;
   const generatedId = useId();
   const triggerId = id ?? generatedId;
   const listId = triggerId + '-choices';
@@ -35,7 +38,9 @@ export default function GameSelect({value, options, onChange, id, className = ''
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [placement, setPlacement] = useState<CSSProperties>();
-  const selected = options.find(option => option.value === value);
+  const selectedValues = new Set(Array.isArray(value) ? value : [value]);
+  const selected = options.find(option => selectedValues.has(option.value));
+  const displayValue = valueLabel ?? (multiple ? options.filter(option => selectedValues.has(option.value)).map(option => option.label).join('、') : selected?.label) ?? placeholder;
   const enabled = options.flatMap((option, index) => option.disabled ? [] : [index]);
   const expanded = open && !disabled;
   const surface = expanded ? trigger.current?.closest('dialog[open]') ?? document.body : null;
@@ -95,7 +100,7 @@ export default function GameSelect({value, options, onChange, id, className = ''
 
   function show(last = false) {
     if (disabled || !enabled.length) return;
-    const current = options.findIndex(option => option.value === value && !option.disabled);
+    const current = options.findIndex(option => selectedValues.has(option.value) && !option.disabled);
     setActive(current >= 0 ? current : (last ? enabled.at(-1) : enabled[0]) ?? -1);
     setPlacement(undefined);
     setOpen(true);
@@ -103,8 +108,12 @@ export default function GameSelect({value, options, onChange, id, className = ''
   function choose(index: number) {
     const option = options[index];
     if (disabled || !option || option.disabled) return;
-    setOpen(false);
-    if (option.value !== value) onChange(option.value);
+    if (props.multiple) {
+      props.onChange(selectedValues.has(option.value) ? props.value.filter(value => value !== option.value) : [...props.value, option.value]);
+    } else {
+      setOpen(false);
+      if (option.value !== props.value) props.onChange(option.value);
+    }
   }
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     if (disabled || event.nativeEvent.isComposing) return;
@@ -137,19 +146,20 @@ export default function GameSelect({value, options, onChange, id, className = ''
     <button ref={trigger} id={triggerId} type="button" className={`game-select-trigger ${triggerClassName}`} role="combobox"
       aria-label={label} aria-labelledby={labelledBy} aria-haspopup="listbox" aria-expanded={expanded}
       aria-controls={expanded ? listId : undefined} aria-activedescendant={expanded && active >= 0 ? optionId(active) : undefined}
-      aria-disabled={disabled || undefined} disabled={disabled} title={title ?? valueLabel ?? selected?.label ?? placeholder}
+      aria-disabled={disabled || undefined} disabled={disabled} title={title ?? (displayValue || placeholder)}
       onKeyDown={onKeyDown} onBlur={() => setOpen(false)} onClick={event => {event.currentTarget.focus(); if (expanded) setOpen(false); else show();}}>
       <GameButtonArt variant="secondary"/>
-      {selected?.icon && <img className="game-select-icon" src={selected.icon} alt=""/>}
-      <span className="game-select-value">{valueLabel ?? selected?.label ?? placeholder}</span><ChevronDown aria-hidden="true"/>
+      {!multiple && selected?.icon && <img className="game-select-icon" src={selected.icon} alt=""/>}
+      <span className="game-select-value">{displayValue || placeholder}</span><ChevronDown aria-hidden="true"/>
     </button>
     {expanded && surface && createPortal(<ul ref={list} id={listId} className={`game-select-options ${menuClassName}`} role="listbox"
-      aria-label={label} aria-labelledby={labelledBy} style={placement ?? {visibility: 'hidden'}}>
-      {options.map((option, index) => <li key={option.value} id={optionId(index)} role="option" aria-selected={option.value === value}
+      aria-label={label} aria-labelledby={labelledBy} aria-multiselectable={multiple || undefined} style={placement ?? {visibility: 'hidden'}}>
+      {options.map((option, index) => <li key={option.value} id={optionId(index)} role="option" aria-selected={selectedValues.has(option.value)}
         aria-disabled={option.disabled || undefined} data-active={index === active || undefined}
         onMouseDown={event => event.preventDefault()} onPointerMove={() => {if (!option.disabled) setActive(index);}} onClick={() => choose(index)}>
+        {multiple && <span className="game-select-checkbox" data-checked={selectedValues.has(option.value) || undefined} aria-hidden="true">{selectedValues.has(option.value) && <Check/>}</span>}
         {option.icon && <img className="game-select-icon" src={option.icon} alt=""/>}
-        <span>{option.label}</span>{option.value === value && <Check aria-hidden="true"/>}
+        <span>{option.label}</span>{!multiple && selectedValues.has(option.value) && <Check aria-hidden="true"/>}
       </li>)}
     </ul>, surface)}
   </span>;

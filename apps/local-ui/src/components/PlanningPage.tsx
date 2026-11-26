@@ -7,6 +7,7 @@ import type {ProjectRecord} from '../projects/domain';
 import {translate,type Language} from '../i18n';
 import {planningService,planningMessage,planningProgress,planningFailure,planningGenerationMessage,type PlanningEntry,type PlanningIntent,type PlanningJob} from '../planning/service';
 import {learningService,type LearningProgress} from '../routes/learning';
+import {studiedNodes} from '../routes/learning-record';
 import {routeService} from '../routes/service';
 import {PROVIDERS,type ProviderId} from '../agents/domain';
 import {isResourceUsable,resourceKey,resourceMessage,resourceRef,resourceService,useResourceBindings,useResourceList,type AttachmentTarget,type ResourceItem} from '../resources/service';
@@ -384,7 +385,7 @@ export default function PlanningPage({language,project,entryMode='resume',onPrev
  const progress=generationOpen?generationProgress(state):null;
  const savedGeneration=progress&&draftChange==='removed'?{...progress,resumable:false}:progress;
  return <>{state.step==='editor'&&draft?<RouteEditorSurface language={language} state={state} route={draft} busy={busy} working={working} workingLabel={workingLabel} partialReply={partialReply} partialProviderId={partialProviderId} activity={activity} dirty={dirty} error={error} conversationError={conversationError} notice={notice} onOptions={updateOptions} onProvider={updateProvider} onRoute={setRoute} onSave={()=>void action(async()=>{await save();setNotice(translate(language,'草稿已保存','Draft saved'))})} onConfirm={()=>void action(confirm)} onSend={(text,mentions,target,files)=>ai('edit',text,mentions,target,false,'new',[],files)} onCancel={cancel} onApply={()=>void action(async()=>{if(stateRef.current)accept(await planningService.applyProposal(stateRef.current))})} onDiscard={()=>void action(async()=>{if(stateRef.current)accept(await planningService.discardProposal(stateRef.current))})} onUndo={()=>void action(async()=>{const current=dirtyRef.current?await save():stateRef.current;if(current)accept(await planningService.undo(current))})} onRedo={()=>void action(async()=>{if(stateRef.current)accept(await planningService.redo(stateRef.current))})} onRemoveImport={()=>void action(async()=>{const route=await routeService.read(project.id);setRemoveImport(route.revision)})} onPrevious={previous} onHome={()=>leave(onHome)}
-  studiedNodeIds={learningProgress?.startedNodeIds} learningRead={learningRead} onRetryLearning={()=>setProgressRetry(value=>value+1)}
+  studiedNodeIds={learningProgress ? studiedNodes(learningProgress) : undefined} learningRead={learningRead} onRetryLearning={()=>setProgressRetry(value=>value+1)}
   renderMaterials={resources.enabled?(target,locked)=>{
     const items=attachmentsFrom(linkedTo(target),[...resources.items,...(materialData?.items??[])]);
     const onRemove=locked?undefined:(link:MaterialLink)=>void updateMaterial(target,link,false,link.segmentId);

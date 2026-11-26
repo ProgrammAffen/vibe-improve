@@ -118,15 +118,25 @@ final class ResourceBridge {
                 return NSNull()
             }
         case "resources.open":
+            guard Set(value.keys).isSubset(of: ["projectId", "ref", "segmentId"]),
+                  value["segmentId"] == nil || value["segmentId"] is String else {
+                reply(nil, ResourceError.invalid.rawValue); return
+            }
             queue.async { [self] in
                 do {
                     let item = try library.item(project, ref: reference(value["ref"]))
+                    guard !item.removed else { throw ResourceError.unavailable }
                     let segment = value["segmentId"] as? String
                     if segment != nil && !item.segments.contains(where: { $0.id == segment }) { throw ResourceError.unavailable }
                     let location = item.segments.first { $0.id == segment }?.location
                     DispatchQueue.main.async {
-                        if self.previews.open(item, location: location) { reply(NSNull(), nil) }
-                        else { reply(nil, ResourceError.unavailable.rawValue) }
+                        let opened: Bool
+                        if item.isLink {
+                            opened = BrowserAddress.url(item.origin).map { NSWorkspace.shared.open($0) } ?? false
+                        } else {
+                            opened = self.previews.open(item, location: location)
+                        }
+                        reply(opened ? NSNull() : nil, opened ? nil : ResourceError.unavailable.rawValue)
                     }
                 } catch { DispatchQueue.main.async { reply(nil, ResourceError.unavailable.rawValue) } }
             }

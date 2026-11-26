@@ -653,6 +653,36 @@ function seedFor(route, groups) {
   return seed >>> 0;
 }
 
+// A viewport may need another guide for this page after excluding its corners.
+// Keep paging and learning identity intact; never rebuild the surrounding route.
+export function createMapPageVariant(page, variant) {
+  if (!Number.isInteger(variant) || variant < 1 || variant > 2 || page.nodes.length < 2) return null;
+  const source = page.nodes.map(node => ({...node}));
+  const terminal = page.finish !== null;
+  const originalShape = fingerprint(page.paths);
+  const targetTurns = [4, 6, 7][(variant + (page.seed % 3)) % 3];
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const seed = mixSeed(page.seed, 160 + (variant - 1) * 4 + attempt);
+    try {
+      const candidate = pageGeometry(source, seed, page.themeId, Infinity, [originalShape], targetTurns, page.compact);
+      if ((candidate.nodes[0].y < candidate.nodes.at(-1).y) !== (source[0].y < source.at(-1).y)) continue;
+      const positioned = terminal ? finishTail(candidate, {...page.finish}, page.themeId) : candidate;
+      if (!positioned) continue;
+      return {
+        ...page,
+        nodes: terminal ? positioned.nodes.slice(0, -1) : positioned.nodes,
+        paths: terminal ? positioned.paths.filter(path => path.leg < source.length - 1) : positioned.paths,
+        spacing: positioned.gap,
+        finish: terminal ? positioned.nodes.at(-1) : null,
+        finishPaths: terminal ? positioned.paths.filter(path => path.leg === source.length - 1) : [],
+      };
+    } catch {
+      // A difficult candidate should not make an otherwise usable page fail.
+    }
+  }
+  return null;
+}
+
 export function createRouteMapPages(route) {
   if (!route.chapters.length) return [];
   const groups = partition(buildNodes(route.chapters));

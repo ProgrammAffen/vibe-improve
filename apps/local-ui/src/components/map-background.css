@@ -1,0 +1,11 @@
+.map-background {
+  position: absolute;
+  inset: 0;
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.map-background-patch {overflow: hidden;}

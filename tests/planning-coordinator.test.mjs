@@ -130,6 +130,7 @@ func skip(_ node:String,_ reason:String)throws->[String:Any]{
 do{_ = try complete("define-a-question");check(false,"unconfirmed lesson accepted")}catch PlanningError.conflict{}
 do{_ = try start("define-a-question",0);check(false,"unconfirmed lesson started")}catch PlanningError.conflict{}
 do{_ = try skip("define-a-question","Already familiar");check(false,"unconfirmed lesson skipped")}catch PlanningError.conflict{}
+do{_ = try call("planning.learning.master",manualID,learningIdentity.merging(["nodeId":"define-a-question","progressRevision":0]){_,new in new});check(false,"unconfirmed lesson accepted a mastery mark")}catch PlanningError.conflict{}
 manual=try call("planning.confirm",manualID,["expectedRevision":rev(manual)])
 do{_ = try complete("interpret-results");check(false,"unfinished prerequisite bypassed")}catch PlanningError.conflict{}
 do{_ = try skip("interpret-results","Already familiar");check(false,"locked lesson skipped")}catch PlanningError.conflict{}
@@ -148,15 +149,28 @@ check(progressRevision(repeatSkip)==progressRevision(skipped),"idempotent skip a
 check(try store.withRouteReplacementGuard(projectID:manualID){true},"skip locked route replacement")
 let learningReopened=try PlanningStore(runtime:runtime,validatorURL:planningURL,workspace:workspaceFor)
 let reopenedSkip=try learningReopened.learningProgress(projectID:manualID,routeID:legacyRouteID,revision:rev(learningRoute))
-check(reopenedSkip["skippedReasons"] as? [String:String]==["define-a-question":"Already familiar"],"skip was lost on reopen")
-do{_ = try complete("interpret-results",progressRevision(reopenedSkip));check(false,"lesson completed without starting")}catch PlanningError.conflict{}
-let started=try start("interpret-results",progressRevision(reopenedSkip))
-check(started["startedNodeIds"] as? [String]==["interpret-results"],"skipped prerequisite did not unlock the dependent lesson")
-check(progressRevision(started)==progressRevision(reopenedSkip)+1,"start did not advance the revision")
+check(reopenedSkip["skippedReasons"] as? [String:String]==["define-a-question":"Already familiar"] && reopenedSkip["masteredNodeIds"] as? [String]==[],"legacy skip or missing mastery field restored incorrectly")
+do{_ = try start("interpret-results",progressRevision(reopenedSkip));check(false,"a skipped prerequisite unlocked its dependent")}catch PlanningError.conflict{}
+var skippedChapterEdit=learningRoute
+var skippedChapters=skippedChapterEdit["chapters"] as! [[String:Any]]
+skippedChapters[0]["title"]="Changed unstudied chapter"
+skippedChapterEdit["chapters"]=skippedChapters
+manual=try call("planning.save",manualID,["route":skippedChapterEdit,"expectedRevision":rev(manual)])
+let skipEditedRoute=manual["routeDraft"] as! [String:Any]
+learningIdentity["routeRevision"]=rev(skipEditedRoute)
+manual=try call("planning.confirm",manualID,["expectedRevision":rev(manual)])
+let startedPrerequisite=try start("define-a-question",progressRevision(reopenedSkip))
+do{_ = try start("interpret-results",progressRevision(startedPrerequisite));check(false,"a started prerequisite unlocked its dependent before completion")}catch PlanningError.conflict{}
+check(try complete("define-a-question",progressRevision(startedPrerequisite))==["define-a-question"],"skipped lesson could not be completed")
+let completedPrerequisite=try call("planning.learning.read",manualID,learningIdentity)
+do{_ = try complete("interpret-results",progressRevision(completedPrerequisite));check(false,"lesson completed without starting")}catch PlanningError.conflict{}
+let started=try start("interpret-results",progressRevision(completedPrerequisite))
+check(started["startedNodeIds"] as? [String]==["define-a-question","interpret-results"],"a completed prerequisite did not unlock its dependent lesson")
+check(progressRevision(started)==progressRevision(completedPrerequisite)+1,"start did not advance the revision")
 check(try progressRevision(start("interpret-results",progressRevision(started)))==progressRevision(started),"idempotent start advanced the revision")
-let reopenedStart=try learningReopened.learningProgress(projectID:manualID,routeID:legacyRouteID,revision:rev(learningRoute))
-check(reopenedStart["startedNodeIds"] as? [String]==["interpret-results"],"started lesson was lost on reopen")
-var protectedEdit=learningRoute
+let reopenedStart=try learningReopened.learningProgress(projectID:manualID,routeID:legacyRouteID,revision:rev(skipEditedRoute))
+check(reopenedStart["startedNodeIds"] as? [String]==["define-a-question","interpret-results"],"started lesson was lost on reopen")
+var protectedEdit=skipEditedRoute
 var editedChapters=protectedEdit["chapters"] as! [[String:Any]]
 editedChapters[1]["title"]="Changed learned chapter"
 protectedEdit["chapters"]=editedChapters
@@ -166,20 +180,15 @@ do{_ = try call("planning.route.reset",manualID,["expectedRevision":rev(manual)]
 var replacementRan=false
 do{_ = try store.withRouteReplacementGuard(projectID:manualID){replacementRan=true};check(false,"studied import replacement was accepted")}catch PlanningError.studiedLessonLocked{}
 check(!replacementRan,"studied import replacement ran side effects")
-var unlockedEdit=learningRoute
-var editableChapters=unlockedEdit["chapters"] as! [[String:Any]]
-editableChapters[0]["title"]="Changed unstudied chapter"
-unlockedEdit["chapters"]=editableChapters
+var unlockedEdit=skipEditedRoute
+unlockedEdit["title"]="Renamed route"
 manual=try call("planning.save",manualID,["route":unlockedEdit,"expectedRevision":rev(manual)])
 learningIdentity["routeRevision"]=rev(manual["routeDraft"] as! [String:Any])
 let draftLearning=try call("planning.learning.read",manualID,learningIdentity)
-check(draftLearning["startedNodeIds"] as? [String]==["interpret-results"],"unconfirmed current draft could not report its lock")
+check(draftLearning["startedNodeIds"] as? [String]==["define-a-question","interpret-results"],"unconfirmed current draft could not report its lock")
 do{_ = try complete("interpret-results",progressRevision(draftLearning));check(false,"unconfirmed draft recorded completion")}catch PlanningError.conflict{}
 manual=try call("planning.confirm",manualID,["expectedRevision":rev(manual)])
-check(try complete("interpret-results",progressRevision(draftLearning))==["interpret-results"],"started lesson did not complete")
-let afterDependent=try call("planning.learning.read",manualID,learningIdentity)
-_ = try start("define-a-question",progressRevision(afterDependent))
-check(try complete("define-a-question")==["define-a-question","interpret-results"],"skipped lesson could not be completed")
+check(try complete("interpret-results",progressRevision(draftLearning))==["define-a-question","interpret-results"],"started lesson did not complete")
 check(try complete("define-a-question")==["define-a-question","interpret-results"],"repeat completion was not idempotent")
 do{_ = try skip("define-a-question","Already familiar");check(false,"completed lesson was skipped")}catch PlanningError.conflict{}
 let savedProgress=try call("planning.learning.read",manualID,learningIdentity)
@@ -191,6 +200,11 @@ let noReasonID="proj_12345678-1234-4234-8234-123456789abf"
 var noReasonPlan=try store.enter(projectID:noReasonID,provider:nil,locale:"en")
 var noReasonRoute=route
 noReasonRoute["id"]=(noReasonPlan["routeDraft"] as! [String:Any])["id"]
+var electiveChapters=noReasonRoute["chapters"] as! [[String:Any]]
+var electiveNodes=electiveChapters[0]["nodes"] as! [[String:Any]]
+electiveNodes[0]["requirement"]="optional"
+electiveChapters[0]["nodes"]=electiveNodes
+noReasonRoute["chapters"]=electiveChapters
 noReasonPlan=try store.saveEditor(projectID:noReasonID,route:noReasonRoute,expectedRevision:rev(noReasonPlan))
 noReasonPlan=try store.confirmRoute(projectID:noReasonID,expectedRevision:rev(noReasonPlan))
 let noReasonSavedRoute=noReasonPlan["routeDraft"] as! [String:Any]
@@ -205,14 +219,33 @@ noReasonRequest["reason"]="";noReasonRequest["progressRevision"]=progressRevisio
 let noReasonRepeated=try call("planning.learning.skip",noReasonID,noReasonRequest)
 check(progressRevision(noReasonRepeated)==progressRevision(noReasonSkipped),"empty skip was not idempotent")
 noReasonRequest.removeValue(forKey:"reason");noReasonRequest["nodeId"]="interpret-results"
+do{_ = try call("planning.learning.start",noReasonID,noReasonRequest);check(false,"a skipped elective explicitly set as a prerequisite did not lock its dependent")}catch PlanningError.conflict{}
+do{_ = try call("planning.learning.master",noReasonID,noReasonRequest);check(false,"a locked lesson could be marked mastered")}catch PlanningError.conflict{}
+noReasonRequest["nodeId"]="define-a-question";noReasonRequest["progressRevision"]=0
+do{_ = try call("planning.learning.master",noReasonID,noReasonRequest);check(false,"stale mastery was saved")}catch PlanningError.conflict{}
+noReasonRequest["progressRevision"]=progressRevision(noReasonSkipped)
+let mastered=try call("planning.learning.master",noReasonID,noReasonRequest)
+check(mastered["masteredNodeIds"] as? [String]==["define-a-question"] && mastered["startedNodeIds"] as? [String]==[] && mastered["completedNodeIds"] as? [String]==[],"self-marked mastery was not recorded separately")
+check((mastered["skippedReasons"] as? [String:String])?.isEmpty==true && mastered["recordedNodeCount"] as? Int==1,"mastery did not replace the skip record")
+noReasonRequest["progressRevision"]=progressRevision(mastered)
+check(try progressRevision(call("planning.learning.master",noReasonID,noReasonRequest))==progressRevision(mastered),"repeat mastery advanced revision")
+do{_ = try call("planning.learning.skip",noReasonID,noReasonRequest);check(false,"mastered lesson could be skipped")}catch PlanningError.conflict{}
+do{_ = try store.withRouteReplacementGuard(projectID:noReasonID){true};check(false,"mastered lesson was not protected against replacement")}catch PlanningError.studiedLessonLocked{}
+let reopenedMastered=try learningReopened.learningProgress(projectID:noReasonID,routeID:noReasonSavedRoute["id"] as! String,revision:rev(noReasonSavedRoute))
+check(reopenedMastered["masteredNodeIds"] as? [String]==["define-a-question"],"mastery was lost on reopen")
+noReasonRequest["nodeId"]="interpret-results"
 let noReasonDependent=try call("planning.learning.start",noReasonID,noReasonRequest)
-check(noReasonDependent["startedNodeIds"] as? [String]==["interpret-results"],"empty skipped prerequisite failed to unlock its dependent")
+check(noReasonDependent["startedNodeIds"] as? [String]==["interpret-results"],"mastered prerequisite failed to unlock its dependent")
 noReasonRequest["nodeId"]="define-a-question";noReasonRequest["progressRevision"]=progressRevision(noReasonDependent)
 let noReasonStarted=try call("planning.learning.start",noReasonID,noReasonRequest)
 noReasonRequest["progressRevision"]=progressRevision(noReasonStarted)
 _ = try call("planning.learning.complete",noReasonID,noReasonRequest)
 let noReasonCompleted=try learningReopened.learningProgress(projectID:noReasonID,routeID:noReasonSavedRoute["id"] as! String,revision:rev(noReasonSavedRoute))
-check(noReasonCompleted["completedNodeIds"] as? [String]==["define-a-question"] && (noReasonCompleted["skippedReasons"] as? [String:String])?.isEmpty==true,"completed no-reason skip was not cleared")
+check(noReasonCompleted["completedNodeIds"] as? [String]==["define-a-question"] && noReasonCompleted["masteredNodeIds"] as? [String]==[],"full completion did not replace mastery")
+noReasonRequest["nodeId"]="interpret-results";noReasonRequest["progressRevision"]=progressRevision(noReasonCompleted)
+let masteredDependent=try call("planning.learning.master",noReasonID,noReasonRequest)
+let noReasonReset=try call("planning.learning.reset",noReasonID,noReasonIdentity.merging(["progressRevision":progressRevision(masteredDependent)]){_,new in new})
+check(noReasonReset["masteredNodeIds"] as? [String]==[] && noReasonReset["recordedNodeCount"] as? Int==0,"reset retained mastery or its progress count")
 do{_ = try learningReopened.learningProgress(projectID:manualID,routeID:legacyRouteID,revision:rev(learningRoute));check(false,"stale route revision accepted")}catch PlanningError.conflict{}
 var reordered=manual["routeDraft"] as! [String:Any]
 reordered["chapters"]=Array((reordered["chapters"] as! [[String:Any]]).reversed())
@@ -221,7 +254,7 @@ let legacyStudy=try JSONSerialization.data(withJSONObject:["routeId":legacyRoute
 try legacyDirectory.write(legacyKey+".json",data:legacyStudy)
 let legacyLocked=try call("planning.learning.read",manualID,learningIdentity)
 check(legacyLocked["startedNodeIds"] as? [String]==["define-a-question"] && progressRevision(legacyLocked)==0,"legacy completion did not protect the lesson")
-do{_ = try call("planning.undo",manualID,["expectedRevision":rev(manual)]);check(false,"undo changed a legacy-completed chapter")}catch PlanningError.studiedLessonLocked{}
+do{_ = try call("planning.save",manualID,["route":learningRoute,"expectedRevision":rev(manual)]);check(false,"save changed a legacy-completed chapter")}catch PlanningError.studiedLessonLocked{}
 var resetRequest=learningIdentity
 resetRequest["progressRevision"]=progressRevision(savedProgress)
 do{_ = try call("planning.learning.reset",manualID,resetRequest);check(false,"stale reset was accepted")}catch PlanningError.conflict{}

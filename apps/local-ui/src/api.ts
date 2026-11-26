@@ -7,7 +7,7 @@ import {passwordValid} from './password-validation';
 
 declare global {
   interface Window {
-    vibeNative?: {agents?: {request: (action: string, value?: Record<string,unknown>) => Promise<unknown>}; projects?: {request: (action: string, value?: Record<string,unknown>) => Promise<unknown>}; clock?: {sample: () => Promise<ClockSample>}; deviceId: string; deviceName?: string; preferences: Record<string, unknown>; setPreferences: (value: Record<string, unknown>) => void; quit: () => void; log?: (entry: DiagnosticEntry) => void; session?: {read: () => Promise<unknown>; write: (value: unknown) => Promise<unknown>; clear: () => Promise<unknown>}};
+    vibeNative?: {agents?: {request: (action: string, value?: Record<string,unknown>) => Promise<unknown>}; projects?: {request: (action: string, value?: Record<string,unknown>) => Promise<unknown>}; inlineWeb?: boolean; inlineWebNotes?: boolean; clock?: {sample: () => Promise<ClockSample>}; deviceId: string; deviceName?: string; preferences: Record<string, unknown>; setPreferences: (value: Record<string, unknown>) => void; quit: () => void; log?: (entry: DiagnosticEntry) => void; session?: {read: () => Promise<unknown>; write: (value: unknown) => Promise<unknown>; clear: () => Promise<unknown>}};
   }
 }
 export type Snapshot = {

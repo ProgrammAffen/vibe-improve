@@ -76,10 +76,18 @@ function editor(value, depth = 0, budget = {nodes: 0}) {
   }
 }
 function source(value) {
-  keys(value, ['quote'], ['page', 'startMs', 'endMs']); string(value.quote, 10_000);
+  keys(value, ['quote'], ['page', 'startMs', 'endMs', 'web']); string(value.quote, 10_000);
   if (value.page !== undefined) {integer(value.page, 1_000_000); if (value.page < 1) fail();}
   if (value.startMs !== undefined) integer(value.startMs);
   if (value.endMs !== undefined) {integer(value.endMs); if (value.startMs === undefined || value.endMs < value.startMs) fail();}
+  if (value.web !== undefined) {
+    if (value.page !== undefined || value.startMs !== undefined || value.endMs !== undefined) fail();
+    keys(value.web, ['url', 'prefix', 'suffix']);
+    lessonURL(value.web.url);
+    string(value.quote, 1000, false);
+    string(value.web.prefix, 120);
+    string(value.web.suffix, 120);
+  }
 }
 export function validateLessonWorkspace(input, identity) {
   keys(input, ['schemaVersion', 'projectId', 'routeId', 'nodeId', 'revision', 'blocks']);

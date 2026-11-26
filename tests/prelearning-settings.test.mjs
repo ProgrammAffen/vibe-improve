@@ -31,9 +31,9 @@ test('started lesson protection remains read only without a clear-records-and-ed
  for(const language of ['zh-CN','en']){
   const html=editor(state,language,{studiedNodeIds:new Set(['lesson']),onResetLearning:no});
   assert.doesNotMatch(html,/清空学习记录并编辑|Clear progress &amp; edit|清空学习记录后可|Clear learning progress from/);
-  assert.match(html,language==='en'?/aria-description="Study started · Read only"/:/aria-description="已开始学习 · 只读"/);
+  assert.match(html,language==='en'?/aria-description="Learning progress recorded · Read only"/:/aria-description="已有学习进度 · 只读"/);
   assert.match(html,/readonly=""/i);
-  assert.match(html,language==='en'?/Study started · Read only/:/已开始学习 · 只读/);
+  assert.match(html,language==='en'?/Learning progress recorded · Read only/:/已有学习进度 · 只读/);
  }
 });
 

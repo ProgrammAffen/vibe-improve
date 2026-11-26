@@ -49,6 +49,7 @@ export function useLessonWorkspace(identity: LessonIdentity) {
       generation.current++;
       setWorkspace(next);
       setStatus("dirty");
+      return generation.current;
     },
     [],
   );
@@ -91,6 +92,10 @@ export function useLessonWorkspace(identity: LessonIdentity) {
     queue.current = run();
     return queue.current;
   }, [key]);
+  const flushUpdate = useCallback(async (version: number) => {
+    await flush();
+    return savedGeneration.current >= version;
+  }, [flush]);
   useEffect(() => {
     if (status !== "dirty") return;
     const timer = window.setTimeout(() => void flush(), 900);
@@ -119,6 +124,7 @@ export function useLessonWorkspace(identity: LessonIdentity) {
     workspace,
     update,
     flush,
+    flushUpdate,
     status,
     error,
     current,

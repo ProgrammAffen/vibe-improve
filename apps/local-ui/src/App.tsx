@@ -10,7 +10,7 @@ import SettingsPage, {type SoundPreferences} from './components/SettingsPage';
 import AgentSelectionPage from './components/AgentSelectionPage';
 import RouteSourcePage from './components/RouteSourcePage';
 import {routeService} from './routes/service';
-import {confirmedRoute, learningService, prerequisiteMet, type LearningProgress} from './routes/learning';
+import {confirmedRoute, learningService, type LearningProgress} from './routes/learning';
 import PlanningPage from './components/PlanningPage';
 import AdventureMap from './components/AdventureMap';
 const LessonPage = lazy(() => import('./components/LessonPage'));
@@ -258,10 +258,7 @@ export default function App() {
 
   async function startLesson(nodeId: string) {
     const session = adventure;
-    if (!session || changingProgress.current) return;
-    const node = session.route.chapters.flatMap(chapter => chapter.nodes).find(item => item.id === nodeId);
-    if (!node || !learningProgress || (!learningProgress.completedNodeIds.has(nodeId)
-      && node.prerequisites.some(id => !prerequisiteMet(learningProgress, id)))) return;
+    if (!session || !learningProgress || changingProgress.current) return;
     const saved = await updateLearning(session, () => learningService.start(session.projectId, session.route, nodeId, learningProgress.progressRevision));
     if (session !== adventureRef.current || initialPage() !== 'map') return;
     if (!saved) {setLearningError(true); return;}
@@ -269,7 +266,7 @@ export default function App() {
     navigate('lesson');
   }
 
-  async function updateLearning(session: Adventure, operation: () => Promise<LearningProgress>) {
+  async function updateLearning(session: Adventure, operation: () => Promise<LearningProgress>, returnOnConflict = true) {
     if (changingProgress.current) return false;
     changingProgress.current = true;
     setLearningBusy(true);
@@ -281,7 +278,7 @@ export default function App() {
     } catch (cause) {
       if (session === adventureRef.current && planningError(cause) === 'PLANNING_CONFLICT') {
         setLearningReadAttempt(value => value + 1);
-        if (initialPage() === 'lesson') {setLessonId(undefined); navigate('map');}
+        if (returnOnConflict && initialPage() === 'lesson') {setLessonId(undefined); navigate('map');}
       }
       return false;
     } finally {
@@ -291,10 +288,14 @@ export default function App() {
   }
 
   async function completeLesson() {
-    if (!adventure || !lessonId || !learningProgress || changingProgress.current) return;
+    if (!adventure || !lessonId || !learningProgress || changingProgress.current
+        || adventure !== adventureRef.current || initialPage() !== 'lesson') return;
     const session = adventure;
-    const saved = await updateLearning(session, () => learningService.complete(session.projectId, session.route, lessonId, learningProgress.progressRevision));
-    if (!saved && session === adventureRef.current && initialPage() === 'lesson') setLearningError(true);
+    const request = projectRequest.current;
+    const saved = await updateLearning(session, () => learningService.complete(session.projectId, session.route, lessonId, learningProgress.progressRevision), false);
+    if (request !== projectRequest.current || session !== adventureRef.current || initialPage() !== 'lesson') return;
+    if (saved) navigate('map');
+    else setLearningError(true);
   }
 
   async function skipLesson(nodeId: string, reason: string) {
@@ -302,6 +303,12 @@ export default function App() {
     return session && learningProgress
       ? updateLearning(session, () => learningService.skip(session.projectId, session.route, nodeId, reason, learningProgress.progressRevision))
       : false;
+  }
+
+  async function masterLesson(nodeId: string) {
+    const session = adventure;
+    if (!session || !learningProgress || initialPage() !== 'map') return false;
+    return updateLearning(session, () => learningService.master(session.projectId, session.route, nodeId, learningProgress.progressRevision));
   }
 
   function editRoute() {
@@ -354,9 +361,9 @@ export default function App() {
       </div>
     </section>;
     return <AdventureMap key={project.id + ':' + route.id} route={route} language={language} initialNodeId={lessonId}
-      completedNodeIds={learningProgress.completedNodeIds} skippedReasons={learningProgress.skippedReasons}
+      completedNodeIds={learningProgress.completedNodeIds} masteredNodeIds={learningProgress.masteredNodeIds} skippedReasons={learningProgress.skippedReasons}
       onStartLesson={startLesson} startPending={learningBusy} startError={learningError ? t('无法记录开始学习，请重试。', 'Could not start the lesson. Try again.') : ''}
-      onSkipLesson={skipLesson} onBack={() => navigate('home')} onEdit={editRoute}/>;
+      onSkipLesson={skipLesson} onMasterLesson={masterLesson} onBack={() => navigate('home')} onEdit={editRoute}/>;
   }
 
   async function run(action: () => Promise<unknown>, completed?: () => void) {

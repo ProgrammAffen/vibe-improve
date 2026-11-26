@@ -1,22 +1,19 @@
 export const isRequiredLesson = node => node.requirement !== 'optional';
 
-// Elective lessons do not gate progress; their required foundations still do.
 export function learningPrerequisiteIds(route, nodeId) {
-  const nodes = new Map(route.chapters.flatMap(chapter => chapter.nodes.map(node => [node.id, node])));
-  const required = new Set(), visited = new Set([nodeId]);
-  function visit(id) {
-    if (visited.has(id)) return;
-    visited.add(id);
-    const node = nodes.get(id);
-    if (!node || isRequiredLesson(node)) required.add(id);
-    else node.prerequisites.forEach(visit);
+  for (const chapter of route.chapters) {
+    const node = chapter.nodes.find(item => item.id === nodeId);
+    if (node) return [...node.prerequisites];
   }
-  nodes.get(nodeId)?.prerequisites.forEach(visit);
-  return [...required];
+  return [];
 }
 
-export function learningProgressSummary(nodes, completedNodeIds) {
+export function learningProgressSummary(nodes, completedNodeIds, masteredNodeIds) {
   const required = nodes.filter(isRequiredLesson);
   const tracked = required.length ? required : nodes;
-  return {total: tracked.length, completed: tracked.filter(node => completedNodeIds.has(node.id)).length, optionalOnly: nodes.length > 0 && required.length === 0};
+  return {
+    total: tracked.length,
+    completed: tracked.filter(node => completedNodeIds.has(node.id) || masteredNodeIds?.has(node.id)).length,
+    optionalOnly: nodes.length > 0 && required.length === 0,
+  };
 }

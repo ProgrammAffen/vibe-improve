@@ -123,6 +123,7 @@ final class AssetServer {
         if fields["Content-Length"] == nil { fields["Content-Length"] = String(data.count) }
         fields["Connection"] = "close"
         fields["X-Content-Type-Options"] = "nosniff"
+        fields["X-Frame-Options"] = "DENY"
         fields["Cache-Control"] = "no-store"
         if fields["Content-Security-Policy"] == nil { fields["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; media-src 'self' blob:; connect-src 'self' https://*.tcloudbasegateway.com https://*.tcb-api.tencentcloudapi.com https://*.tcloudbase.com https://*.tcb.qcloud.la https://*.tencentcloudapi.com; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'" }
         let head = "HTTP/1.1 \(code)\r\n" + fields.map { "\($0.key): \($0.value)\r\n" }.joined() + "\r\n"
@@ -143,11 +144,13 @@ final class AssetServer {
     }
 }
 
-final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply, WKNavigationDelegate {
+final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply, WKNavigationDelegate, WKUIDelegate {
     var window: NSWindow!
     var webView: WKWebView!
     var server: AssetServer!
     var port: UInt16 = 0
+    private lazy var browser = InAppBrowserWindowController()
+    private var inlineBrowser: InlineLessonBrowserController?
     let sessionStore = SessionCredentialStore(runtimeRoot: runtimeRoot)
     let sessionQueue = DispatchQueue(label: "vibe-improve.session")
     let projectQueue = DispatchQueue(label: "vibe-improve.projects")
@@ -212,6 +215,18 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             var result: [String: Any] = ["route": route, "chapter": chapter, "node": node,
                                          "notebookResetRevision": progress["notebookResetRevision"] ?? 0]
             if let choice = state["agentChoice"] { result["agentChoice"] = choice }
+            let materials = (state["routeMaterials"] as? [[String: Any]])?.first {
+                $0["routeId"] as? String == identity.routeId
+            }?["links"] as? [[String: String]] ?? []
+            result["linkedResources"] = materials.compactMap { link -> ResourceSelection? in
+                guard let id = link["id"], let version = link["version"] else { return nil }
+                switch link["kind"] {
+                case "lesson" where link["targetId"] == identity.nodeId,
+                     "chapter" where link["targetId"] == chapter["id"] as? String:
+                    return ResourceSelection(id: id, version: version)
+                default: return nil
+                }
+            }
             return result
         }, resource: { identity, ref in
             let item = try library.item(identity.projectId, ref: ref)
@@ -252,11 +267,19 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         let prefs = String(decoding: prefsData, as: UTF8.self)
         let deviceNameData = try! JSONSerialization.data(withJSONObject: Host.current().localizedName ?? ProcessInfo.processInfo.hostName, options: [.fragmentsAllowed])
         let deviceName = String(decoding: deviceNameData, as: UTF8.self)
-        let script = "window.vibeNative={deviceId:'\(deviceId)',deviceName:\(deviceName),preferences:\(prefs),setPreferences:function(p){window.webkit.messageHandlers.vibeNative.postMessage({action:'preferences',value:p})},log:function(e){window.webkit.messageHandlers.vibeNative.postMessage({action:'log',value:e})},quit:function(){window.webkit.messageHandlers.vibeNative.postMessage({action:'quit'})},clock:{sample:function(){return window.webkit.messageHandlers.vibeSession.postMessage({action:'clock'})}},agents:{request:function(action,value){return window.webkit.messageHandlers.vibeAgents.postMessage({action:action,value:value||{}})}},projects:{request:function(action,value){return window.webkit.messageHandlers.vibeProjects.postMessage({action:action,value:value||{}})}},session:{read:function(){return window.webkit.messageHandlers.vibeSession.postMessage({action:'read'})},write:function(value){return window.webkit.messageHandlers.vibeSession.postMessage({action:'write',value:value})},clear:function(){return window.webkit.messageHandlers.vibeSession.postMessage({action:'clear'})}}};"
+        let script = "window.vibeNative={inlineWeb:true,inlineWebNotes:true,deviceId:'\(deviceId)',deviceName:\(deviceName),preferences:\(prefs),setPreferences:function(p){window.webkit.messageHandlers.vibeNative.postMessage({action:'preferences',value:p})},log:function(e){window.webkit.messageHandlers.vibeNative.postMessage({action:'log',value:e})},quit:function(){window.webkit.messageHandlers.vibeNative.postMessage({action:'quit'})},clock:{sample:function(){return window.webkit.messageHandlers.vibeSession.postMessage({action:'clock'})}},agents:{request:function(action,value){return window.webkit.messageHandlers.vibeAgents.postMessage({action:action,value:value||{}})}},projects:{request:function(action,value){return window.webkit.messageHandlers.vibeProjects.postMessage({action:action,value:value||{}})}},session:{read:function(){return window.webkit.messageHandlers.vibeSession.postMessage({action:'read'})},write:function(value){return window.webkit.messageHandlers.vibeSession.postMessage({action:'write',value:value})},clear:function(){return window.webkit.messageHandlers.vibeSession.postMessage({action:'clear'})}}};"
         config.userContentController.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         webView = WKWebView(frame: .zero, configuration: config)
+        inlineBrowser = InlineLessonBrowserController(host: webView, onState: { [weak view = webView] id, state in
+            view?.callAsyncJavaScript("window.dispatchEvent(new CustomEvent('vibe-inline-browser-state', {detail: {id, state}}));",
+                                      arguments: ["id": id, "state": state], in: nil, in: .page, completionHandler: nil)
+        }, onAnnotation: { [weak view = webView] payload in
+            view?.callAsyncJavaScript("window.dispatchEvent(new CustomEvent('vibe-inline-note', {detail: payload}));",
+                                      arguments: ["payload": payload], in: nil, in: .page, completionHandler: nil)
+        })
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in self?.checkLicenseTime() }
         webView.navigationDelegate = self
+        webView.uiDelegate = self
         webView.setValue(false, forKey: "drawsBackground")
         let available = NSScreen.main?.visibleFrame.size ?? NSSize(width: 1440, height: 900)
         let style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable]
@@ -300,16 +323,27 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         diagnosticLog.record("native.local.failed", level: "error", resultCode: "SERVICE_UNAVAILABLE")
     }
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { inlineBrowser?.clear() }
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { inlineBrowser?.clear() }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { diagnosticLog.record("native.navigation.completed") }
     func makeMenus() {
+        let english = preferences["language"] as? String == "en"
         let menu = NSMenu(); let appItem = NSMenuItem(); menu.addItem(appItem)
         let appMenu = NSMenu(); appItem.submenu = appMenu
         appMenu.addItem(withTitle: "退出 Vibe Improve", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         let editItem = NSMenuItem(); menu.addItem(editItem); let edit = NSMenu(title: "编辑"); editItem.submenu = edit
         for (title, selector, key) in [("撤销", "undo:", "z"), ("剪切", "cut:", "x"), ("复制", "copy:", "c"), ("粘贴", "paste:", "v"), ("全选", "selectAll:", "a")] { edit.addItem(withTitle: title, action: Selector(selector), keyEquivalent: key) }
+        let browserItem = NSMenuItem(); menu.addItem(browserItem)
+        let browserMenu = NSMenu(title: english ? "Browser" : "浏览器")
+        browserItem.submenu = browserMenu
+        let openPage = browserMenu.addItem(withTitle: english ? "Open Browser" : "打开浏览器", action: #selector(openBrowser), keyEquivalent: "l")
+        openPage.target = self
         let windowItem = NSMenuItem(); menu.addItem(windowItem); let windowMenu = NSMenu(title: "窗口"); windowItem.submenu = windowMenu
         let fullscreen = windowMenu.addItem(withTitle: "切换全屏", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f"); fullscreen.keyEquivalentModifierMask = [.control, .command]
         NSApplication.shared.mainMenu = menu
+    }
+    @objc private func openBrowser() {
+        browser.show(english: preferences["language"] as? String == "en", relativeTo: window)
     }
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.frameInfo.isMainFrame, let origin = message.frameInfo.request.url, isAllowed(origin), let body = message.body as? [String: Any], let action = body["action"] as? String else { return }
@@ -324,8 +358,10 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 if let volume = sound["volume"] as? Double, volume.isFinite { safe["volume"] = min(100, max(0, volume)) }
                 allowed["sound"] = safe
             }
+            let languageChanged = preferences["language"] as? String != allowed["language"] as? String
             preferences = allowed
             saveState()
+            if languageChanged { makeMenus() }
         }
     }
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
@@ -357,6 +393,52 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
               projectPayloadFits(action, body),
               let store = projectStore else { replyHandler(nil, "PROJECT_STORAGE_UNAVAILABLE"); return }
         let value = body["value"] as? [String: Any] ?? [:]
+        if action == "browser.inline.update" {
+            guard inlineBrowser?.update(value) == true else { replyHandler(nil, "BROWSER_INLINE_UNAVAILABLE"); return }
+            replyHandler(NSNull(), nil)
+            return
+        }
+        if action == "browser.inline.remove" {
+            guard Set(value.keys) == ["id"], let id = value["id"] as? String, UUID(uuidString: id) != nil else {
+                replyHandler(nil, "BROWSER_INLINE_UNAVAILABLE"); return
+            }
+            inlineBrowser?.remove(id)
+            replyHandler(NSNull(), nil)
+            return
+        }
+        if ["browser.inline.notes", "browser.inline.note.begin", "browser.inline.note.resolve"].contains(action) {
+            let accepted: Bool
+            switch action {
+            case "browser.inline.notes":
+                accepted = inlineBrowser?.setAnnotations(value) == true
+            case "browser.inline.note.begin":
+                accepted = Set(value.keys) == ["id"] && (value["id"] as? String).map { inlineBrowser?.beginAnnotation($0) == true } == true
+            default:
+                accepted = inlineBrowser?.resolveAnnotation(value) == true
+            }
+            if accepted { replyHandler(NSNull(), nil) }
+            else { replyHandler(nil, "BROWSER_INLINE_NOTE_UNAVAILABLE") }
+            return
+        }
+        if action == "browser.openExternal" {
+            guard Set(value.keys) == ["url"], let rawURL = value["url"] as? String,
+                  let url = BrowserAddress.url(rawURL) else {
+                replyHandler(nil, "BROWSER_ADDRESS_INVALID"); return
+            }
+            guard NSWorkspace.shared.open(url) else {
+                replyHandler(nil, "BROWSER_EXTERNAL_UNAVAILABLE"); return
+            }
+            replyHandler(NSNull(), nil)
+            return
+        }
+        if action == "browser.open" {
+            guard Set(value.keys) == ["url"], let rawURL = value["url"] as? String,
+                  let url = BrowserAddress.url(rawURL), openWebsite(url) else {
+                replyHandler(nil, "BROWSER_ADDRESS_INVALID"); return
+            }
+            replyHandler(NSNull(), nil)
+            return
+        }
         if action.hasPrefix("lesson."){handleLesson(action,value:value,replyHandler:replyHandler);return}
         if action.hasPrefix("planning."){handlePlanning(action,value:value,replyHandler:replyHandler);return}
         if action.hasPrefix("route."){handleRoutePreparation(action,value:value,replyHandler:replyHandler);return}
@@ -426,7 +508,8 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             measured["value"]=value
         }
         guard let bytes=try? JSONSerialization.data(withJSONObject:measured) else{return false}
-        return bytes.count<=((action.hasPrefix("planning.") || action.hasPrefix("lesson.")) ? 2_162_688:65_536)
+        let includesWorkspaceData = action.hasPrefix("planning.") || action.hasPrefix("lesson.") || action == "browser.inline.notes"
+        return bytes.count <= (includesWorkspaceData ? 2_162_688 : 65_536)
     }
     private func handleLesson(_ action: String, value: [String: Any], replyHandler: @escaping (Any?, String?) -> Void) {
         guard let store = lessonStore else { replyHandler(nil, LessonError.storage.rawValue); return }
@@ -547,8 +630,31 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
     }
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        if navigationAction.navigationType == .linkActivated, let url=navigationAction.request.url,AgentLogin.permitsAuthURL(url){NSWorkspace.shared.open(url);decisionHandler(.cancel);return}
-        if let url = navigationAction.request.url, isAllowed(url) { decisionHandler(.allow) } else { decisionHandler(.cancel) }
+        guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
+        if isAllowed(url) {
+            decisionHandler(.allow)
+            return
+        }
+        decisionHandler(.cancel)
+        openActivatedLink(navigationAction)
+    }
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        if navigationAction.targetFrame == nil { openActivatedLink(navigationAction) }
+        return nil
+    }
+    private func openActivatedLink(_ action: WKNavigationAction) {
+        guard action.navigationType == .linkActivated, action.sourceFrame.isMainFrame,
+              let source = action.sourceFrame.request.url, isAllowed(source),
+              let url = action.request.url, !isAllowed(url) else { return }
+        _ = openWebsite(url)
+    }
+    private func openWebsite(_ url: URL) -> Bool {
+        if AgentLogin.permitsAuthURL(url) {
+            return NSWorkspace.shared.open(url)
+        }
+        guard BrowserAddress.permits(url) else { return false }
+        return browser.show(url: url, english: preferences["language"] as? String == "en", relativeTo: window)
     }
     private func isAllowed(_ url: URL) -> Bool {
         LocalClientOrigin(port: port).permits(url)

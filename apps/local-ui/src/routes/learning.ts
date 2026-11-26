@@ -7,7 +7,7 @@ import {currentProgress, emptyProgress, MAX_PROGRESS_REVISION, MAX_SKIP_REASON_L
 export {MAX_SKIP_REASON_LENGTH, prerequisiteMet, type LearningProgress} from './learning-record';
 
 type LearningChange =
-  | {kind: 'start' | 'complete'; nodeId: string; progressRevision: number}
+  | {kind: 'start' | 'complete' | 'master'; nodeId: string; progressRevision: number}
   | {kind: 'skip'; nodeId: string; reason: string; progressRevision: number}
   | {kind: 'reset'; progressRevision: number};
 
@@ -49,12 +49,15 @@ async function progress(projectId: string, route: RouteDocument, change?: Learni
       if (state.confirmedRevision !== route.revision) throw new Error('PLANNING_CONFLICT');
       const node = nodes.find(item => item.id === change.nodeId);
       const completed = history.completedNodeIds.has(change.nodeId);
-      if (!node || (!completed && learningPrerequisiteIds(current, node.id).some(id => !prerequisiteMet(history, id)))) throw new Error('PLANNING_CONFLICT');
+      const mastered = history.masteredNodeIds.has(change.nodeId);
+      if (!node || (!completed && !mastered && learningPrerequisiteIds(current, node.id).some(id => !prerequisiteMet(history, id)))) {
+        throw new Error('PLANNING_CONFLICT');
+      }
       switch (change.kind) {
         case 'skip': {
           const reason = change.reason.trim();
           if (reason.length > MAX_SKIP_REASON_LENGTH) throw new Error('PLANNING_INVALID');
-          if (completed) throw new Error('PLANNING_CONFLICT');
+          if (completed || mastered) throw new Error('PLANNING_CONFLICT');
           if (history.skippedReasons.has(node.id)) return currentProgress(history, ids);
           history.skippedReasons.set(node.id, reason);
           break;
@@ -63,10 +66,18 @@ async function progress(projectId: string, route: RouteDocument, change?: Learni
           if (history.startedNodeIds.has(node.id)) return currentProgress(history, ids);
           history.startedNodeIds.add(node.id);
           break;
+        case 'master': {
+          if (completed) return currentProgress(history, ids);
+          const wasSkipped = history.skippedReasons.delete(node.id);
+          if (mastered && !wasSkipped) return currentProgress(history, ids);
+          history.masteredNodeIds.add(node.id);
+          break;
+        }
         case 'complete':
           if (completed && !history.skippedReasons.has(node.id)) return currentProgress(history, ids);
           if (!history.startedNodeIds.has(node.id)) throw new Error('PLANNING_CONFLICT');
           history.completedNodeIds.add(node.id);
+          history.masteredNodeIds.delete(node.id);
           history.skippedReasons.delete(node.id);
           break;
       }
@@ -86,6 +97,7 @@ export const learningService = {
   read: (projectId: string, route: RouteDocument) => progress(projectId, route),
   start: (projectId: string, route: RouteDocument, nodeId: string, progressRevision: number) => progress(projectId, route, {kind: 'start', nodeId, progressRevision}),
   complete: (projectId: string, route: RouteDocument, nodeId: string, progressRevision: number) => progress(projectId, route, {kind: 'complete', nodeId, progressRevision}),
+  master: (projectId: string, route: RouteDocument, nodeId: string, progressRevision: number) => progress(projectId, route, {kind: 'master', nodeId, progressRevision}),
   skip: (projectId: string, route: RouteDocument, nodeId: string, reason: string, progressRevision: number) => progress(projectId, route, {kind: 'skip', nodeId, reason, progressRevision}),
   reset: (projectId: string, route: RouteDocument, progressRevision: number) => progress(projectId, route, {kind: 'reset', progressRevision}),
 };

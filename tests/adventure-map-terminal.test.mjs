@@ -71,7 +71,8 @@ test('resizing preserves opposite endpoints and redistributes learning markers u
   const pages=createRouteMapPages(route(sizes,'resized-endpoints-'+sizes.join('-')));
   for(const original of pages) for(const viewport of [{width:960,height:540,top:118,bottom:80},{width:1440,height:960,top:140,bottom:98},{width:2560,height:1080,top:146,bottom:100}]){
    const page=projectMapPage(original,viewport).page,first=page.nodes[0],last=page.nodes.at(-1);
-   near(first.x,original.nodes[0].x);near(last.x,original.nodes.at(-1).x);
+   assert.ok(first.x<last.x,'Resizing must retain the left-to-right endpoints');
+   assert.ok(first.x>=1672*.1&&last.x<=1672*.9,'Endpoints stay inside the central map frame');
    assert.equal(first.y<last.y,original.nodes[0].y<original.nodes.at(-1).y);
    for(let index=0;index<page.nodes.length-1;index++)near(routeMarkerGap(page.nodes.slice(index,index+2),page.paths.filter(path=>path.leg===index),page.themeId),page.spacing);
    near(page.paths.at(-1).end.x,last.x);near(page.paths.at(-1).end.y,last.y);

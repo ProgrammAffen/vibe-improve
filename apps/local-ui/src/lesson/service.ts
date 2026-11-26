@@ -1,5 +1,7 @@
 import {emptyLessonWorkspace, nextLessonWorkspace, recoverLessonWorkspace, resetLessonWorkspace, validateLessonIdentity, validateLessonWorkspace} from '../../../../packages/domain/lesson-workspace.mjs';
+import type {ResourceSelection} from '../../../../packages/domain/planning.mjs';
 import {browserProjectTransaction, withProjectLock} from '../planning/browser-store';
+import {resourceRef} from '../resources/service';
 import type {LessonIdentity, LessonWorkspace} from './types';
 
 export type LessonPreview = {url: string; mimeType: string; name: string};
@@ -92,10 +94,10 @@ async function save(identity: LessonIdentity, expectedRevision: number, workspac
     });
   });
 }
-async function preview(identity: LessonIdentity, ref: {id: string; version: string}): Promise<LessonPreview> {
+async function preview(identity: LessonIdentity, ref: ResourceSelection): Promise<LessonPreview> {
   validateLessonIdentity(identity);
   if (!window.vibeNative?.projects) throw new Error('LESSON_DESKTOP_REQUIRED');
-  const result = await window.vibeNative.projects.request('lesson.preview', {...identity, ref}) as LessonPreview;
+  const result = await window.vibeNative.projects.request('lesson.preview', {...identity, ref: resourceRef(ref)}) as LessonPreview;
   if (!result || typeof result.url !== 'string' || typeof result.mimeType !== 'string' || typeof result.name !== 'string') throw new Error('LESSON_PREVIEW_UNAVAILABLE');
   // Local content must come from this app's current loopback origin; web links are not fetched here.
   const url = new URL(result.url, location.href);

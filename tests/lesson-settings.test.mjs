@@ -61,13 +61,14 @@ test('incomplete review settings save as drafts and point to their exact fields 
   }
 });
 
-test('electives do not gate learning but preserve required ancestors and required-only progress', () => {
+test('explicit elective prerequisites gate learning while required progress counts each completed or mastered lesson once', () => {
   const value = route();
-  assert.deepEqual(learningPrerequisiteIds(value,'c'),['a']);
+  assert.deepEqual(learningPrerequisiteIds(value,'c'),['b']);
   assert.deepEqual(learningPrerequisiteIds(value,'b'),['a']);
   assert.deepEqual(learningProgressSummary(value.chapters[0].nodes,new Set(['a','b'])),{total:2, completed:1, optionalOnly:false});
+  assert.deepEqual(learningProgressSummary(value.chapters[0].nodes,new Set(['a','b']),new Set(['a','c'])),{total:2, completed:2, optionalOnly:false});
   value.chapters[0].nodes[0].requirement = 'optional';
-  assert.deepEqual(learningPrerequisiteIds(value,'c'),[]);
+  assert.deepEqual(learningPrerequisiteIds(value,'c'),['b']);
   value.chapters[0].nodes[2].requirement = 'optional';
   assert.deepEqual(learningProgressSummary(value.chapters[0].nodes,new Set(['a','c'])),{total:3, completed:2, optionalOnly:true});
 });
@@ -81,7 +82,7 @@ test('started lessons protect both settings, including through AI proposals', ()
   }
 });
 
-test('native store restores review settings and applies the same elective unlocking and studied lock', {skip:process.platform!=='darwin', timeout:180_000}, async () => {
+test('native store restores review settings and applies explicit elective prerequisites and studied lock', {skip:process.platform!=='darwin', timeout:180_000}, async () => {
   await mkdir('tmp/checks/lesson-settings',{recursive:true});
   const dir = await mkdtemp(resolve('tmp/checks/lesson-settings/native-'));
   const validator = join(dir,'planning.js'), source = join(dir,'main.swift'), binary = join(dir,'verify');
@@ -94,11 +95,14 @@ func store()throws->PlanningStore{try PlanningStore(runtime:RuntimeDirectory(url
 let value=try JSONSerialization.jsonObject(with:Data(contentsOf:root.appendingPathComponent("route.json"))) as! [String:Any]
 let first=try store(),entered=try first.enter(projectID:id,provider:nil,locale:"en",route:value)
 let confirmed=try first.confirmRoute(projectID:id,expectedRevision:entered["revision"] as! Int),route=confirmed["routeDraft"] as! [String:Any],revision=route["revision"] as! Int
-do{_ = try first.learningProgress(projectID:id,routeID:"synthetic",revision:revision,change:.start("c"),expectedProgressRevision:0);preconditionFailure("Lost required ancestor")}catch PlanningError.conflict{}
+do{_ = try first.learningProgress(projectID:id,routeID:"synthetic",revision:revision,change:.start("c"),expectedProgressRevision:0);preconditionFailure("Lost explicit prerequisite")}catch PlanningError.conflict{}
 _ = try first.learningProgress(projectID:id,routeID:"synthetic",revision:revision,change:.start("a"),expectedProgressRevision:0)
 _ = try first.learningProgress(projectID:id,routeID:"synthetic",revision:revision,change:.complete("a"),expectedProgressRevision:1)
-let started=try first.learningProgress(projectID:id,routeID:"synthetic",revision:revision,change:.start("c"),expectedProgressRevision:2)
+do{_ = try first.learningProgress(projectID:id,routeID:"synthetic",revision:revision,change:.start("c"),expectedProgressRevision:2);preconditionFailure("Completing an ancestor bypassed an elective prerequisite")}catch PlanningError.conflict{}
+_ = try first.learningProgress(projectID:id,routeID:"synthetic",revision:revision,change:.master("b"),expectedProgressRevision:2)
+let started=try first.learningProgress(projectID:id,routeID:"synthetic",revision:revision,change:.start("c"),expectedProgressRevision:3)
 precondition(!(started["startedNodeIds"] as! [String]).contains("b"))
+precondition((started["masteredNodeIds"] as! [String]).contains("b"))
 let reopened=try store(),loaded=try reopened.read(projectID:id)!,restored=loaded["routeDraft"] as! [String:Any],chapters=restored["chapters"] as! [[String:Any]],nodes=chapters[0]["nodes"] as! [[String:Any]]
 precondition(nodes[1]["requirement"] as? String=="optional");precondition((nodes[1]["review"] as? [String:Any])?["content"] as? String=="Explain the concepts and apply them to a new example.")
 var changed=restored,changedChapters=chapters,changedNodes=nodes

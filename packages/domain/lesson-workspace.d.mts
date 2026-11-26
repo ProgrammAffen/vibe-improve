@@ -1,6 +1,6 @@
 export type LessonIdentity = {projectId: string; routeId: string; nodeId: string};
 export type LessonEditorContent = {type?: string; attrs?: Record<string, any>; content?: LessonEditorContent[]; marks?: {type: string; attrs?: Record<string, any>; [key: string]: any}[]; text?: string; [key: string]: any};
-export type LessonSource = {quote: string; page?: number; startMs?: number; endMs?: number};
+export type LessonSource = {quote: string; page?: number; startMs?: number; endMs?: number; web?: {url: string; prefix: string; suffix: string}};
 export type LessonMessage = {id: string; role: 'user'|'assistant'; text: string; status?: 'pending'|'complete'|'incomplete'};
 export type LessonRecord = {id: string; kind: 'note'|'question'; title: string; content?: LessonEditorContent; source?: LessonSource; references?: {blockId: string; source: LessonSource}[]; messages: LessonMessage[]; collapsed: boolean};
 export type LessonBlock = {id: string; kind: 'text'|'math'|'resource'|'link'; content?: LessonEditorContent; latex?: string; resource?: {id: string; version: string}; url?: string; title?: string; collapsed: boolean; records: LessonRecord[]};

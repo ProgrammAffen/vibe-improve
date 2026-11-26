@@ -9,7 +9,7 @@
 ```sh
 mkdir -p tmp/dependencies/app
 cp package.json package-lock.json tmp/dependencies/app/
-npm ci --prefix tmp/dependencies/app --cache "$PWD/tmp/cache/npm" --no-audit --no-fund
+npm ci --prefix tmp/dependencies/app --cache ，"$PWD/tmp/cache/npm" --no-audit --no-fund
 ln -s "$PWD/tmp/dependencies/app/node_modules" node_modules
 npm run prebuild
 npm run dev

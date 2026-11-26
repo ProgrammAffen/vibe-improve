@@ -160,8 +160,27 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 999999999
+        },
+        "web": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["url", "prefix", "suffix"],
+          "properties": {
+            "url": {"type": "string", "maxLength": 2048, "pattern": "^[hH][tT][tT][pP][sS]?://"},
+            "prefix": {"type": "string", "maxLength": 120},
+            "suffix": {"type": "string", "maxLength": 120}
+          }
         }
       },
+      "allOf": [
+        {
+          "if": {"required": ["web"]},
+          "then": {
+            "properties": {"quote": {"minLength": 1, "maxLength": 1000}},
+            "not": {"anyOf": [{"required": ["page"]}, {"required": ["startMs"]}, {"required": ["endMs"]}]}
+          }
+        }
+      ],
       "dependentRequired": {
         "endMs": [
           "startMs"

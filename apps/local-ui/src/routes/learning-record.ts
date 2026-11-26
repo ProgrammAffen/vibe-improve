@@ -10,27 +10,43 @@ export type LearningProgress = {
   recordedNodeCount: number;
   startedNodeIds: Set<string>;
   completedNodeIds: Set<string>;
+  masteredNodeIds: Set<string>;
   skippedReasons: Map<string, string>;
 };
 
 export function emptyProgress(progressRevision = 0): LearningProgress {
-  return {progressRevision, notebookResetRevision: 0, recordedNodeCount: 0, startedNodeIds: new Set(), completedNodeIds: new Set(), skippedReasons: new Map()};
+  return {
+    progressRevision,
+    notebookResetRevision: 0,
+    recordedNodeCount: 0,
+    startedNodeIds: new Set(),
+    completedNodeIds: new Set(),
+    masteredNodeIds: new Set(),
+    skippedReasons: new Map(),
+  };
+}
+
+export function studiedNodes(progress: LearningProgress): Set<string> {
+  return new Set([...progress.startedNodeIds, ...progress.completedNodeIds, ...progress.masteredNodeIds]);
 }
 
 export function recordedNodes(progress: LearningProgress): Set<string> {
-  return new Set([...progress.startedNodeIds, ...progress.completedNodeIds, ...progress.skippedReasons.keys()]);
+  return new Set([...studiedNodes(progress), ...progress.skippedReasons.keys()]);
 }
 
 export function prerequisiteMet(progress: LearningProgress, nodeId: string): boolean {
-  return progress.completedNodeIds.has(nodeId) || progress.skippedReasons.has(nodeId);
+  return progress.completedNodeIds.has(nodeId) || progress.masteredNodeIds.has(nodeId);
 }
 
 export function parseProgress(value: unknown, max = MAX_ROUTE_NODES): LearningProgress {
   if (!value || typeof value !== 'object') throw new Error('PLANNING_STORAGE_UNAVAILABLE');
-  const {completedNodeIds, startedNodeIds = [], skippedReasons = {}, progressRevision = 0, notebookResetRevision = 0, recordedNodeCount} = value as Record<string, unknown>;
+  const {
+    completedNodeIds, startedNodeIds = [], masteredNodeIds = [], skippedReasons = {},
+    progressRevision = 0, notebookResetRevision = 0, recordedNodeCount,
+  } = value as Record<string, unknown>;
   const ids = (items: unknown): items is string[] => Array.isArray(items) && items.length <= max
     && items.every((id: unknown) => typeof id === 'string');
-  if (!ids(completedNodeIds) || !ids(startedNodeIds)
+  if (!ids(completedNodeIds) || !ids(startedNodeIds) || !ids(masteredNodeIds)
       || !skippedReasons || typeof skippedReasons !== 'object' || Array.isArray(skippedReasons)
       || typeof progressRevision !== 'number' || !Number.isSafeInteger(progressRevision)
       || progressRevision < 0 || progressRevision > MAX_PROGRESS_REVISION
@@ -43,9 +59,11 @@ export function parseProgress(value: unknown, max = MAX_ROUTE_NODES): LearningPr
   // retain nonempty legacy values without inventing an explanation.
   if (skipped.length > max || !skipped.every(([, reason]) => typeof reason === 'string'
       && reason.length <= MAX_SKIP_REASON_LENGTH)) throw new Error('PLANNING_STORAGE_UNAVAILABLE');
+  const completed = new Set(completedNodeIds);
   const result = {
     progressRevision, notebookResetRevision, recordedNodeCount: 0, startedNodeIds: new Set([...startedNodeIds, ...completedNodeIds]),
-    completedNodeIds: new Set(completedNodeIds), skippedReasons: new Map<string, string>(skipped),
+    completedNodeIds: completed, masteredNodeIds: new Set(masteredNodeIds.filter(id => !completed.has(id))),
+    skippedReasons: new Map<string, string>(skipped),
   };
   const count = recordedNodes(result).size;
   if (recordedNodeCount !== undefined && (typeof recordedNodeCount !== 'number' || !Number.isSafeInteger(recordedNodeCount)
@@ -61,6 +79,7 @@ export function currentProgress(history: LearningProgress, ids: Set<string>): Le
     recordedNodeCount: history.recordedNodeCount,
     startedNodeIds: new Set([...history.startedNodeIds].filter(id => ids.has(id))),
     completedNodeIds: new Set([...history.completedNodeIds].filter(id => ids.has(id))),
-    skippedReasons: new Map([...history.skippedReasons].filter(([id]) => ids.has(id) && !history.completedNodeIds.has(id))),
+    masteredNodeIds: new Set([...history.masteredNodeIds].filter(id => ids.has(id) && !history.completedNodeIds.has(id))),
+    skippedReasons: new Map([...history.skippedReasons].filter(([id]) => ids.has(id) && !prerequisiteMet(history, id))),
   };
 }

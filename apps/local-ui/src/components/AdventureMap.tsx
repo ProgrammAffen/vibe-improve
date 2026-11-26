@@ -8,8 +8,9 @@ import {translate, type Language} from '../i18n';
 import BackHomeButton from './BackHomeButton';
 import GameButton, {GameButtonArt} from './GameButton';
 import GameSelect from './GameSelect';
+import MapBackground from './MapBackground';
 import {projectMapPage, type MapViewport} from './adventure-map-viewport';
-import {FinishFlagArt, LandmarkArt, mapAsset, PawArt, terrainName, TerrainTrail, type MapTerrain} from './adventure-map-art';
+import {FinishFlagArt, LandmarkArt, PawArt, terrainName, TerrainTrail, type MapTerrain} from './adventure-map-art';
 import './adventure-map.css';
 
 type Props = {
@@ -23,12 +24,15 @@ type Props = {
   initialNodeId?: string;
   currentNodeId?: string;
   completedNodeIds?: ReadonlySet<string>;
+  masteredNodeIds?: ReadonlySet<string>;
   skippedReasons?: ReadonlyMap<string, string>;
   onSkipLesson?: (nodeId: string, reason: string) => Promise<boolean>;
+  onMasterLesson?: (nodeId: string) => Promise<boolean>;
 };
 
 type Lesson = {chapter: RouteChapter; node: RouteNode};
-type Status = 'complete' | 'locked' | 'current' | 'ready' | 'skipped';
+type PendingPrerequisite = {node: RouteNode; skipped: boolean};
+type Status = 'complete' | 'mastered' | 'locked' | 'current' | 'ready' | 'skipped';
 type Selection = {anchor: HTMLButtonElement; node: MapNode};
 type Placement = {x: number; y: number; point: number; side: 'left' | 'right' | 'above' | 'below'};
 const EMPTY = new Set<string>();
@@ -72,13 +76,14 @@ function locateCard(anchor: DOMRect, card: DOMRect): Placement {
   return {x, y: boundedY(opensBelow ? anchor.bottom + gap : anchor.top - card.height - gap), point: centerX - x, side: opensBelow ? 'below' : 'above'};
 }
 
-function LandmarkCard({selection, chapter, lesson, unmet, status, completed, skippedReason, terrain, language, startPending, startError, onStart, onSkip, onClose}: {
+function LandmarkCard({selection, chapter, lesson, unmet, status, completed, mastered, skippedReason, terrain, language, startPending, startError, onStart, onSkip, onMaster, onClose}: {
   selection: Selection;
   chapter: RouteChapter;
   lesson?: RouteNode;
-  unmet: Lesson[];
+  unmet: PendingPrerequisite[];
   status?: Status;
   completed: ReadonlySet<string>;
+  mastered: ReadonlySet<string>;
   skippedReason?: string;
   terrain: MapTerrain;
   language: Language;
@@ -86,17 +91,23 @@ function LandmarkCard({selection, chapter, lesson, unmet, status, completed, ski
   startError?: string;
   onStart: (nodeId: string) => void;
   onSkip?: Props['onSkipLesson'];
+  onMaster?: Props['onMasterLesson'];
   onClose: (restoreFocus?: boolean) => void;
 }) {
   const card = useRef<HTMLElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
-  const skipSaving = useRef(false);
+  const saveInFlight = useRef(false);
   const close = useRef(onClose);
   const [placement, setPlacement] = useState<Placement>();
   const [skipMode, setSkipMode] = useState<'view' | 'confirm' | 'saving'>('view');
   const [skipFailed, setSkipFailed] = useState(false);
+  const [masteryPending, setMasteryPending] = useState(false);
+  const [masteryFailed, setMasteryFailed] = useState(false);
   const canSkip = !!onSkip && (status === 'current' || status === 'ready');
-  const canStart = status === 'complete' || unmet.length === 0;
+  const finished = status === 'complete' || status === 'mastered';
+  const canStart = finished || unmet.length === 0;
+  const canMaster = !!onMaster && canStart && !finished;
+  const pending = skipMode === 'saving' || masteryPending || startPending;
   close.current = onClose;
   useLayoutEffect(() => {
     const element = card.current;
@@ -130,14 +141,14 @@ function LandmarkCard({selection, chapter, lesson, unmet, status, completed, ski
 
   async function confirmSkip(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!lesson || !onSkip || !canSkip || skipSaving.current) return;
-    skipSaving.current = true;
+    if (!lesson || !onSkip || !canSkip || saveInFlight.current || startPending) return;
+    saveInFlight.current = true;
     setSkipMode('saving');
     setSkipFailed(false);
     let saved = false;
     try { saved = await onSkip(lesson.id, ''); }
     catch { saved = false; }
-    finally { skipSaving.current = false; }
+    finally { saveInFlight.current = false; }
     if (saved) dismissSkip();
     else {
       setSkipFailed(true);
@@ -145,15 +156,30 @@ function LandmarkCard({selection, chapter, lesson, unmet, status, completed, ski
     }
   }
 
+  async function markMastered() {
+    if (!lesson || !onMaster || !canMaster || pending || saveInFlight.current) return;
+    saveInFlight.current = true;
+    setMasteryFailed(false);
+    setMasteryPending(true);
+    try {
+      setMasteryFailed(!await onMaster(lesson.id));
+    } catch {
+      setMasteryFailed(true);
+    } finally {
+      saveInFlight.current = false;
+      setMasteryPending(false);
+    }
+  }
+
   useEffect(() => {
     function handlePointer(event: PointerEvent) {
-      if (skipSaving.current || startPending) return;
+      if (saveInFlight.current || startPending) return;
       if (event.target instanceof Element && !card.current?.contains(event.target) && !event.target.closest('.adventure-marker')) close.current(false);
     }
     function handleEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault();
-        if (skipSaving.current || startPending) return;
+        if (saveInFlight.current || startPending) return;
         if (skipMode === 'confirm') dismissSkip();
         else close.current(true);
       }
@@ -166,7 +192,7 @@ function LandmarkCard({selection, chapter, lesson, unmet, status, completed, ski
     };
   }, [skipMode, startPending]);
 
-  const chapterProgress = learningProgressSummary(chapter.nodes, completed);
+  const chapterProgress = learningProgressSummary(chapter.nodes, completed, mastered);
   const style = {
     left: placement?.x,
     top: placement?.y,
@@ -174,25 +200,27 @@ function LandmarkCard({selection, chapter, lesson, unmet, status, completed, ski
     '--adventure-card-point': `${placement?.point ?? 0}px`,
   } as CSSProperties;
   return createPortal(
-    <section ref={card} className="adventure-card" data-map-terrain={terrain} data-side={placement?.side} style={style}
-      role="dialog" aria-labelledby="adventure-card-title" aria-busy={skipMode === 'saving' || startPending || undefined}>
+    <section ref={card} className="adventure-card" data-map-terrain={terrain} data-side={placement?.side} data-view={skipMode === 'view' ? 'details' : 'skip'} style={style}
+      role="dialog" aria-labelledby="adventure-card-title" aria-busy={pending || undefined}>
       <div className="adventure-card-content">
         <header>
           <div>
             {lesson && <p className="adventure-card-chapter">{chapter.title}</p>}
-            <h2 ref={heading} id="adventure-card-title" tabIndex={-1}>{lesson?.title ?? chapter.title}</h2>
+            <h2 ref={heading} id="adventure-card-title" tabIndex={-1} title={lesson?.title ?? chapter.title}>{lesson?.title ?? chapter.title}</h2>
           </div>
-          <button className="adventure-card-close" aria-label={translate(language, '关闭', 'Close')} disabled={skipMode === 'saving' || startPending} onClick={() => onClose(true)}><X size={21}/></button>
+          <button className="adventure-card-close" aria-label={translate(language, '关闭', 'Close')} disabled={pending} onClick={() => onClose(true)}><X size={21}/></button>
         </header>
+        {skipMode !== 'view' ? <SkipLessonConfirmation language={language} saving={skipMode === 'saving'} failed={skipFailed} canSkip={canSkip} onConfirm={confirmSkip} onCancel={dismissSkip}/> : <>
         <div className="adventure-card-details" tabIndex={0}>
-          {skipMode !== 'view' ? <SkipLessonConfirmation language={language} saving={skipMode === 'saving'} failed={skipFailed} canSkip={canSkip} onConfirm={confirmSkip} onCancel={dismissSkip}/> : lesson ? <>
+          {lesson ? <>
             <p className="adventure-card-meta"><Clock3 size={16} aria-hidden="true"/>{translate(language, `${lesson.estimatedMinutes} 分钟`, `${lesson.estimatedMinutes} min`)}
               <span className="adventure-card-state">{isRequiredLesson(lesson)?translate(language, '必学', 'Required'):translate(language, '选学', 'Elective')}</span>
               {status === 'complete' && <span className="adventure-card-state"><Check size={16} aria-hidden="true"/>{translate(language, '已完成', 'Completed')}</span>}
+              {status === 'mastered' && <span className="adventure-card-state" role="status"><Check size={16} aria-hidden="true"/>{translate(language, '已掌握', 'Mastered')}</span>}
               {status === 'locked' && <span className="adventure-card-state"><LockKeyhole size={14} aria-hidden="true"/>{translate(language, '未解锁', 'Locked')}</span>}
               {status === 'skipped' && <span className="adventure-card-state adventure-card-skipped" role="status"><SkipForward size={16} aria-hidden="true"/>{translate(language, '已跳过', 'Skipped')}</span>}
             </p>
-            {status === 'skipped' && skippedReason && <div className="adventure-card-objectives adventure-card-skip-reason">
+            {skippedReason && <div className="adventure-card-objectives adventure-card-skip-reason">
               <h3>{translate(language, '跳过原因', 'Reason for skipping')}</h3>
               <p>{skippedReason}</p>
             </div>}
@@ -202,35 +230,48 @@ function LandmarkCard({selection, chapter, lesson, unmet, status, completed, ski
             </div>}
             {!canStart && <div className="adventure-card-objectives">
               <h3>{translate(language, '前置小节待处理', 'Pending prerequisites')}</h3>
-              <ul>{unmet.map(item => <li key={item.node.id}>{item.node.title}</li>)}</ul>
+              <ul>{unmet.map(item => <li key={item.node.id}>
+                {item.node.title}{' · '}
+                <span className="adventure-card-prerequisite-status">
+                  {item.skipped ? translate(language, '已跳过', 'Skipped') : translate(language, '未完成', 'Incomplete')}
+                </span>
+              </li>)}</ul>
             </div>}
-            {startError&&<p className="adventure-card-skip-error" role="alert">{startError}</p>}
+            {masteryFailed
+              ? <p className="adventure-card-skip-error" role="alert">{translate(language, '未能保存掌握状态，请重试。', 'Could not save mastery. Try again.')}</p>
+              : startError && <p className="adventure-card-skip-error" role="alert">{startError}</p>}
           </> : <>
             {chapter.stageGoal && <p className="adventure-card-goal">{chapter.stageGoal}</p>}
-            <p className="adventure-card-meta"><Check size={16} aria-hidden="true"/>{chapterProgress.optionalOnly ? translate(language, `选学 ${chapterProgress.completed} / ${chapterProgress.total} 节已完成`, `${chapterProgress.completed} / ${chapterProgress.total} elective lessons completed`) : translate(language, `必学 ${chapterProgress.completed} / ${chapterProgress.total} 节已完成`, `${chapterProgress.completed} / ${chapterProgress.total} required lessons completed`)}</p>
+            <p className="adventure-card-meta"><Check size={16} aria-hidden="true"/>{chapterProgress.optionalOnly
+              ? translate(language, `选学进度 ${chapterProgress.completed} / ${chapterProgress.total}`, `Elective progress ${chapterProgress.completed} / ${chapterProgress.total}`)
+              : translate(language, `必学进度 ${chapterProgress.completed} / ${chapterProgress.total}`, `Required progress ${chapterProgress.completed} / ${chapterProgress.total}`)}</p>
           </>}
         </div>
-        {lesson && skipMode === 'view' && <div className="adventure-card-actions">
-            {canSkip && <GameButton variant="secondary" disabled={startPending} onClick={() => setSkipMode('confirm')}>{translate(language, '跳过本节', 'Skip lesson')}</GameButton>}
-            <GameButton className="adventure-card-start" disabled={!canStart || startPending} onClick={() => onStart(lesson.id)}>
+        {lesson && <div className="adventure-card-actions adventure-card-lesson-actions">
+            {canSkip && <GameButton variant="secondary" disabled={pending} onClick={() => setSkipMode('confirm')}>{translate(language, '跳过本节', 'Skip lesson')}</GameButton>}
+            <GameButton variant="secondary" disabled={!canMaster || pending} onClick={() => void markMastered()}>
+              {masteryPending ? translate(language, '保存中…', 'Saving…') : translate(language, '已掌握', 'Already mastered')}
+            </GameButton>
+            <GameButton className="adventure-card-start" disabled={!canStart || pending} onClick={() => onStart(lesson.id)}>
               {startPending ? translate(language, '正在开始…', 'Starting…') : status === 'skipped' ? translate(language, '补学本节', 'Study lesson') : translate(language, '开始学习', 'Start learning')}
             </GameButton>
         </div>}
+        </>}
       </div>
     </section>,
     document.body,
   );
 }
 
-export function AdventureMap({route, language, onStartLesson, startPending=false, startError, onEdit, onBack, initialNodeId, currentNodeId, completedNodeIds = EMPTY, skippedReasons = NO_SKIPS, onSkipLesson}: Props) {
+export function AdventureMap({route, language, onStartLesson, startPending=false, startError, onEdit, onBack, initialNodeId, currentNodeId, completedNodeIds = EMPTY, masteredNodeIds = EMPTY, skippedReasons = NO_SKIPS, onSkipLesson, onMasterLesson}: Props) {
   const {lessons, chapters} = useMemo(() => ({
     lessons: new Map(route.chapters.flatMap(chapter => chapter.nodes.map(node => [node.id, {chapter, node}] as const))),
     chapters: new Map(route.chapters.map(chapter => [chapter.id, chapter] as const)),
   }), [route.chapters]);
   const pages = useMemo(() => createRouteMapPages(route), [route]);
-  const handled = (id: string) => completedNodeIds.has(id) || skippedReasons.has(id);
+  const satisfied = (id: string) => completedNodeIds.has(id) || masteredNodeIds.has(id);
   const dependencies = useMemo(() => new Map([...lessons.values()].map(({node}) => [node.id, learningPrerequisiteIds(route, node.id)])), [route, lessons]);
-  const isNext = (node: RouteNode) => !handled(node.id) && (dependencies.get(node.id) ?? []).every(handled);
+  const isNext = (node: RouteNode) => !satisfied(node.id) && !skippedReasons.has(node.id) && (dependencies.get(node.id) ?? []).every(satisfied);
   const current = currentNodeId ? lessons.get(currentNodeId)?.node : undefined;
   const available = Array.from(lessons.values()).filter(({node}) => isNext(node));
   const suggested = current && isNext(current) ? current.id : (available.find(({node}) => isRequiredLesson(node)) ?? available[0])?.node.id;
@@ -266,20 +307,21 @@ export function AdventureMap({route, language, onStartLesson, startPending=false
   const page = projected?.page;
   const markers = useMemo(() => page?.nodes.map(node => ({node, placement: pawPlacement(page, node)})) ?? [], [page]);
   const terrain = page?.themeId ?? 'grassland';
-  const progress = learningProgressSummary([...lessons.values()].map(({node}) => node), completedNodeIds);
+  const progress = learningProgressSummary([...lessons.values()].map(({node}) => node), completedNodeIds, masteredNodeIds);
   const selectedLesson = selection?.node.kind === 'lesson' ? lessons.get(selection.node.id) : undefined;
   const selectedChapter = selectedLesson?.chapter ?? (selection?.node.kind === 'chapter' ? chapters.get(selection.node.id) : undefined);
   const unmet = (lesson: RouteNode) => (dependencies.get(lesson.id) ?? []).flatMap(id => {
     const prerequisite = lessons.get(id);
-    return prerequisite && !handled(id) ? [prerequisite] : [];
+    return prerequisite && !satisfied(id) ? [{node: prerequisite.node, skipped: skippedReasons.has(id)}] : [];
   });
   const status = (lesson: RouteNode): Status => {
     if (completedNodeIds.has(lesson.id)) return 'complete';
-    if (skippedReasons.has(lesson.id)) return 'skipped';
+    if (masteredNodeIds.has(lesson.id)) return 'mastered';
     if (unmet(lesson).length) return 'locked';
+    if (skippedReasons.has(lesson.id)) return 'skipped';
     return lesson.id === suggested ? 'current' : 'ready';
   };
-  const statusLabels = {complete: ['已完成', 'Completed'], locked: ['未解锁', 'Locked'], current: ['当前小节', 'Current lesson'], ready: ['可学习', 'Available'], skipped: ['已跳过', 'Skipped']} as const;
+  const statusLabels = {complete: ['已完成', 'Completed'], mastered: ['已掌握', 'Mastered'], locked: ['未解锁', 'Locked'], current: ['当前小节', 'Current lesson'], ready: ['可学习', 'Available'], skipped: ['已跳过', 'Skipped']} as const;
   function changePage(index: number) {
     setSelection(undefined);
     setPageChoice(index);
@@ -309,7 +351,7 @@ export function AdventureMap({route, language, onStartLesson, startPending=false
     {page ? <>
       <div className="adventure-board-scroller" ref={scroller}>
         <div ref={board} className="adventure-board" role="region" aria-label={terrainName(terrain, language)}>
-          <img className="adventure-background" src={mapAsset(`${terrain}-background`)} alt="" draggable={false}/>
+          <MapBackground terrain={terrain}/>
           <TerrainTrail page={page} height={projected!.height}/>
           {markers.map(({node, placement}) => {
             const lesson = node.kind === 'lesson' ? lessons.get(node.id)?.node : undefined;
@@ -323,8 +365,9 @@ export function AdventureMap({route, language, onStartLesson, startPending=false
               top: `${placement.top / projected!.height * 100}%`,
               width: `${node.width / WIDTH * 100}%`,
               height: `${node.height / projected!.height * 100}%`,
+              '--map-marker-scale': node.artworkScale ?? 1,
               zIndex: Math.round(node.y),
-            };
+            } as CSSProperties;
             return <button key={node.key} type="button" className="adventure-marker" style={style} disabled={startPending}
               aria-label={lesson ? `${lesson.title} · ${label}` : `${chapterTitle} · ${chapter?.title}`}
               aria-haspopup="dialog" aria-expanded={selection?.node === node} data-kind={node.kind} data-status={state}
@@ -337,9 +380,9 @@ export function AdventureMap({route, language, onStartLesson, startPending=false
               }}>
               <span className="adventure-terrain-contact" aria-hidden="true"/>
               {chapter ? <LandmarkArt terrain={terrain} node={node} language={language}/>
-                : <PawArt terrain={terrain} placement={placement} gold={state === 'complete' || state === 'skipped'}/>}
+                : <PawArt terrain={terrain} placement={placement} darkened={state === 'complete' || state === 'mastered' || state === 'skipped'}/>}
               {state && state !== 'ready' && <span className="adventure-marker-badge" aria-hidden="true">
-                {state === 'complete' ? <Check/> : state === 'skipped' ? <SkipForward/> : state === 'locked' ? <LockKeyhole/> : <MapPin/>}
+                {state === 'complete' || state === 'mastered' ? <Check/> : state === 'skipped' ? <SkipForward/> : state === 'locked' ? <LockKeyhole/> : <MapPin/>}
               </span>}
             </button>;
           })}
@@ -363,11 +406,11 @@ export function AdventureMap({route, language, onStartLesson, startPending=false
       </nav>
     </> : <p className="adventure-map-empty">{translate(language, '暂无学习小节', 'No lessons yet')}</p>}
     {selection && selectedChapter && <LandmarkCard key={selection.node.key} selection={selection} chapter={selectedChapter}
-      lesson={selectedLesson?.node} completed={completedNodeIds} unmet={selectedLesson ? unmet(selectedLesson.node) : []}
+      lesson={selectedLesson?.node} completed={completedNodeIds} mastered={masteredNodeIds} unmet={selectedLesson ? unmet(selectedLesson.node) : []}
       skippedReason={selectedLesson && skippedReasons.get(selectedLesson.node.id)} status={selectedLesson && status(selectedLesson.node)}
       terrain={terrain} language={language} startPending={startPending&&selectedLesson?.node.id===startingLessonId}
       startError={selectedLesson?.node.id===startingLessonId?startError:undefined}
-      onStart={nodeId=>{setStartingLessonId(nodeId);onStartLesson(nodeId)}} onSkip={onSkipLesson} onClose={closeCard}/>}
+      onStart={nodeId=>{setStartingLessonId(nodeId);onStartLesson(nodeId)}} onSkip={onSkipLesson} onMaster={onMasterLesson} onClose={closeCard}/>}
   </section>;
 }
 

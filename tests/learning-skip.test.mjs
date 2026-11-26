@@ -21,7 +21,8 @@ await build({
         const fixture=globalThis.__skipFixture;
         return work({state:structuredClone(fixture.state),progress:parseProgress(JSON.parse(JSON.stringify(fixture.record))),
           saveProgress(next){fixture.record={progressRevision:next.progressRevision,notebookResetRevision:next.notebookResetRevision,
-            startedNodeIds:[...next.startedNodeIds],completedNodeIds:[...next.completedNodeIds],skippedReasons:Object.fromEntries(next.skippedReasons)};},
+            startedNodeIds:[...next.startedNodeIds],completedNodeIds:[...next.completedNodeIds],
+            masteredNodeIds:[...next.masteredNodeIds],skippedReasons:Object.fromEntries(next.skippedReasons)};},
           savePlan(next){fixture.state=next;}});
       }`}));
   }}],
@@ -32,7 +33,7 @@ const node = (id,prerequisites=[])=>({id,title:id,objectives:[{id:'goal',descrip
 const route = {format:'vibe-improve.route',schemaVersion:2,id:'synthetic-skip',revision:1,title:'Synthetic skip route',locale:'en',sourceLanguage:'en',
   chapters:[{id:'chapter',title:'Chapter',stageGoal:'Practice the ideas.',nodes:[node('a'),node('b',['a']),node('legacy')]}]};
 
-test('no-reason skipping survives progress serialization, stays idempotent and unlocks the next lesson', async () => {
+test('no-reason skipping stays idempotent and requires later completion to unlock a dependent lesson', async () => {
   globalThis.window = {};
   globalThis.__skipFixture = {state:confirmRoute(createPlanning(project,null,'en',route),0),record:{progressRevision:0,notebookResetRevision:0,
     startedNodeIds:[],completedNodeIds:[],skippedReasons:{legacy:'Kept from an older version'}}};
@@ -40,7 +41,7 @@ test('no-reason skipping survives progress serialization, stays idempotent and u
   assert.equal(saved.progressRevision,1);
   assert.equal(saved.skippedReasons.has('a'),true);
   assert.equal(saved.skippedReasons.get('a'),'');
-  assert.equal(prerequisiteMet(saved,'a'),true);
+  assert.equal(prerequisiteMet(saved,'a'),false);
   assert.deepEqual([...saved.completedNodeIds],[]);
   const reopened = await learningService.read(project,route);
   assert.equal(reopened.skippedReasons.has('a'),true);
@@ -48,9 +49,11 @@ test('no-reason skipping survives progress serialization, stays idempotent and u
   const repeat = await learningService.skip(project,route,'a','Do not replace',saved.progressRevision);
   assert.equal(repeat.progressRevision,saved.progressRevision);
   assert.equal(repeat.skippedReasons.get('a'),'');
-  const next = await learningService.start(project,route,'b',reopened.progressRevision);
-  assert.equal(next.startedNodeIds.has('b'),true);
-  const started = await learningService.start(project,route,'a',next.progressRevision);
+  await assert.rejects(learningService.start(project,route,'b',reopened.progressRevision),/PLANNING_CONFLICT/);
+  await assert.rejects(learningService.skip(project,route,'b','',reopened.progressRevision),/PLANNING_CONFLICT/);
+  const started = await learningService.start(project,route,'a',reopened.progressRevision);
+  assert.equal(prerequisiteMet(started,'a'),false);
+  await assert.rejects(learningService.start(project,route,'b',started.progressRevision),/PLANNING_CONFLICT/);
   const complete = await learningService.complete(project,route,'a',started.progressRevision);
   assert.equal(complete.completedNodeIds.has('a'),true);
   assert.equal(complete.skippedReasons.has('a'),false);
@@ -60,5 +63,53 @@ test('no-reason skipping survives progress serialization, stays idempotent and u
   assert.equal(again.skippedReasons.has('a'),false);
   await assert.rejects(learningService.skip(project,route,'a','',again.progressRevision),/PLANNING_CONFLICT/);
   await assert.rejects(learningService.skip(project,route,'b','x'.repeat(241),again.progressRevision),/PLANNING_INVALID/);
+  const next = await learningService.start(project,route,'b',again.progressRevision);
+  assert.equal(next.startedNodeIds.has('b'),true);
   delete globalThis.__skipFixture;delete globalThis.window;
+});
+
+test('self-marking mastery removes a skip without creating a study session and survives reopening', async t => {
+  globalThis.window = {};
+  globalThis.__skipFixture = {state:confirmRoute(createPlanning(project,null,'en',route),0),record:{
+    progressRevision:3, startedNodeIds:[], completedNodeIds:[], skippedReasons:{a:'An older skip'},
+  }};
+  t.after(() => {delete globalThis.__skipFixture;delete globalThis.window;});
+
+  const legacy = await learningService.read(project,route);
+  assert.deepEqual([...legacy.masteredNodeIds],[]);
+  assert.equal(legacy.skippedReasons.get('a'),'An older skip');
+  await assert.rejects(learningService.master(project,route,'b',3),/PLANNING_CONFLICT/);
+  await assert.rejects(learningService.master(project,route,'a',2),/PLANNING_CONFLICT/);
+  const marked = await learningService.master(project,route,'a',3);
+  assert.equal(marked.progressRevision,4);
+  assert.equal(marked.recordedNodeCount,1);
+  assert.equal(marked.skippedReasons.has('a'),false);
+  assert.equal(marked.startedNodeIds.has('a'),false);
+  assert.equal(marked.completedNodeIds.has('a'),false);
+  assert.equal(prerequisiteMet(marked,'a'),true);
+
+  const reopened = await learningService.read(project,route);
+  assert.deepEqual([...reopened.masteredNodeIds],['a']);
+  assert.equal((await learningService.master(project,route,'a',4)).progressRevision,4);
+  await assert.rejects(learningService.skip(project,route,'a','',4),/PLANNING_CONFLICT/);
+  const dependent = await learningService.start(project,route,'b',4);
+  assert.equal(dependent.startedNodeIds.has('b'),true);
+  const started = await learningService.start(project,route,'a',dependent.progressRevision);
+  const completed = await learningService.complete(project,route,'a',started.progressRevision);
+  assert.deepEqual([...completed.masteredNodeIds],[]);
+  assert.deepEqual([...completed.completedNodeIds],['a']);
+  assert.equal(prerequisiteMet(completed,'a'),true);
+});
+
+test('learningService sends the same revision and IDs for a native mastery write', async t => {
+  const calls = [];
+  globalThis.window = {vibeNative:{projects:{request:async (...args) => {
+    calls.push(args);
+    return {progressRevision:8, startedNodeIds:[], completedNodeIds:[], masteredNodeIds:['a','outside-current-route']};
+  }}}};
+  t.after(() => {delete globalThis.window;});
+  const saved = await learningService.master(project,route,'a',7);
+  assert.deepEqual(calls,[['planning.learning.master',{projectId:project,routeId:route.id,routeRevision:route.revision,nodeId:'a',progressRevision:7}]]);
+  assert.deepEqual([...saved.masteredNodeIds],['a']);
+  assert.equal(saved.recordedNodeCount,2);
 });

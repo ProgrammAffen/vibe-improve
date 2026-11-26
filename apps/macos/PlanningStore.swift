@@ -14,6 +14,7 @@ final class PlanningStore {
     enum LearningChange {
         case start(String)
         case complete(String)
+        case master(String)
         case skip(String, reason: String)
         case reset
     }
@@ -21,12 +22,13 @@ final class PlanningStore {
     private struct LearningProgress: Codable {
         let routeId: String
         var completedNodeIds: Set<String>
+        var masteredNodeIds: Set<String>?
         var skippedReasons: [String: String]?
         var startedNodeIds: Set<String>?
         var progressRevision: Int?
         var notebookResetRevision: Int?
 
-        var studiedNodeIds: Set<String> { completedNodeIds.union(startedNodeIds ?? []) }
+        var studiedNodeIds: Set<String> { completedNodeIds.union(startedNodeIds ?? []).union(masteredNodeIds ?? []) }
         var revision: Int { progressRevision ?? 0 }
     }
 
@@ -118,8 +120,9 @@ final class PlanningStore {
             let ids = Set(nodes.compactMap { $0["id"] as? String })
             let location = try learningLocation(projectID, routeID)
             var progress = try readProgress(location.directory, location.name, routeID: routeID)
-            var started = progress.studiedNodeIds
             var completed = progress.completedNodeIds
+            var started = completed.union(progress.startedNodeIds ?? [])
+            var mastered = (progress.masteredNodeIds ?? []).subtracting(completed)
             var skipped = progress.skippedReasons ?? [:]
             var changed = false
             if let change {
@@ -129,6 +132,7 @@ final class PlanningStore {
                     guard state["pending"] == nil else { throw PlanningError.busy }
                     started.removeAll()
                     completed.removeAll()
+                    mastered.removeAll()
                     skipped.removeAll()
                     progress.notebookResetRevision = progress.revision + 1
                     changed = true
@@ -136,12 +140,13 @@ final class PlanningStore {
                     guard state["confirmedRevision"] as? Int == revision else { throw PlanningError.conflict }
                     let nodeID: String
                     switch change {
-                    case .start(let id), .complete(let id), .skip(let id, _): nodeID = id
+                    case .start(let id), .complete(let id), .master(let id), .skip(let id, _): nodeID = id
                     case .reset: throw PlanningError.invalid
                     }
                     guard nodes.contains(where: { $0["id"] as? String == nodeID }),
-                          let required = try invoke("learningPrerequisiteIds", [route, nodeID])?.toArray() as? [String],
-                          completed.contains(nodeID) || required.allSatisfy({ completed.contains($0) || skipped[$0] != nil })
+                          let prerequisites = try invoke("learningPrerequisiteIds", [route, nodeID])?.toArray() as? [String],
+                          completed.contains(nodeID) || mastered.contains(nodeID) ||
+                          prerequisites.allSatisfy({ completed.contains($0) || mastered.contains($0) })
                           else { throw PlanningError.conflict }
                     switch change {
                     case .start:
@@ -149,11 +154,17 @@ final class PlanningStore {
                     case .complete:
                         guard started.contains(nodeID) else { throw PlanningError.conflict }
                         let wasSkipped = skipped.removeValue(forKey: nodeID) != nil
-                        changed = completed.insert(nodeID).inserted || wasSkipped
+                        let wasMastered = mastered.remove(nodeID) != nil
+                        changed = completed.insert(nodeID).inserted || wasSkipped || wasMastered
+                    case .master:
+                        if !completed.contains(nodeID) {
+                            let wasSkipped = skipped.removeValue(forKey: nodeID) != nil
+                            changed = mastered.insert(nodeID).inserted || wasSkipped
+                        }
                     case .skip(_, let rawReason):
                         let reason = rawReason.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard reason.utf16.count <= 240 else { throw PlanningError.invalid }
-                        guard !completed.contains(nodeID) else { throw PlanningError.conflict }
+                        guard !completed.contains(nodeID), !mastered.contains(nodeID) else { throw PlanningError.conflict }
                         changed = skipped[nodeID] == nil
                         if changed { skipped[nodeID] = reason }
                     case .reset: throw PlanningError.invalid
@@ -164,6 +175,7 @@ final class PlanningStore {
                     progress.progressRevision = progress.revision + 1
                     progress.startedNodeIds = started
                     progress.completedNodeIds = completed
+                    progress.masteredNodeIds = mastered
                     progress.skippedReasons = skipped
                     let data = try JSONEncoder().encode(progress)
                     guard data.count <= maximumBytes else { throw PlanningError.large }
@@ -173,10 +185,11 @@ final class PlanningStore {
             return [
                 "progressRevision": progress.revision,
                 "notebookResetRevision": progress.notebookResetRevision ?? 0,
-                "recordedNodeCount": started.union(skipped.keys).count,
+                "recordedNodeCount": started.union(mastered).union(skipped.keys).count,
                 "startedNodeIds": started.intersection(ids).sorted(),
                 "completedNodeIds": completed.intersection(ids).sorted(),
-                "skippedReasons": skipped.filter { ids.contains($0.key) && !completed.contains($0.key) },
+                "masteredNodeIds": mastered.intersection(ids).sorted(),
+                "skippedReasons": skipped.filter { ids.contains($0.key) && !completed.contains($0.key) && !mastered.contains($0.key) },
             ]
         }
     }

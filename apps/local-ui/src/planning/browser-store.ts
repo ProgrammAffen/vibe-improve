@@ -85,6 +85,7 @@ export async function browserProjectTransaction<T>(projectId: string, work: (val
               if (!routeId) throw new Error('PLANNING_CONFLICT');
               const record = {projectId, routeId, progressRevision: next.progressRevision, notebookResetRevision: next.notebookResetRevision,
                 startedNodeIds: [...next.startedNodeIds], completedNodeIds: [...next.completedNodeIds],
+                masteredNodeIds: [...next.masteredNodeIds],
                 skippedReasons: Object.fromEntries(next.skippedReasons)};
               if (JSON.stringify(record).length > MAX_PROGRESS_SIZE) throw new Error('PLANNING_TOO_LARGE');
               learning.put(record);

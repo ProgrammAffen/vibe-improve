@@ -19,6 +19,8 @@ import type { LessonIdentity, LessonSource } from "./types";
 import type { ResourceItem } from "../resources/service";
 import { resourceService, timecode } from "../resources/service";
 import { translate, type Language } from "../i18n";
+import LessonWebPage from "./LessonWebPage";
+import type { WebAnnotations } from "./web-notes";
 
 GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -171,19 +173,27 @@ export default function LessonResource({
   item,
   language,
   onQuote,
+  workspaceRevision,
+  webAnnotations,
 }: {
   identity: LessonIdentity;
   item: ResourceItem;
   language: Language;
   onQuote: (source: LessonSource) => void;
+  workspaceRevision?: number;
+  webAnnotations?: WebAnnotations;
 }) {
   const [preview, setPreview] = useState<{
     url: string;
     mimeType: string;
     name: string;
   }>();
-  const [error, setError] = useState(""),
+  const [previewFailed, setPreviewFailed] = useState(false),
+    [openFailed, setOpenFailed] = useState(false),
     [plain, setPlain] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  const revision = useRef(workspaceRevision ?? 0), requestedAt = useRef(0);
+  revision.current = workspaceRevision ?? 0;
   const [start, setStart] = useState<number>(),
     [end, setEnd] = useState<number>();
   const media = useRef<HTMLMediaElement>(null),
@@ -192,6 +202,8 @@ export default function LessonResource({
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
+    requestedAt.current = revision.current;
+    setPreviewFailed(false);
     void lessonService
       .preview(identity, item)
       .then(async (value) => {
@@ -209,15 +221,7 @@ export default function LessonResource({
           if (active) setPlain(text);
         }
       })
-      .catch(() => {
-        if (active)
-          setError(
-            t(
-              "此资料可通过原件查看。",
-              "Open the original to view this resource.",
-            ),
-          );
-      });
+      .catch(() => { if (active) setPreviewFailed(true); });
     return () => {
       active = false;
       controller.abort();
@@ -228,24 +232,23 @@ export default function LessonResource({
     identity.nodeId,
     item.id,
     item.version,
+    attempt,
   ]);
+  useEffect(() => {
+    // A newly inserted link may first be eligible for preview after workspace autosave.
+    if (item.format === 'web' && previewFailed && revision.current > requestedAt.current)
+      setAttempt(value => value + 1);
+  }, [item.format, previewFailed, workspaceRevision]);
   const openOriginal = () => {
-    setError("");
+    setOpenFailed(false);
     void resourceService
       .open(identity.projectId, item)
-      .catch(() =>
-        setError(
-          t(
-            "原件不可用，请重新添加资料。",
-            "The original is unavailable. Add the resource again.",
-          ),
-        ),
-      );
+      .catch(() => setOpenFailed(true));
   };
   const isMedia = preview && /^(audio|video)\//.test(preview.mimeType);
   return (
     <div className="notebook-resource-preview">
-      {!preview && !error && (
+      {!preview && !previewFailed && (
         <p className="notebook-loading">
           <LoaderCircle />
           {t("正在打开资料…", "Opening resource…")}
@@ -278,10 +281,7 @@ export default function LessonResource({
         />
       )}
       {preview?.mimeType === "text/uri-list" && (
-        <a href={preview.url} target="_blank" rel="noreferrer">
-          {preview.url}
-          <ExternalLink />
-        </a>
+        <LessonWebPage url={preview.url} title={item.name} language={language} showOpenOriginal={false} annotations={webAnnotations} />
       )}
       {plain && (
         <pre className="notebook-plain" ref={copy}>
@@ -345,9 +345,11 @@ export default function LessonResource({
           {t("引用所选文字", "Quote selection")}
         </button>
       )}
-      {error && (
+      {(openFailed || previewFailed) && (
         <p className="notebook-muted" role="status">
-          {error}
+          {openFailed
+            ? t("原件不可用，请重新添加资料。", "The original is unavailable. Add the resource again.")
+            : t("此资料可通过原件查看。", "Open the original to view this resource.")}
         </p>
       )}
       <button className="notebook-inline-action" onClick={openOriginal}>

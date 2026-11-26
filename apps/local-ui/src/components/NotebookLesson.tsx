@@ -48,7 +48,9 @@ import {
   markdownDocument,
 } from "../lesson-editor";
 import LessonResource from "../lesson/LessonResource";
+import LessonWebPage from "../lesson/LessonWebPage";
 import { useLessonWorkspace } from "../lesson/useLessonWorkspace";
+import { webNoteRecord, type WebAnnotations, type WebNote, type WebNoteAction } from "../lesson/web-notes";
 import {
   lessonAgent,
   lessonAgentMessage,
@@ -93,6 +95,7 @@ const sourceLabel = (source: LessonSource | undefined, language: Language) =>
   !source
     ? ""
     : [
+        source.web ? translate(language, "网页摘录", "Page quote") : "",
         source.page
           ? language === "en"
             ? `p. ${source.page}`
@@ -166,6 +169,7 @@ export default function NotebookLesson({
     [chatError, setChatError] = useState("");
   const [working, setWorking] = useState(false),
     [workingStage, setWorkingStage] = useState("");
+  const [finishingTarget, setFinishingTarget] = useState<LessonIdentity | null>(null);
   const [proposal, setProposal] = useState<{
     blockId: string;
     recordId: string;
@@ -190,6 +194,9 @@ export default function NotebookLesson({
     initialized = useRef(false),
     knownSources = useRef(new Set<string>()),
     insertAt = useRef<number | null>(null);
+  const finishingRequest = useRef<LessonIdentity | null>(null),
+    finishIdentity = useRef(identity);
+  finishIdentity.current = identity;
   const current = store.workspace;
   const activeBlock = current?.blocks.find(
     (block) => block.id === selection?.blockId,
@@ -211,7 +218,8 @@ export default function NotebookLesson({
       item,
     ]),
   );
-  const blocked = !current || providerBusy;
+  const interactionLocked = finishingTarget === identity || busy;
+  const blocked = !current || providerBusy || interactionLocked;
   useEffect(() => {
     alive.current = true;
     void planningService.read(projectId).then(
@@ -300,7 +308,7 @@ export default function NotebookLesson({
     change: (block: LessonBlock) => LessonBlock,
   ) {
     setHistory([]);
-    store.update((value) => ({
+    return store.update((value) => ({
       ...value,
       blocks: value.blocks.map((block) =>
         block.id === id ? change(block) : block,
@@ -387,6 +395,38 @@ export default function NotebookLesson({
       input.current?.focus();
     }
     return record.id;
+  }
+  async function commitWebNote(blockId: string, action: WebNoteAction, note: WebNote) {
+    const workspace = store.current.current;
+    if (!workspace || !alive.current || finishIdentity.current !== identity || finishingRequest.current || interactionLocked)
+      return false;
+    const block = workspace.blocks.find(value => value.id === blockId);
+    if (!block || block.collapsed || (block.kind !== "link" && block.kind !== "resource")) return false;
+    const index = block.records.findIndex(record => record.id === note.id);
+    const previous = block.records[index];
+    if (previous && (previous.kind !== "note" || previous.source?.web?.url !== note.anchor.url)) return false;
+    if (action === "delete" && !previous) return true;
+    const next = action === "save" ? webNoteRecord(note, t("网页笔记", "Page note"), previous) : undefined;
+    const version = changeBlock(blockId, value => {
+      const records = [...value.records];
+      records.splice(previous ? index : records.length, previous ? 1 : 0, ...(next ? [next] : []));
+      return {...value, records};
+    });
+    if (version !== undefined && await store.flushUpdate(version)) return true;
+
+    // Keep the unsaved text in the native editor while preserving unrelated notebook edits.
+    if (alive.current && finishIdentity.current === identity) changeBlock(blockId, value => {
+      const current = value.records.findIndex(record => record.id === note.id);
+      if (next ? value.records[current] !== next : current >= 0) return value;
+      const records = [...value.records];
+      if (current >= 0) records.splice(current, 1);
+      if (previous) records.splice(index, 0, previous);
+      return {...value, records};
+    });
+    return false;
+  }
+  function annotationsFor(block: LessonBlock): WebAnnotations {
+    return {records: block.records, commit: (action, note) => commitWebNote(block.id, action, note)};
   }
   function cite(blockId: string, source: LessonSource) {
     setQuote({
@@ -590,6 +630,7 @@ export default function NotebookLesson({
     }
   }
   async function navigate(action: () => void) {
+    if (finishingRequest.current === identity || busy) return;
     if (working) {
       setNotice(
         t(
@@ -601,6 +642,27 @@ export default function NotebookLesson({
     }
     if ((!store.current.current || await store.flush()) && !composer.trim()) action();
     else setLeave(() => action);
+  }
+  async function finishLesson() {
+    if (finishingRequest.current === identity || !alive.current || busy || working || !current || completed)
+      return;
+    const target = identity;
+    finishingRequest.current = target;
+    setFinishingTarget(target);
+    try {
+      const saved = await store.flush();
+      if (!saved || !alive.current || finishIdentity.current !== target) return;
+      await onComplete();
+    } catch {
+      if (alive.current && finishIdentity.current === target)
+        setNotice(t("保存失败，请重试。", "Could not save progress. Try again."));
+    } finally {
+      if (finishingRequest.current === target) {
+        finishingRequest.current = null;
+        if (alive.current && finishIdentity.current === target)
+          setFinishingTarget(null);
+      }
+    }
   }
   function removeBlock() {
     if (!remove) return;
@@ -694,12 +756,14 @@ export default function NotebookLesson({
           <GameButton
             variant="secondary"
             leadingIcon={<ArrowLeft />}
+            disabled={interactionLocked}
             onClick={() => void navigate(onHome)}
           >
             {t("返回主页", "Home")}
           </GameButton>
           <button
             className="notebook-inline-action"
+            disabled={interactionLocked}
             onClick={() => void navigate(onMap)}
           >
             <ArrowLeft />
@@ -718,12 +782,8 @@ export default function NotebookLesson({
             {saveText}
           </span>
           <GameButton
-            disabled={busy || working || !current || completed}
-            onClick={() =>
-              void store.flush().then((saved) => {
-                if (saved) void onComplete();
-              })
-            }
+            disabled={interactionLocked || working || !current || completed}
+            onClick={() => void finishLesson()}
           >
             {completed
               ? t("已完成", "Completed")
@@ -731,8 +791,8 @@ export default function NotebookLesson({
           </GameButton>
         </div>
       </header>
-      <div className="notebook-layout" style={{gridTemplateColumns: `minmax(0,1fr) 6px minmax(300px,${chatWidth}%)`}}>
-        <main className="notebook-paper">
+      <div className="notebook-layout" inert={interactionLocked} aria-busy={interactionLocked} style={{gridTemplateColumns: `minmax(0,1fr) 6px minmax(300px,${chatWidth}%)`}}>
+        <main className="notebook-paper" data-inline-web-paused={dragging ? "true" : undefined}>
           <div className="notebook-toolbar">
             <RichEditorToolbar
               editor={activeEditor?.isDestroyed ? null : activeEditor}
@@ -945,10 +1005,13 @@ export default function NotebookLesson({
                         (block.resource &&
                         resourceMap.get(resourceKey(block.resource)) ? (
                           <LessonResource
+                            key={resourceKey(block.resource)}
                             identity={identity}
                             item={resourceMap.get(resourceKey(block.resource))!}
                             language={language}
+                            workspaceRevision={current.revision}
                             onQuote={(source) => cite(block.id, source)}
+                            webAnnotations={annotationsFor(block)}
                           />
                         ) : (
                           <p className="notebook-muted">
@@ -958,10 +1021,8 @@ export default function NotebookLesson({
                             )}
                           </p>
                         ))}{" "}
-                      {block.kind === "link" && (
-                        <a href={block.url} target="_blank" rel="noreferrer">
-                          {block.url}
-                        </a>
+                      {block.kind === "link" && block.url && (
+                        <LessonWebPage url={block.url} title={block.title} language={language} annotations={annotationsFor(block)} />
                       )}
                     </div>
                   )}
@@ -1359,14 +1420,14 @@ export default function NotebookLesson({
         </aside>
       </div>
       {(notice || error) && (
-        <div className="notebook-toast" role="status">
-          <span>{notice || error}</span>
-          <button
+        <div className="notebook-toast" role={error ? "alert" : "status"}>
+          <span>{error || notice}</span>
+          {!error && <button
             aria-label={t("关闭提示", "Dismiss")}
             onClick={() => setNotice("")}
           >
             <X />
-          </button>
+          </button>}
         </div>
       )}
       {resourcesOpen && (

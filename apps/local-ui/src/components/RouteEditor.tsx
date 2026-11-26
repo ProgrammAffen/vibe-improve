@@ -6,6 +6,7 @@ import {planningMentionToken,refreshPlanningMentions} from '../../../../packages
 import {routeIssues,type RouteDocument,type RouteChapter,type RouteNode} from '../../../../packages/domain/route-validation.mjs';
 import {messageEditRoutes,routeChanges} from '../../../../packages/domain/route-changes.mjs';
 import {routeOutline,routeTargetPosition,moveRouteItem,moveRouteItemBy} from '../../../../packages/domain/route-order.mjs';
+import {routePrerequisiteOptions,setRoutePrerequisites} from '../../../../packages/domain/route-prerequisites.mjs';
 import {PROVIDERS,type ProviderId} from '../agents/domain';
 import {translate,type Language} from '../i18n';
 import type {AttachmentTarget} from '../resources/service';
@@ -52,7 +53,7 @@ export function RouteEditorSurface({language,state,route,busy=false,working=fals
  const detailLocked=node?studiedNodeIds.has(node.id):chapter?studiedChapters.has(chapter.id):false;
  const detailDisabled=editingDisabled||detailLocked;
  const detailTarget=chapter?{chapterId:chapter.id,...(node?{nodeId:node.id}:{})}:undefined;
- const lockLabel=t('已开始学习 · 只读','Study started · Read only');
+ const lockLabel=t('已有学习进度 · 只读','Learning progress recorded · Read only');
  function respectsLocks(next:RouteDocument|undefined){
   if(!next)return true;
   try{assertStudiedRouteUnchanged(route,next,studiedNodeIds);return true}catch{return false}
@@ -95,6 +96,7 @@ export function RouteEditorSurface({language,state,route,busy=false,working=fals
  function edit(change:(copy:RouteDocument)=>void){if(editingDisabled)return;const copy=structuredClone(route);change(copy);copy.schemaVersion=2;onRoute(copy)}
  function editChapter(change:(item:RouteChapter)=>void){if(chapter&&!detailLocked)edit(copy=>{const item=copy.chapters.find(ch=>ch.id===chapter.id);if(item)change(item)})}
  function editNode(change:(item:RouteNode)=>void){if(node&&!detailLocked)edit(copy=>{const item=copy.chapters.find(ch=>ch.id===chapter?.id)?.nodes.find(n=>n.id===node.id);if(item)change(item)})}
+ function changePrerequisites(values:string[]){if(!node||detailDisabled)return;const next=setRoutePrerequisites(route,node.id,values);if(next!==route)onRoute({...next,schemaVersion:2})}
  function addChapter(after?:string){if(editingDisabled||route.chapters.length>=24)return;const id=newID('chapter');edit(copy=>copy.chapters.splice(after?copy.chapters.findIndex(ch=>ch.id===after)+1:copy.chapters.length,0,{id,title:'',stageGoal:'',nodes:[]}));setSelection({chapterId:id,nodeId:null});setExpanded(old=>new Set(old).add(id))}
  function addNode(ch:RouteChapter,after?:string){if(editingDisabled||ch.nodes.length>=64||nodes.length>=512)return;const id=newID('lesson');edit(copy=>copy.chapters.find(item=>item.id===ch.id)?.nodes.splice(after?ch.nodes.findIndex(n=>n.id===after)+1:ch.nodes.length,0,{id,title:'',objectives:[{id:newID('objective'),description:''}],prerequisites:[],estimatedMinutes:30}));setSelection({chapterId:ch.id,nodeId:id});setExpanded(old=>new Set(old).add(ch.id))}
  function moved(next:RouteDocument,source:PlanningTarget){
@@ -169,7 +171,7 @@ export function RouteEditorSurface({language,state,route,busy=false,working=fals
      {learningRead==='failed'&&onRetryLearning&&<button type="button" className="text-button" disabled={busy} onClick={onRetryLearning}>{t('重试','Retry')}</button>}
     </div>}
     {chapter?<><div className="route-editor-detail-heading"><div><small>{node?t('小章节','Lesson'):t('大章节','Chapter')}</small><h2 title={node?.title??chapter.title}>{selectedPosition?.number??''} {node?.title||chapter.title||t('新章节','New chapter')}</h2></div>{detailTarget&&<EditorIcon label={node?t('删除当前小章','Delete current lesson'):t('删除当前大章','Delete current chapter')} disabled={editingDisabled||removalLocked(detailTarget)} onClick={()=>setRemove(detailTarget)}><Trash2/></EditorIcon>}</div>
-     {detailLocked&&<div className="route-editor-locked"><LockKeyhole aria-hidden="true"/><div><strong>{lockLabel}</strong><p>{t('已开始学习的小节保持只读，可继续编辑未学小节。','Started lessons stay read only. You can edit lessons you have not started.')}</p></div></div>}
+     {detailLocked&&<div className="route-editor-locked"><LockKeyhole aria-hidden="true"/><div><strong>{lockLabel}</strong><p>{t('已开始学习或已掌握的小节保持只读。','Lessons that have been started or marked as mastered are read only.')}</p></div></div>}
      {!detailLocked&&detailTarget&&removalLocked(detailTarget)&&<p className="route-editor-locked">{t('已学小节依赖这里的前置内容，无法删除。','A studied lesson depends on this prerequisite, so it cannot be deleted.')}</p>}
      {node?<>
       <label data-route-field="title" className="route-editor-field"><span>{t('小章名称','Lesson name')}</span><input value={node.title} maxLength={160} disabled={editingDisabled} readOnly={detailLocked} onChange={event=>editNode(n=>{n.title=event.target.value})}/></label>
@@ -179,6 +181,7 @@ export function RouteEditorSurface({language,state,route,busy=false,working=fals
       <div className="route-editor-disclosures">
        <details data-route-section="settings"><summary>{t('其他设置','Other settings')}<ChevronRight/></summary><div className="route-editor-disclosure-body">
         <div data-route-field="requirement" className="route-editor-field"><span>{t('小节性质','Lesson requirement')}</span><GameSelect aria-label={t('小节性质','Lesson requirement')} value={node.requirement??'required'} disabled={detailDisabled} onChange={value=>editNode(n=>{n.requirement=value as 'required'|'optional'})} options={[{value:'required',label:t('必学','Required')},{value:'optional',label:t('选学','Elective')}]}/></div>
+        <div data-route-field="prerequisites" className="route-editor-field route-editor-prerequisites"><span>{t('前置章节','Prerequisites')}</span><GameSelect multiple aria-label={t('前置章节','Prerequisites')} value={node.prerequisites} placeholder={t('无前置章节','No prerequisites')} disabled={detailDisabled} onChange={changePrerequisites} options={routePrerequisiteOptions(route,node.id).map(option=>({value:option.value,disabled:option.disabled,label:option.problem==='missing'?t('已失效的小节','Unavailable lesson'):(option.number+' '+(option.title||t('未命名小节','Untitled lesson')))+(option.problem==='cycle'?t('（会形成循环）',' (would create a cycle)'):option.problem==='self'?t('（当前小节）',' (current lesson)'):'')}))}/></div>
         {incompleteFollowup.length>0&&<div data-route-field="legacyFollowup" className="route-editor-legacy-followup">
          <p>{t('旧测验或复习配置尚未填写完整。','A legacy quiz or review configuration is incomplete.')}</p>
          <button type="button" className="text-button" disabled={detailDisabled} onClick={()=>editNode(n=>{for(const field of incompleteFollowup)delete n[field]})}>{t('移除未完成的旧配置','Remove incomplete legacy configuration')}</button>

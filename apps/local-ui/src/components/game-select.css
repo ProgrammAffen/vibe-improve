@@ -72,6 +72,9 @@
 }
 .game-select-options li > span {flex: 1; min-inline-size: 0; overflow-wrap: anywhere;}
 .game-select-options li > svg {flex: none; inline-size: 1em; block-size: 1em; color: var(--game-select-accent, #536b3b);}
+.game-select-options li > .game-select-checkbox {display: inline-flex; align-items: center; justify-content: center; flex: none; inline-size: 1.1em; block-size: 1.1em; border: 1px solid var(--game-select-edge, #b18b57); border-radius: 3px; background: #fff4d866;}
+.game-select-options li > .game-select-checkbox[data-checked] {background: var(--game-select-accent, #536b3b); border-color: var(--game-select-accent, #536b3b); color: #fff8e8;}
+.game-select-checkbox > svg {inline-size: .9em; block-size: .9em;}
 .game-select-options li[aria-selected='true'] {background: var(--game-select-selected, #dce1ae);}
 .game-select-options li:not([aria-disabled='true']):is([data-active], :hover) {background: var(--game-select-hover, #ead3a2);}
 .game-select-options li[aria-disabled='true'] {opacity: .55; cursor: default;}
